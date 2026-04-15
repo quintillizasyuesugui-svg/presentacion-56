@@ -8,11 +8,12 @@
 <div class="phone-frame">
   <div class="content glass-card">
     <!-- Title removed per feedback -->
-    <div class="control-buttons">
+<div class="control-buttons">
       <button onclick="enviar('anterior')">⬅️ Atrás</button>
       <button onclick="enviar('mostrar')">▶️ Mostrar</button>
       <button onclick="enviar('siguiente')">➡️ Siguiente</button>
       <button onclick="fullscreen()">📺 Pantalla Completa</button>
+      <button id="voiceBtn" onclick="toggleVoice()">🎤 Voz (Manual)</button>
     </div>
   </div>
 </div>
@@ -25,6 +26,51 @@
 function enviar(accion) {
     socket.emit("cambiar", accion);
   }
+
+let recognition;
+let voiceActive = false;
+
+function initVoice() {
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'es-ES';  // Español
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.toLowerCase().trim();
+      console.log('Heard:', transcript);
+      if (transcript.includes('mostrar')) {
+        socket.emit("cambiar", "mostrar");
+      } else if (transcript.includes('siguiente') || transcript.includes('adelante')) {
+        socket.emit("cambiar", "siguiente");
+      } else if (transcript.includes('anterior') || transcript.includes('atrás') || transcript.includes('back')) {
+        socket.emit("cambiar", "anterior");
+      }
+    };
+    recognition.onerror = (event) => {
+      console.error('Voice error:', event.error);
+      if (voiceActive) toggleVoice();
+    };
+  } else {
+    alert('Speech Recognition no soportado en este navegador.');
+  }
+}
+
+function toggleVoice() {
+  const btn = document.getElementById('voiceBtn');
+  if (!recognition) initVoice();
+  if (voiceActive) {
+    recognition.stop();
+    voiceActive = false;
+    btn.textContent = '🎤 Voz (Manual)';
+    btn.style.background = '';
+  } else {
+    recognition.start();
+    voiceActive = true;
+    btn.textContent = '🔴 Voz Activa';
+    btn.style.background = '#ff4444';
+  }
+}
 
 function fullscreen() {
   socket.emit("cine");
