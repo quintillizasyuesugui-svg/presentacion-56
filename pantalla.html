@@ -98,11 +98,69 @@ socket.on("cambiar", (accion) => {
     if (accion === "siguiente" || accion === "anterior") {
       const img = document.getElementById("img");
       img.classList.remove('show');
-      img.onload = () => img.classList.add('show');
+      img.onload = () => {
+        img.classList.add('show');
+        if (index === diapositivas.length - 1) {
+          confetti();
+        }
+      };
       img.src = diapositivas[index];
     }
 
   });
+
+function confetti() {
+  // Simple confetti canvas
+  const canvas = document.createElement('canvas');
+  canvas.style.position = 'fixed';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = '10000';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const pieces = [];
+  const colors = ['#ff00ff', '#00f5ff', '#ffd700', '#98FB98', '#ff6b6b', '#4ecdc4'];
+  for (let i = 0; i < 150; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height - canvas.height,
+      vx: Math.random() * 10 - 5,
+      vy: Math.random() * 3 + 2,
+      size: Math.random() * 8 + 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      vr: Math.random() * 10 - 5
+    });
+  }
+  let animationId;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.y += p.vy;
+      p.x += p.vx;
+      p.rotation += p.vr;
+      if (p.y > canvas.height) {
+        p.y = -p.size;
+        p.x = Math.random() * canvas.width;
+      }
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+      ctx.restore();
+    });
+    animationId = requestAnimationFrame(animate);
+  }
+  animate();
+  setTimeout(() => {
+    cancelAnimationFrame(animationId);
+    document.body.removeChild(canvas);
+  }, 3000);
+}
 
 // Salir de pantalla completa con ESC
 window.addEventListener('keydown', (event) => {
