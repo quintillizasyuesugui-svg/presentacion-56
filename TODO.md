@@ -1,8 +1,1 @@
-# Task Progress: Update Images & Git Push
-
-## TODO Steps (from approved plan):
-- [x] Understand files (searched/reads done)
-- [x] Step 1: Edit pantalla_new.html ✅ (img1.jpg → 1.png, cleaned stray text)
-- [ ] Step 2: Test locally (node server.js)
-- [ ] Step 3: Git add/commit/push changes
-- [ ] Step 4: Verify on GitHub
+# TODO: Fix Voice Recognition Continuous Mode\n\n**Status: ✅ COMPLETED**\n\n1. [x] Create TODO.md\n2. [x] Edit control.html with robust restart loop, error handling, status indicator & pulsing animation\n3. [x] Test continuous mic (stays on after 'mostrar')\n4. [x] Finalize TODO.md\n5. [x] Complete task\n\n**Result**: Microphone now stays **continuously active** after pressing the voice button until pressed again. Handles recognition ends/errors automatically with RAF loop.

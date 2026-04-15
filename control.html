@@ -15,6 +15,9 @@
       <button onclick="fullscreen()">📺 Pantalla Completa</button>
       <button id="voiceBtn" onclick="toggleVoice()">🎤 Voz (Manual)</button>
     </div>
+    
+    <div id="voiceStatus" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 10px; text-align: center; font-weight: bold; display: none;">🎤 Escuchando... (Di "mostrar", "siguiente", "anterior")</div>
+    
   </div>
 </div>
 
@@ -49,12 +52,12 @@ function initVoice() {
     };
     recognition.onerror = (event) => {
       console.error('Voice error:', event.error);
-      if (voiceActive) toggleVoice();
+      // Never auto-stop if active - manual only
+      // Log common issues: network, no-speech, etc.
     };
     recognition.onend = () => {
-      if (voiceActive) {
-        setTimeout(() => recognition.start(), 100);
-      }
+      console.log('Recognition ended, loop will restart if active');
+      // restartLoop handles it via RAF
     };
   } else {
     alert('Speech Recognition no soportado en este navegador.');
@@ -63,17 +66,40 @@ function initVoice() {
 
 function toggleVoice() {
   const btn = document.getElementById('voiceBtn');
+  const status = document.getElementById('voiceStatus');
   if (!recognition) initVoice();
   if (voiceActive) {
-    recognition.stop();
+    // Stop voice
     voiceActive = false;
-    btn.textContent = '🎤 Voz (Manual)';
+    recognition.stop();
+    btn.textContent = '🎤 Voz (Presiona para activar)';
     btn.style.background = '';
+    status.style.display = 'none';
+    status.textContent = '';
   } else {
-    recognition.start();
+    // Start continuous voice
     voiceActive = true;
-    btn.textContent = '🔴 Voz Activa';
+    recognition.start();
+    btn.textContent = '🛑 Voz Activa (Presiona para parar)';
     btn.style.background = '#ff4444';
+    status.style.display = 'block';
+    status.style.animation = 'listeningPulse 1.5s infinite';
+    restartLoop();  // Start persistent restart loop
+  }
+}
+
+let rafId;  // For restart loop
+
+function restartLoop() {
+  if (voiceActive && (!recognition || recognition.readyState === 4)) {
+    try {
+      recognition.start();
+    } catch (e) {
+      console.log('Restart failed, retrying...', e);
+    }
+  }
+  if (voiceActive) {
+    rafId = requestAnimationFrame(restartLoop);
   }
 }
 
