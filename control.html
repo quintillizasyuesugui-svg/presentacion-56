@@ -33,7 +33,7 @@ let voiceActive = false;
 function initVoice() {
   if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = 'es-ES';  // Español
     recognition.onresult = (event) => {
@@ -50,6 +50,11 @@ function initVoice() {
     recognition.onerror = (event) => {
       console.error('Voice error:', event.error);
       if (voiceActive) toggleVoice();
+    };
+    recognition.onend = () => {
+      if (voiceActive) {
+        setTimeout(() => recognition.start(), 100);
+      }
     };
   } else {
     alert('Speech Recognition no soportado en este navegador.');
