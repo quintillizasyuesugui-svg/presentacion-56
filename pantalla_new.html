@@ -214,13 +214,7 @@ function confetti() {
 socket.on("cambiar", (accion) => {
     console.log('Received:', accion, 'current index:', index);
     
-    // Número directo (1-6)
-    const num = parseInt(accion);
-    if (num >= 1 && num <= 6 && diapositivas[num - 1]) {
-      index = num - 1;
-      updateUI();
-      return;
-    }
+
 
     if (accion === "mostrar") {
       index = 0;
