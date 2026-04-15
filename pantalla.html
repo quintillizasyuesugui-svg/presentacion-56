@@ -73,13 +73,24 @@ socket.on("cine", () => {
 });
 
 socket.on("cambiar", (accion) => {
+    const img = document.getElementById("img");
 
-    if (accion === "mostrar") {
-      // Mostrar la primera imagen o la actual
-      const img = document.getElementById("img");
+    // Número directo (1-6)
+    const num = parseInt(accion);
+    if (num >= 1 && num <= 6 && diapositivas[num - 1]) {
+      index = num - 1;
       img.classList.remove('show');
       img.onload = () => img.classList.add('show');
       img.src = diapositivas[index];
+      return;
+    }
+
+    if (accion === "mostrar") {
+      index = 0;
+      img.classList.remove('show');
+      img.onload = () => img.classList.add('show');
+      img.src = diapositivas[index];
+      return;
     }
 
     if (accion === "siguiente") {
@@ -94,19 +105,15 @@ socket.on("cambiar", (accion) => {
       }
     }
 
-      // Fade anim para siguiente/anterior
-    if (accion === "siguiente" || accion === "anterior") {
-      const img = document.getElementById("img");
-      img.classList.remove('show');
-      img.onload = () => {
-        img.classList.add('show');
-        if (index === diapositivas.length - 1) {
-          confetti();
-        }
-      };
-      img.src = diapositivas[index];
-    }
-
+    // Fade anim para siguiente/anterior/mostrar/números
+    img.classList.remove('show');
+    img.onload = () => {
+      img.classList.add('show');
+      if (index === diapositivas.length - 1) {
+        confetti();
+      }
+    };
+    img.src = diapositivas[index];
   });
 
 function confetti() {

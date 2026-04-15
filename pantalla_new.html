@@ -213,6 +213,21 @@ function confetti() {
 
 socket.on("cambiar", (accion) => {
     console.log('Received:', accion, 'current index:', index);
+    
+    // Número directo (1-6)
+    const num = parseInt(accion);
+    if (num >= 1 && num <= 6 && diapositivas[num - 1]) {
+      index = num - 1;
+      updateUI();
+      return;
+    }
+
+    if (accion === "mostrar") {
+      index = 0;
+      updateUI();
+      return;
+    }
+    
     if (accion === "siguiente") {
       index = (index + 1) % diapositivas.length;
       updateUI();
@@ -221,21 +236,6 @@ socket.on("cambiar", (accion) => {
     if (accion === "anterior") {
       index = index === 0 ? diapositivas.length - 1 : index - 1;
       updateUI();
-      return;
-    }
-    if (accion === "mostrar") {
-      // Force refresh
-      img.classList.remove('show');
-      const tempSrc = diapositivas[index] + '?t=' + Date.now();
-      img.onerror = () => { 
-        console.error('Load failed:', diapositivas[index]); 
-        img.classList.add('show');
-      };
-      img.onload = () => { 
-        img.classList.add('show'); 
-        console.log('Mostrar OK:', diapositivas[index]);
-      };
-      img.src = tempSrc;
       return;
     }
     console.log('Unknown action:', accion);

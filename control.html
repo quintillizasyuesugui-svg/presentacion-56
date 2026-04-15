@@ -42,8 +42,18 @@ function initVoice() {
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript.toLowerCase().trim();
       console.log('Heard:', transcript);
-      if (transcript.includes('mostrar')) {
-        socket.emit("cambiar", "mostrar");
+      if (transcript.includes('mostrar') || transcript === 'uno' || transcript === '1') {
+        socket.emit("cambiar", "1");
+      } else if (transcript.includes('dos') || transcript === '2') {
+        socket.emit("cambiar", "2");
+      } else if (transcript.includes('tres') || transcript === '3') {
+        socket.emit("cambiar", "3");
+      } else if (transcript.includes('cuatro') || transcript === '4') {
+        socket.emit("cambiar", "4");
+      } else if (transcript.includes('cinco') || transcript === '5') {
+        socket.emit("cambiar", "5");
+      } else if (transcript.includes('seis') || transcript === '6') {
+        socket.emit("cambiar", "6");
       } else if (transcript.includes('siguiente') || transcript.includes('adelante')) {
         socket.emit("cambiar", "siguiente");
       } else if (transcript.includes('anterior') || transcript.includes('atrás') || transcript.includes('back')) {
