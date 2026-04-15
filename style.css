@@ -5,8 +5,8 @@
   --glass-border: rgba(0,255,255,0.3);
   --glow-cyan: 0 0 20px rgba(0,255,255,0.6);
   --glow-gold: 0 0 30px rgba(255,215,0,0.5);
-  --gradient-main: linear-gradient(135deg, #1a0033 0%, #2d1b69 30%, #6a1b9a 60%, #16213e 100%);
-  --title-gradient: linear-gradient(135deg, #00f5ff, #ff00ff, #ffd700);
+#98FB98 60%
+#00f5ff, #98FB98, #ffd700
 }
 
 body {
