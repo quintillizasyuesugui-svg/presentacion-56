@@ -5,8 +5,8 @@
   --glass-border: rgba(0,255,255,0.3);
   --glow-cyan: 0 0 20px rgba(0,255,255,0.6);
   --glow-gold: 0 0 30px rgba(255,215,0,0.5);
-#98FB98 60%
-#00f5ff, #98FB98, #ffd700
+  --gradient-main: linear-gradient(135deg, #1a0033 0%, #2d1b69 30%, #98FB98 60%, #16213e 100%);
+  --title-gradient: linear-gradient(135deg, #00f5ff, #98FB98, #ffd700);
 }
 
 body {
@@ -135,36 +135,6 @@ h1 {
     0 0 0 2px rgba(0,255,255,0.3),
     inset 0 0 0 1px rgba(255,255,255,0.2);
 }
-  .control-buttons {
-    flex-direction: column;
-    gap: 1rem;
-    bottom: 5px;
-  }
-
-
-.glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  padding: 2rem;
-  box-shadow: var(--glow-cyan);
-}
-
-/* Phone bezel frame */
-.phone-frame {
-  position: relative;
-  max-width: 400px;
-  margin: 2rem auto;
-  padding: 1.5rem;
-  background: linear-gradient(145deg, #1a0033, #2d1b69);
-  border-radius: 36px;
-  box-shadow: 
-    0 20px 60px rgba(0,0,0,0.6),
-    inset 0 2px 10px rgba(255,255,255,0.1),
-    0 0 0 2px rgba(0,255,255,0.3),
-    inset 0 0 0 1px rgba(255,255,255,0.2);
-}
 
 .phone-frame::before {
   content: '';
@@ -230,7 +200,6 @@ button:active {
   transform: scale(0.98);
 }
 
-/* Fullscreen indicator overlay */
 .fullscreen-indicator {
   position: fixed;
   top: 0;
@@ -275,14 +244,22 @@ button:active {
   50% { transform: scale(1.05); }
 }
 
-/* Post-exit refit for normal screen */
+@keyframes glow {
+  0% { box-shadow: var(--glow-cyan); }
+  100% { box-shadow: 0 0 40px #00f5ff, 0 0 60px #00f5ff; }
+}
+
+@keyframes titlePulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.02); }
+}
+
 .post-exit #img {
   width: 100vw !important;
   height: 100vh !important;
   object-fit: contain !important;
 }
 
-/* Cinema movie mode - fullscreen like watching movie */
 body.cinema-mode {
   background: black;
 }
@@ -312,14 +289,14 @@ body.cinema-mode::before {
   top: 0;
   left: 0;
   right: 0;
-  height: 5vh; /* Top letterbox bar */
+  height: 5vh;
 }
 
 body.cinema-mode::after {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 5vh; /* Bottom letterbox bar */
+  height: 5vh;
 }
 
 body.cinema-mode .fullscreen-indicator h2 {
@@ -328,7 +305,6 @@ body.cinema-mode .fullscreen-indicator h2 {
   border: 3px solid lime;
 }
 
-/* Progress bar & thumbnails */
 .progress-container {
   position: fixed;
   bottom: 120px;
@@ -349,7 +325,7 @@ body.cinema-mode .fullscreen-indicator h2 {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00f5ff, #ff00ff);
+  background: linear-gradient(90deg, #00f5ff, #98FB98);
   width: 0%;
   transition: width 0.5s ease;
   box-shadow: 0 0 10px #00f5ff;
@@ -388,9 +364,6 @@ body.cinema-mode .fullscreen-indicator h2 {
   transform: scale(1.05);
 }
 
-/* Gracias styles removed per feedback */
-
-/* Mobile portrait - Enhanced */
 @media (max-width: 480px) and (max-height: 800px) {
   .player-container {
     height: 50vh;
@@ -440,3 +413,8 @@ body.cinema-mode .fullscreen-indicator h2 {
   }
 }
 
+.control-buttons {
+  flex-direction: column;
+  gap: 1rem;
+  bottom: 5px;
+}
