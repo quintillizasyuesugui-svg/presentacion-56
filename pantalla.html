@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pantalla</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="phone-frame">
+  <div class="content">
+    <!-- Title removed per feedback -->
+<img id="img" src="">
+<!-- Gracias removed per feedback -->
+    <p id="fullscreenHint" style="margin-top:1rem; color:#444;">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
+    <button id="enterFullscreen" style="margin-top:0.5rem;">📺 Ir a pantalla completa</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+let diapositivas = [];
+  let index = 0;
+
+  // Load images dynamically
+  fetch('/images')
+    .then(res => res.json())
+    .then(images => {
+      diapositivas = images;
+    })
+    .catch(err => console.error('Error loading images:', err));
+
+const fullscreenButton = document.getElementById('enterFullscreen');
+const fullscreenHint = document.getElementById('fullscreenHint');
+
+function requestFullscreen() {
+  const el = document.documentElement;
+  if (el.requestFullscreen) {
+    el.requestFullscreen();
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  } else if (el.mozRequestFullScreen) {
+    el.mozRequestFullScreen();
+  } else if (el.msRequestFullscreen) {
+    el.msRequestFullscreen();
+  }
+}
+
+fullscreenButton.addEventListener('click', () => {
+  requestFullscreen();
+  fullscreenButton.style.display = 'none';
+  fullscreenHint.textContent = 'Pantalla completa activada';
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+    fullscreenButton.style.display = 'none';
+    fullscreenHint.textContent = 'Modo pantalla completa (ESC para salir)';
+  } else {
+    fullscreenButton.style.display = 'inline-block';
+    fullscreenHint.textContent = 'Presiona el botón para ir a pantalla completa';
+  }
+});
+
+socket.on("cine", () => {
+  // Intentar fullscreen directamente (a veces falla por falta de gesto usuario desde otra ventana)
+  requestFullscreen();
+
+  // Mostrar botón de fallback para que el usuario confirme en esta pestaña
+  fullscreenButton.style.display = 'inline-block';
+  fullscreenHint.textContent = 'Se solicitó pantalla completa desde control. Toca el botón si no se activó.';
+});
+
+socket.on("cambiar", (accion) => {
+
+    if (accion === "mostrar") {
+      // Mostrar la primera imagen o la actual
+      const img = document.getElementById("img");
+      img.classList.remove('show');
+      img.onload = () => img.classList.add('show');
+      img.src = diapositivas[index];
+    }
+
+    if (accion === "siguiente") {
+      index++;
+      if (index >= diapositivas.length) index = 0;
+    }
+
+    if (accion === "anterior") {
+      index--;
+      if (index < 0) {
+        index = diapositivas.length - 1;
+      }
+    }
+
+      // Fade anim para siguiente/anterior
+    if (accion === "siguiente" || accion === "anterior") {
+      const img = document.getElementById("img");
+      img.classList.remove('show');
+      img.onload = () => img.classList.add('show');
+      img.src = diapositivas[index];
+    }
+
+  });
+
+// Salir de pantalla completa con ESC
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  }
+});
+
+// Imagen solo aparece al presionar "Mostrar" desde control (pantalla negra inicial)
+
+
+</script>
+
+</body>
+</html>

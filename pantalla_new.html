@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pantalla Cinema</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body onclick="toggleFullscreen()">
+
+<div class="content glass-card">
+  <h1>🎬 Presentación Cinema</h1>
+  
+  <div class="player-container">
+    <img id="img" src="1.png" class="show">
+  </div>
+  
+  <!-- Fullscreen ESC indicator -->
+  <div id="fs-indicator" class="fullscreen-indicator">
+    <h2>🖥️ Apreté ESC para salir</h2>
+  </div>
+  
+  <!-- Progress bar -->
+  <div class="progress-container">
+    <div class="progress-bar">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+  </div>
+  
+  <!-- Thumbnails -->
+  <div class="thumbnails" id="thumbnails"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+let diapositivas = [];
+  let index = 0;
+
+  const img = document.getElementById("img");
+  const progressFill = document.getElementById('progress-fill');
+  const thumbnailsContainer = document.getElementById('thumbnails');
+  
+  // Load images dynamically
+  fetch('/images')
+    .then(res => res.json())
+    .then(images => {
+      diapositivas = images;
+      if (diapositivas.length > 0) {
+        img.src = diapositivas[0];
+        img.classList.add('show');
+      }
+      // Initialize thumbnails
+      diapositivas.forEach((slide, i) => {
+        const thumb = document.createElement('img');
+        thumb.src = slide;
+        thumb.onerror = () => { thumb.style.display = 'none'; };
+        thumb.classList.add('thumbnail');
+        thumb.onclick = () => goToSlide(i);
+        thumb.ontouchstart = (e) => { e.preventDefault(); goToSlide(i); };
+        thumb.dataset.index = i;
+        thumbnailsContainer.appendChild(thumb);
+      });
+    })
+    .catch(err => console.error('Error loading images:', err));
+
+  const thumbnails = thumbnailsContainer.children;
+
+  // Fullscreen change handler - Cinema mode
+  document.onfullscreenchange = function() {
+    const indicator = document.getElementById('fs-indicator');
+    const body = document.body;
+    
+    if (document.fullscreenElement) {
+      // Entered fullscreen → Cinema movie mode
+      indicator.classList.add('show');
+      body.classList.add('cinema-mode');
+    } else {
+      // Exited fullscreen (ESC) → Normal mode
+      indicator.classList.remove('show');
+      body.classList.remove('cinema-mode');
+      body.classList.add('post-exit');
+      // Remove post-exit after transition
+      setTimeout(() => {
+        body.classList.remove('post-exit');
+      }, 1000);
+    }
+  };
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement == null) {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      } else if (document.documentElement.webkitRequestFullscreen) {
+        document.documentElement.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      }
+    }
+  }
+
+  function nextSlide() {
+    index = (index + 1) % diapositivas.length;
+    img.classList.remove('show');
+    img.onload = () => img.classList.add('show');
+    img.src = diapositivas[index];
+  }
+
+socket.on("cine", () => {
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen();
+  } else if (document.documentElement.webkitRequestFullscreen) {
+    document.documentElement.webkitRequestFullscreen();
+  } else if (document.documentElement.msRequestFullscreen) {
+    document.documentElement.msRequestFullscreen();
+  } else if (document.documentElement.mozRequestFullScreen) {
+    document.documentElement.mozRequestFullScreen();
+  }
+});
+
+function goToSlide(newIndex) {
+  index = newIndex;
+  updateUI();
+}
+
+  function updateUI() {
+    console.log('updateUI called, index:', index);
+    img.classList.remove('show');
+    const src = diapositivas[index] + '?t=' + Date.now();
+    img.onerror = () => { 
+      console.error('Load failed:', diapositivas[index]); 
+      img.classList.add('show');
+    };
+    img.onload = () => { 
+      img.classList.add('show'); 
+      console.log('Loaded:', diapositivas[index]);
+    };
+    img.src = src;
+    
+    // Progress
+    const progress = ((index + 1) / diapositivas.length) * 100;
+    progressFill.style.width = progress + '%';
+    
+    // Thumbs
+    Array.from(thumbnails).forEach((thumb, i) => {
+      thumb.classList.toggle('active', i === index);
+    });
+  }
+
+socket.on("cambiar", (accion) => {
+    console.log('Received:', accion, 'current index:', index);
+    if (accion === "siguiente") {
+      index = (index + 1) % diapositivas.length;
+      updateUI();
+      return;
+    }
+    if (accion === "anterior") {
+      index = index === 0 ? diapositivas.length - 1 : index - 1;
+      updateUI();
+      return;
+    }
+    if (accion === "mostrar") {
+      // Force refresh
+      img.classList.remove('show');
+      const tempSrc = diapositivas[index] + '?t=' + Date.now();
+      img.onerror = () => { 
+        console.error('Load failed:', diapositivas[index]); 
+        img.classList.add('show');
+      };
+      img.onload = () => { 
+        img.classList.add('show'); 
+        console.log('Mostrar OK:', diapositivas[index]);
+      };
+      img.src = tempSrc;
+      return;
+    }
+    console.log('Unknown action:', accion);
+  });
+
+// Imagen visible from start now
+
+</script>
+
+</body>
+</html>
