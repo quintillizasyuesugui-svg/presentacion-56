@@ -9,7 +9,8 @@
 <div class="phone-frame">
   <div class="content">
     <!-- Title removed per feedback -->
-<img id="img" src="">
+    <img id="img" src="">
+    <div id="slideCounter" style="margin-top:0.5rem; font-size:1.2rem; font-weight:bold; color:#00f5ff; text-shadow:0 0 10px #00f5ff;">0 / 0</div>
 <!-- Gracias removed per feedback -->
     <p id="fullscreenHint" style="margin-top:1rem; color:#444;">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
     <button id="enterFullscreen" style="margin-top:0.5rem;">📺 Ir a pantalla completa</button>
@@ -28,8 +29,16 @@ let diapositivas = [];
     .then(res => res.json())
     .then(images => {
       diapositivas = images;
+      updateCounter();
     })
     .catch(err => console.error('Error loading images:', err));
+
+function updateCounter() {
+  const counter = document.getElementById('slideCounter');
+  if (counter) {
+    counter.textContent = (diapositivas.length > 0 ? (index + 1) : 0) + ' / ' + diapositivas.length;
+  }
+}
 
 const fullscreenButton = document.getElementById('enterFullscreen');
 const fullscreenHint = document.getElementById('fullscreenHint');
@@ -79,6 +88,7 @@ socket.on("cambiar", (accion) => {
 
     if (accion === "mostrar") {
       index = 0;
+      updateCounter();
       img.classList.remove('show');
       img.onload = () => img.classList.add('show');
       img.src = diapositivas[index];
@@ -96,6 +106,8 @@ socket.on("cambiar", (accion) => {
         index = diapositivas.length - 1;
       }
     }
+
+    updateCounter();
 
     // Fade anim para siguiente/anterior/mostrar/números
     img.classList.remove('show');
