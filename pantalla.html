@@ -36,7 +36,7 @@ let diapositivas = [];
 function updateCounter() {
   const counter = document.getElementById('slideCounter');
   if (counter) {
-    counter.textContent = (diapositivas.length > 0 ? (index + 1) : 0) + ' / ' + diapositivas.length;
+    counter.textContent = index + ' / ' + (diapositivas.length - 1);
   }
 }
 
