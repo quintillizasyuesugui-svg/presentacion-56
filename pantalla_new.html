@@ -13,7 +13,6 @@
   <div class="player-container">
     <img id="img" src="" class="show">
     <div id="slideCounter" style="position:absolute; top:10px; right:10px; padding:5px 10px; background:rgba(0,0,0,0.6); border-radius:10px; font-size:1.2rem; font-weight:bold; color:#00f5ff; text-shadow:0 0 10px #00f5ff; z-index:10;">0 / 0</div>
-  </div>
   
   <!-- Fullscreen ESC indicator -->
   <div id="fs-indicator" class="fullscreen-indicator">
@@ -24,12 +23,10 @@
   <div class="progress-container">
     <div class="progress-bar">
       <div id="progress-fill" class="progress-fill"></div>
-    </div>
   </div>
   
   <!-- Thumbnails -->
   <div class="thumbnails" id="thumbnails"></div>
-</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -69,7 +66,7 @@ let diapositivas = [];
 function updateCounter() {
   const counter = document.getElementById('slideCounter');
   if (counter) {
-    counter.textContent = index + ' / ' + (diapositivas.length - 1);
+    counter.textContent = index + ' / ' + diapositivas.length;
   }
 }
 

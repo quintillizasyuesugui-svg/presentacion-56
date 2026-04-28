@@ -15,7 +15,6 @@
     <p id="fullscreenHint" style="margin-top:1rem; color:#444;">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
     <button id="enterFullscreen" style="margin-top:0.5rem;">📺 Ir a pantalla completa</button>
   </div>
-</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -36,7 +35,7 @@ let diapositivas = [];
 function updateCounter() {
   const counter = document.getElementById('slideCounter');
   if (counter) {
-    counter.textContent = index + ' / ' + (diapositivas.length - 1);
+    counter.textContent = index + ' / ' + diapositivas.length;
   }
 }
 
