@@ -38,6 +38,11 @@
   --red-500: #f0393f;
   --red-600: #c4272c;
 
+  /* Green — confirmación de que se reconoció un comando de voz */
+  --green-300: #a3f7bf;
+  --green-400: #4ade80;
+  --green-500: #22c55e;
+
   --bg: var(--gray-950);
   --panel: rgba(28, 37, 48, 0.6);
   --panel-border: rgba(255, 255, 255, 0.08);
@@ -444,6 +449,28 @@ body.control {
   background: linear-gradient(180deg, var(--red-400), var(--red-600));
   border-color: var(--red-300);
   color: white;
+}
+
+/* Confirma en verde lo último que se reconoció por voz */
+.voice-heard {
+  text-align: center;
+  color: var(--green-400);
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-top: -6px;
+}
+
+.voice-heard[hidden] { display: none; }
+
+.voice-heard.pulse { animation: heardPulse 260ms var(--ease-out); }
+
+@keyframes heardPulse {
+  0% { opacity: 0.4; transform: scale(0.97); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-heard.pulse { animation: none; }
 }
 
 /* ---- Gestionar imágenes (manage.html) ---- */

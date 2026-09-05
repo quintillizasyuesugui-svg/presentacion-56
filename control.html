@@ -35,6 +35,7 @@
       <span class="voice-dot"></span>
       <span>Escuchando… di "mostrar", "siguiente", "atrás" o un número</span>
     </div>
+    <p id="voiceHeard" class="voice-heard" hidden></p>
 
     <div class="btn-row utility-row">
       <button class="btn small" onclick="fullscreen()">📺 Pantalla</button>
@@ -127,11 +128,22 @@
 
   const voiceBtn = document.getElementById('voiceBtn');
   const voiceStatus = document.getElementById('voiceStatus');
+  const voiceHeard = document.getElementById('voiceHeard');
 
   function setVoiceUI(active) {
     voiceBtn.textContent = active ? '🛑 Detener voz' : '🎤 Voz';
     voiceBtn.classList.toggle('active', active);
     voiceStatus.hidden = !active;
+    if (!active) voiceHeard.hidden = true;
+  }
+
+  // Muestra en verde lo último que se reconoció por voz
+  function showHeard(text) {
+    voiceHeard.textContent = '🎙️ "' + text + '"';
+    voiceHeard.hidden = false;
+    voiceHeard.classList.remove('pulse');
+    void voiceHeard.offsetWidth; // fuerza reflow para poder repetir la animación
+    voiceHeard.classList.add('pulse');
   }
 
   function initVoice() {
@@ -152,6 +164,7 @@
           const accion = matchCommand(alternatives);
           if (accion) {
             socket.emit('cambiar', accion);
+            showHeard(result[0].transcript.trim());
             break;
           }
         }
