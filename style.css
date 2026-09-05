@@ -1,0 +1,586 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  /* Greys — foundation of the UI */
+  --gray-950: #0a0e14;
+  --gray-900: #0f151d;
+  --gray-850: #151d27;
+  --gray-800: #1c2530;
+  --gray-700: #2a3440;
+  --gray-600: #3c4855;
+  --gray-500: #5a6773;
+  --gray-400: #82909c;
+  --gray-300: #abb7c1;
+  --gray-200: #cfd8de;
+  --gray-100: #e9eef2;
+  --gray-50:  #f6f9fb;
+
+  /* Primary — cyan, drives buttons, focus, glow */
+  --primary-100: #c9f7ff;
+  --primary-200: #97ecff;
+  --primary-300: #60dfff;
+  --primary-400: #34cdfa;
+  --primary-500: #17b6ea;
+  --primary-600: #0f93bf;
+  --primary-700: #0a7195;
+  --primary-800: #095169;
+  --primary-900: #06344a;
+
+  /* Amber — reserved for the "last slide" celebration + progress highlight */
+  --amber-300: #ffe08a;
+  --amber-400: #ffcb4d;
+  --amber-500: #ffb703;
+  --amber-600: #d99300;
+
+  /* Red — live/recording state (voice) */
+  --red-300: #ff9d9d;
+  --red-400: #ff6b6b;
+  --red-500: #f0393f;
+  --red-600: #c4272c;
+
+  --bg: var(--gray-950);
+  --panel: rgba(28, 37, 48, 0.6);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: var(--gray-50);
+  --text-muted: var(--gray-400);
+
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slide: 560ms;
+}
+
+html { color-scheme: dark; }
+
+body {
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at top, var(--gray-850) 0%, var(--bg) 60%);
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; }
+a.btn { text-decoration: none; }
+
+/* ==================================================
+   PANTALLA — the projector / TV display
+   ================================================== */
+
+body.pantalla {
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+}
+
+/* Fondo desenfocado a pantalla completa — rellena el letterbox cuando la
+   diapositiva (16:9) no coincide con el aspecto de la pantalla (ej. celular) */
+#imgBg {
+  position: absolute;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  object-fit: cover;
+  filter: blur(50px) brightness(0.45) saturate(1.15);
+  opacity: 0;
+  z-index: 1;
+  transition: opacity var(--dur-slide) var(--ease-out);
+}
+
+#imgBg.show { opacity: 1; }
+
+/* Imagen nítida, siempre completa — nunca recortada */
+#img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(1.04);
+  z-index: 2;
+  transition: opacity var(--dur-slide) var(--ease-out), transform var(--dur-slide) var(--ease-out);
+}
+
+#img.show { opacity: 1; transform: scale(1); }
+
+.hud {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1.1rem;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-300);
+  font-size: clamp(0.85rem, 1.6vw, 1.05rem);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.progress-track {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 20;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--primary-400), var(--amber-400));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-slide) var(--ease-out);
+}
+
+.waiting {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg);
+  transition: opacity var(--dur-base) var(--ease-out), visibility var(--dur-base) var(--ease-out);
+}
+
+.waiting.hide {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Red neuronal esférica 3D — reemplaza el orbe simple en la pantalla de espera.
+   El giro real (rotación + perspectiva) se calcula en JS cuadro a cuadro;
+   acá solo va el tamaño y el brillo del canvas. */
+.brain-sphere {
+  width: min(52vw, 190px);
+  height: min(52vw, 190px);
+  filter: drop-shadow(0 0 22px rgba(23, 182, 234, 0.55));
+}
+
+.waiting h1 {
+  font-size: clamp(1.4rem, 4vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.waiting p {
+  color: var(--text-muted);
+  font-size: clamp(0.9rem, 2.4vw, 1.05rem);
+  max-width: 34ch;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 56px;
+  padding: 0.9rem 1.7rem;
+  font-size: clamp(1rem, 2.6vw, 1.1rem);
+  font-weight: 700;
+  color: var(--text);
+  background: linear-gradient(180deg, var(--gray-700), var(--gray-800));
+  border: 1.5px solid var(--primary-700);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(23, 182, 234, 0.12),
+    0 10px 24px -12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    background var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    transform 120ms var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out);
+}
+
+.btn:hover {
+  border-color: var(--primary-400);
+  background: linear-gradient(180deg, var(--gray-600), var(--gray-700));
+  box-shadow:
+    0 0 0 1px var(--primary-600),
+    0 14px 32px -12px rgba(23, 182, 234, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.btn:active { transform: scale(0.97); }
+.btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; box-shadow: none; }
+
+.btn.primary {
+  background: linear-gradient(180deg, var(--primary-400), var(--primary-600));
+  border-color: var(--primary-200);
+  color: var(--gray-950);
+  box-shadow:
+    0 0 0 1px var(--primary-400),
+    0 16px 36px -12px rgba(23, 182, 234, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.btn.primary:hover {
+  background: linear-gradient(180deg, var(--primary-300), var(--primary-500));
+  box-shadow:
+    0 0 0 1px var(--primary-300),
+    0 18px 40px -12px rgba(23, 182, 234, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-2px); }
+}
+
+.fullscreen-indicator {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-base) var(--ease-out), visibility var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+
+.fullscreen-indicator.show { opacity: 1; visibility: visible; }
+
+.fullscreen-indicator h2 {
+  font-size: clamp(1.4rem, 5vw, 2.4rem);
+  font-weight: 800;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  padding: 1.1rem 2.2rem;
+  border-radius: var(--radius-pill);
+  color: var(--primary-200);
+  letter-spacing: -0.01em;
+}
+
+body.cinema-mode { background: #000; }
+body.cinema-mode .hud,
+body.cinema-mode .progress-track { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #img { transition: opacity var(--dur-base) linear; transform: none !important; }
+  .btn:hover { transform: none; }
+}
+
+/* ==================================================
+   CONTROL — the phone/tablet remote
+   ================================================== */
+
+body.control {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+}
+
+/* Se estira a toda la altura disponible: el .spacer empuja el panel principal
+   hacia abajo, a la zona que el pulgar alcanza cómodo con el celular en una mano. */
+.app {
+  width: 100%;
+  max-width: 420px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+  min-height: 16px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.app-header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--red-500);
+  box-shadow: 0 0 0 4px rgba(240, 57, 63, 0.15);
+  transition: background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.status-dot.online {
+  background: var(--primary-400);
+  box-shadow: 0 0 0 4px rgba(52, 205, 250, 0.18);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  background: var(--panel);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+.btn-row { display: flex; gap: 12px; }
+
+/* "Mostrar" — se usa una sola vez al arrancar, tratamiento discreto */
+.btn.ghost {
+  flex: 1;
+  background: transparent;
+  border: 1.5px dashed var(--gray-600);
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.btn.ghost:hover {
+  border-color: var(--primary-500);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
+}
+
+/* Atrás/Siguiente — lo que más se toca durante toda la presentación */
+.nav-row .btn { flex: 1; min-height: 64px; }
+.nav-row .btn.primary {
+  flex: 1.6;
+  min-height: 72px;
+  font-size: clamp(1.1rem, 3.2vw, 1.3rem);
+}
+
+.btn.secondary {
+  background: var(--gray-800);
+  border-color: var(--gray-600);
+}
+
+/* Pantalla completa / Voz / Gestionar imágenes — de uso ocasional, más chicas */
+.utility-row { gap: 8px; }
+.utility-row .btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.8rem;
+  gap: 0.35rem;
+}
+
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.1rem;
+  background: rgba(240, 57, 63, 0.12);
+  border: 1px solid rgba(240, 57, 63, 0.35);
+  border-radius: var(--radius-md);
+  color: var(--red-300);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.voice-status[hidden] { display: none; }
+
+.voice-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red-400);
+  animation: pulseDot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.btn.voice.active {
+  background: linear-gradient(180deg, var(--red-400), var(--red-600));
+  border-color: var(--red-300);
+  color: white;
+}
+
+/* ---- Gestionar imágenes (manage.html) ---- */
+
+.image-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.image-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--gray-850);
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.image-row.dragging {
+  position: relative;
+  z-index: 10;
+  border-color: var(--primary-500);
+  box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.7);
+  cursor: grabbing;
+}
+
+/* Evita que el texto se seleccione mientras se arrastra por toda la lista */
+body.dragging-active { user-select: none; }
+
+.drag-handle {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, 4px);
+  grid-auto-rows: 4px;
+  gap: 3px;
+  padding: 10px 6px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.drag-handle .dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gray-500);
+}
+
+.order-badge {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-700);
+  color: var(--primary-100);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.thumb {
+  flex: none;
+  width: 64px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--gray-700);
+  background: #000;
+}
+
+.filename-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  background: var(--gray-800);
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.icon-btn:hover { border-color: var(--primary-500); background: var(--gray-700); }
+.icon-btn:active { transform: scale(0.93); }
+.icon-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+.icon-btn.danger:hover {
+  border-color: var(--red-400);
+  background: rgba(240, 57, 63, 0.15);
+  color: var(--red-300);
+}
+
+.empty-hint {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 0;
+  font-size: 0.9rem;
+}
+
+.connection-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-dot { animation: none; }
+}
+
+@media (max-width: 360px) {
+  .panel { padding: 18px; gap: 18px; }
+}

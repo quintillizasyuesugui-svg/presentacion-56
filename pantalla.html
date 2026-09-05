@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pantalla</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="pantalla">
+
+<div class="stage">
+  <img id="imgBg" src="" alt="" aria-hidden="true">
+  <img id="img" src="" alt="">
+</div>
+
+<div class="hud" id="hud">0 / 0</div>
+
+<div class="progress-track">
+  <div class="progress-fill" id="progressFill"></div>
+</div>
+
+<div class="waiting" id="waiting">
+  <canvas class="brain-sphere" id="brainSphere" aria-hidden="true"></canvas>
+  <h1>Presentación lista</h1>
+  <p id="waitingHint">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
+  <button id="enterFullscreen" class="btn primary">📺 Ir a pantalla completa</button>
+</div>
+
+<div id="fs-indicator" class="fullscreen-indicator">
+  <h2>🖥️ Presiona ESC para salir</h2>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  let diapositivas = [];
+  let index = 0;
+  let started = false; // recién true cuando se recibe "mostrar" o un salto por número
+
+  const img = document.getElementById('img');
+  const imgBg = document.getElementById('imgBg');
+  const hud = document.getElementById('hud');
+  const progressFill = document.getElementById('progressFill');
+  const waiting = document.getElementById('waiting');
+  const waitingHint = document.getElementById('waitingHint');
+  const fsIndicator = document.getElementById('fs-indicator');
+  const fullscreenButton = document.getElementById('enterFullscreen');
+
+  // ---- Red neuronal esférica 3D (pantalla de espera) ----
+  // Los nodos viven en coordenadas (x,y,z) reales sobre una esfera y se rotan
+  // con matemática 3D de verdad cada cuadro; se proyectan a 2D con perspectiva
+  // (más cerca de "cámara" = más grande y brillante) y se dibujan de atrás
+  // hacia adelante para que se tapen entre sí de forma correcta.
+  function initBrainSphere() {
+    const canvas = document.getElementById('brainSphere');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const SIZE = 200; // tamaño lógico en px — el CSS puede achicarlo, la nitidez la da el dpr
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = SIZE * dpr;
+    canvas.height = SIZE * dpr;
+    ctx.scale(dpr, dpr);
+
+    const COUNT = 68; // más "neuronas" — red más densa
+    const AXIAL_TILT = -0.4; // inclinación fija del eje, look "planeta"
+    const nodes = [];
+
+    // Distribución pareja de puntos sobre una esfera unitaria (esfera de Fibonacci)
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < COUNT; i++) {
+      const y = 1 - (i / (COUNT - 1)) * 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const theta = goldenAngle * i;
+      nodes.push({ x: Math.cos(theta) * r, y, z: Math.sin(theta) * r, activity: 0 });
+    }
+
+    function dist3(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    }
+
+    // Cada nodo se conecta con sus 3 vecinos más cercanos en el espacio 3D — malla más rica
+    const edges = [];
+    nodes.forEach((n, i) => {
+      const nearest = nodes
+        .map((m, j) => ({ j, d: i === j ? Infinity : dist3(n, m) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 3);
+      nearest.forEach(({ j }) => {
+        const key = [i, j].sort((a, b) => a - b).join('-');
+        if (!edges.some(e => e.key === key)) edges.push({ key, a: i, b: j });
+      });
+    });
+
+    // "Pensamiento": pulsos de señal que viajan entre nodos conectados y hacen
+    // destellar al nodo que los recibe — como sinapsis disparando al azar.
+    const pulses = [];
+    let nextPulseAt = 0;
+
+    function spawnPulse(now) {
+      const edge = edges[Math.floor(Math.random() * edges.length)];
+      const forward = Math.random() < 0.5;
+      pulses.push({
+        from: forward ? edge.a : edge.b,
+        to: forward ? edge.b : edge.a,
+        start: now,
+        duration: 450 + Math.random() * 350
+      });
+      nextPulseAt = now + 30 + Math.random() * 90; // más seguido = se ve "pensando" más rápido
+    }
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const R = SIZE * 0.36;
+    const CX = SIZE / 2;
+    const CY = SIZE / 2;
+    const PERSPECTIVE = 2.5;
+
+    function render(now, animated) {
+      const angle = animated ? (now / 1000) * 0.35 : 0.6;
+      const cosA = Math.cos(angle), sinA = Math.sin(angle);
+      const cosT = Math.cos(AXIAL_TILT), sinT = Math.sin(AXIAL_TILT);
+
+      // Rota en Y (giro del "planeta") y aplica una inclinación fija en X
+      const rotated = nodes.map(n => {
+        const x = n.x * cosA - n.z * sinA;
+        const zSpin = n.x * sinA + n.z * cosA;
+        const y = n.y * cosT - zSpin * sinT;
+        const z = n.y * sinT + zSpin * cosT;
+        return { x, y, z };
+      });
+
+      const screen = rotated.map(p => {
+        const scale = PERSPECTIVE / (PERSPECTIVE - p.z);
+        return { x: CX + p.x * R * scale, y: CY + p.y * R * scale, z: p.z, scale };
+      });
+
+      if (animated) {
+        // Dispara pulsos de señal al azar entre nodos conectados
+        if (now >= nextPulseAt) spawnPulse(now);
+
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const pulse = pulses[i];
+          const t = (now - pulse.start) / pulse.duration;
+          if (t >= 1) {
+            nodes[pulse.to].activity = 1; // el nodo receptor "se enciende"
+            pulses.splice(i, 1);
+          }
+        }
+        nodes.forEach(n => { n.activity *= 0.9; }); // decae hasta el próximo pulso
+      }
+
+      ctx.clearRect(0, 0, SIZE, SIZE);
+
+      // Silueta de la esfera, apenas visible
+      ctx.beginPath();
+      ctx.arc(CX, CY, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(23, 182, 234, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Conexiones — más tenues cuanto más lejos de "cámara"
+      edges.forEach(e => {
+        const a = screen[e.a], b = screen[e.b];
+        const depth = ((a.z + b.z) / 2 + 1) / 2; // 0 = atrás, 1 = adelante
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(52, 205, 250, ${0.06 + depth * 0.35})`;
+        ctx.lineWidth = 1;
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      });
+
+      // Nodos, dibujados de atrás hacia adelante para que se superpongan bien
+      const order = screen.map((_, i) => i).sort((i, j) => screen[i].z - screen[j].z);
+      order.forEach(i => {
+        const p = screen[i];
+        const activity = nodes[i].activity;
+        const depth = (p.z + 1) / 2;
+        const radius = Math.max(0.9, 2.6 * p.scale) * (1 + activity * 0.7);
+        const opacity = Math.min(1, 0.35 + depth * 0.65 + activity * 0.5);
+        const grad = ctx.createRadialGradient(p.x - radius * 0.3, p.y - radius * 0.3, 0, p.x, p.y, radius);
+        grad.addColorStop(0, `rgba(201, 247, 255, ${opacity})`);
+        grad.addColorStop(1, `rgba(23, 182, 234, ${opacity * 0.85})`);
+        ctx.beginPath();
+        ctx.fillStyle = grad;
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Pulsos viajando por sus conexiones — el "pensamiento" en tránsito
+      if (animated) {
+        pulses.forEach(pulse => {
+          const t = Math.min(1, (now - pulse.start) / pulse.duration);
+          const a = screen[pulse.from], b = screen[pulse.to];
+          const x = a.x + (b.x - a.x) * t;
+          const y = a.y + (b.y - a.y) * t;
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    if (reduceMotion) {
+      render(0, false); // ángulo fijo, sin loop de animación
+      return;
+    }
+
+    function loop(ts) {
+      if (waiting.classList.contains('hide')) return; // se detiene solo al arrancar la presentación
+      render(ts, true);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  }
+  initBrainSphere();
+
+  function refreshSlides() {
+    fetch('/images')
+      .then(res => res.json())
+      .then(images => {
+        diapositivas = images;
+        // Si se borraron imágenes y el índice actual quedó fuera de rango, lo acotamos
+        if (index > diapositivas.length - 1) index = Math.max(0, diapositivas.length - 1);
+        updateHud();
+        updateProgress();
+      })
+      .catch(err => console.error('Error loading images:', err));
+  }
+  refreshSlides();
+  socket.on('imagenesActualizadas', refreshSlides);
+
+  function updateHud() {
+    hud.textContent = index + ' / ' + diapositivas.length;
+  }
+
+  function updateProgress() {
+    const progress = (started && diapositivas.length) ? (index + 1) / diapositivas.length : 0;
+    progressFill.style.transform = `scaleX(${progress})`;
+  }
+
+  function requestFullscreenNow() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+    else if (el.msRequestFullscreen) el.msRequestFullscreen();
+  }
+
+  fullscreenButton.addEventListener('click', () => {
+    requestFullscreenNow();
+    waitingHint.textContent = 'Pantalla completa activada';
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+    document.body.classList.toggle('cinema-mode', !!isFs);
+    if (!isFs) {
+      waitingHint.textContent = 'Presiona el botón para ir a pantalla completa';
+    }
+  });
+
+  socket.on('cine', () => {
+    requestFullscreenNow();
+    fsIndicator.classList.add('show');
+    setTimeout(() => fsIndicator.classList.remove('show'), 2000);
+  });
+
+  socket.on('cambiar', (accion) => {
+    if (accion === 'mostrar') {
+      index = 0;
+      started = true;
+      waiting.classList.add('hide');
+    } else if (accion === 'siguiente') {
+      index++;
+      if (index >= diapositivas.length) index = 0;
+    } else if (accion === 'anterior') {
+      index--;
+      if (index < 0) index = diapositivas.length - 1;
+    } else if (/^[0-9]+$/.test(accion)) {
+      // Salto directo por número de voz (ej. "3") — 1-indexado desde el control
+      const n = parseInt(accion, 10);
+      if (n < 1 || n > diapositivas.length) return;
+      index = n - 1;
+      started = true;
+      waiting.classList.add('hide');
+    } else {
+      return;
+    }
+
+    updateHud();
+    updateProgress();
+
+    img.classList.remove('show');
+    imgBg.classList.remove('show');
+    img.onload = () => {
+      img.classList.add('show');
+      imgBg.classList.add('show');
+      if (index === diapositivas.length - 1) confetti();
+    };
+    img.src = diapositivas[index];
+    imgBg.src = diapositivas[index];
+  });
+
+  function confetti() {
+    const canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '10000';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    const pieces = [];
+    const colors = ['#34cdfa', '#ffcb4d', '#ff6b6b', '#e9eef2', '#97ecff'];
+    for (let i = 0; i < 150; i++) {
+      pieces.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        vx: Math.random() * 10 - 5,
+        vy: Math.random() * 3 + 2,
+        size: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 360,
+        vr: Math.random() * 10 - 5
+      });
+    }
+    let animationId;
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach(p => {
+        p.y += p.vy;
+        p.x += p.vx;
+        p.rotation += p.vr;
+        if (p.y > canvas.height) {
+          p.y = -p.size;
+          p.x = Math.random() * canvas.width;
+        }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation * Math.PI / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+      });
+      animationId = requestAnimationFrame(animate);
+    }
+    animate();
+    setTimeout(() => {
+      cancelAnimationFrame(animationId);
+      document.body.removeChild(canvas);
+    }, 3000);
+  }
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' || event.key === 'Esc') {
+      if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

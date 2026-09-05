@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gestionar imágenes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="control">
+<div class="app">
+
+  <div class="app-header">
+    <h1>Gestionar imágenes</h1>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando…</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="btn-row">
+      <button class="btn primary" id="uploadBtn">➕ Subir imágenes</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+    <div class="image-list" id="imageList"></div>
+    <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Subí la primera.</p>
+  </div>
+
+  <div class="btn-row">
+    <a class="btn" href="control.html">⬅️ Volver</a>
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  socket.on('connect', () => {
+    statusDot.classList.add('online');
+    statusText.textContent = 'Conectado';
+  });
+  socket.on('disconnect', () => {
+    statusDot.classList.remove('online');
+    statusText.textContent = 'Sin conexión';
+  });
+
+  let images = [];
+
+  const imageList = document.getElementById('imageList');
+  const emptyHint = document.getElementById('emptyHint');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+
+  async function loadImages() {
+    try {
+      const res = await fetch('/api/images');
+      images = await res.json(); // [{ id, src }, ...]
+      render();
+    } catch (err) {
+      console.error('Error loading images:', err);
+    }
+  }
+
+  function render() {
+    imageList.innerHTML = '';
+    emptyHint.hidden = images.length > 0;
+
+    images.forEach(({ id, src }, i) => {
+      const row = document.createElement('div');
+      row.className = 'image-row';
+      row.dataset.id = id;
+      row.innerHTML = `
+        <span class="drag-handle" aria-hidden="true">
+          <span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span>
+        </span>
+        <span class="order-badge">${i + 1}</span>
+        <img class="thumb" src="${src}" alt="">
+        <span class="filename-label">${id.split('/').pop()}</span>
+        <div class="row-actions">
+          <button type="button" class="icon-btn" data-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Subir de posición">▲</button>
+          <button type="button" class="icon-btn" data-action="down" ${i === images.length - 1 ? 'disabled' : ''} aria-label="Bajar de posición">▼</button>
+          <button type="button" class="icon-btn danger" data-action="delete" aria-label="Eliminar">🗑️</button>
+        </div>
+      `;
+      row.querySelector('[data-action="up"]').addEventListener('click', () => move(i, -1));
+      row.querySelector('[data-action="down"]').addEventListener('click', () => move(i, 1));
+      row.querySelector('[data-action="delete"]').addEventListener('click', () => remove(id));
+      row.querySelector('.drag-handle').addEventListener('pointerdown', (e) => startDrag(e, row));
+      imageList.appendChild(row);
+    });
+  }
+
+  // ---- Arrastrar con el dedo (o el mouse) para reordenar ----
+  // Las flechas ▲▼ siguen andando igual — esto es un atajo más rápido, no un reemplazo.
+  function startDrag(e, row) {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    let startY = e.clientY;
+
+    row.classList.add('dragging');
+    document.body.classList.add('dragging-active');
+    handle.setPointerCapture(e.pointerId);
+
+    function onMove(ev) {
+      const dy = ev.clientY - startY;
+      row.style.transform = `translateY(${dy}px)`;
+
+      const rowRect = row.getBoundingClientRect();
+      const rowCenter = rowRect.top + rowRect.height / 2;
+      const siblings = Array.from(imageList.children).filter(r => r !== row);
+
+      for (const sib of siblings) {
+        const sibRect = sib.getBoundingClientRect();
+        const sibCenter = sibRect.top + sibRect.height / 2;
+        const rows = Array.from(imageList.children);
+        const rowIndex = rows.indexOf(row);
+        const sibIndex = rows.indexOf(sib);
+
+        if (rowIndex < sibIndex && rowCenter > sibCenter) {
+          imageList.insertBefore(sib, row);
+          startY += sibRect.height;
+          row.style.transform = `translateY(${ev.clientY - startY}px)`;
+        } else if (rowIndex > sibIndex && rowCenter < sibCenter) {
+          imageList.insertBefore(row, sib);
+          startY -= sibRect.height;
+          row.style.transform = `translateY(${ev.clientY - startY}px)`;
+        }
+      }
+    }
+
+    function onUp(ev) {
+      handle.releasePointerCapture(ev.pointerId);
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      row.classList.remove('dragging');
+      document.body.classList.remove('dragging-active');
+      row.style.transform = '';
+
+      // El DOM ya quedó en el orden final — reconstruimos el array a partir de él
+      const byId = new Map(images.map(img => [img.id, img]));
+      images = Array.from(imageList.children).map(r => byId.get(r.dataset.id));
+      render();
+      saveOrder();
+    }
+
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
+
+  async function saveOrder() {
+    try {
+      await fetch('/api/images/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: images.map(r => r.id) })
+      });
+    } catch (err) {
+      console.error('No se pudo guardar el orden:', err);
+    }
+  }
+
+  function move(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= images.length) return;
+    [images[index], images[target]] = [images[target], images[index]];
+    render();
+    saveOrder();
+  }
+
+  async function remove(id) {
+    if (!confirm('¿Eliminar esta imagen? Esta acción no se puede deshacer.')) return;
+    try {
+      const res = await fetch('/api/images/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+      images = data;
+      render();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  uploadBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    if (!fileInput.files.length) return;
+    const formData = new FormData();
+    Array.from(fileInput.files).forEach(f => formData.append('images', f));
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = '⏳ Subiendo…';
+    try {
+      const res = await fetch('/api/images/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir');
+      images = data;
+      render();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = '➕ Subir imágenes';
+      fileInput.value = '';
+    }
+  });
+
+  // Si alguien más sube/borra/reordena desde otro dispositivo, esta vista se actualiza sola
+  socket.on('imagenesActualizadas', loadImages);
+
+  loadImages();
+</script>
+
+</body>
+</html>

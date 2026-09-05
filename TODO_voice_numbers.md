@@ -1,0 +1,1 @@
+s# TODO: Voice Number Commands (1e.png to 6e.png)\n\n1. [ ] Update control.html onresult to emit \"1\"-\"6\"\n2. [ ] Update pantalla.html socket.on(\"cambiar\") to set index = parseInt(accion)-1 for \"1\"-\"6\"\n3. [ ] Update pantalla_new.html same\n4. [ ] Test voice \"2\" → 2e.png\n5. [ ] Push to GitHub\n6. [ ] Complete
