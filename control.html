@@ -125,6 +125,15 @@
     return null;
   }
 
+  const voiceBtn = document.getElementById('voiceBtn');
+  const voiceStatus = document.getElementById('voiceStatus');
+
+  function setVoiceUI(active) {
+    voiceBtn.textContent = active ? '🛑 Detener voz' : '🎤 Voz';
+    voiceBtn.classList.toggle('active', active);
+    voiceStatus.hidden = !active;
+  }
+
   function initVoice() {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
@@ -149,9 +158,27 @@
       };
       recognition.onerror = (event) => {
         console.error('Voice error:', event.error);
+        // Sin permiso de micrófono no tiene sentido seguir reintentando
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          voiceActive = false;
+          setVoiceUI(false);
+        }
       };
+      // El navegador corta el reconocimiento solo (a veces tras una sola orden,
+      // sobre todo en celular) aunque continuous=true — por eso lo reiniciamos
+      // acá cada vez que termina, mientras el usuario no lo haya apagado.
       recognition.onend = () => {
-        console.log('Recognition ended, loop will restart if active');
+        if (!voiceActive) return;
+        try {
+          recognition.start();
+        } catch (e) {
+          // A veces onend llega justo después de un start() y tira "already started"
+          setTimeout(() => {
+            if (voiceActive) {
+              try { recognition.start(); } catch (e2) { /* se reintentará en el próximo onend */ }
+            }
+          }, 250);
+        }
       };
     } else {
       alert('Speech Recognition no soportado en este navegador.');
@@ -159,37 +186,15 @@
   }
 
   function toggleVoice() {
-    const btn = document.getElementById('voiceBtn');
-    const status = document.getElementById('voiceStatus');
     if (!recognition) initVoice();
     if (voiceActive) {
       voiceActive = false;
       recognition.stop();
-      btn.textContent = '🎤 Voz';
-      btn.classList.remove('active');
-      status.hidden = true;
+      setVoiceUI(false);
     } else {
       voiceActive = true;
       recognition.start();
-      btn.textContent = '🛑 Detener voz';
-      btn.classList.add('active');
-      status.hidden = false;
-      restartLoop();
-    }
-  }
-
-  let rafId;
-
-  function restartLoop() {
-    if (voiceActive && (!recognition || recognition.readyState === 4)) {
-      try {
-        recognition.start();
-      } catch (e) {
-        console.log('Restart failed, retrying...', e);
-      }
-    }
-    if (voiceActive) {
-      rafId = requestAnimationFrame(restartLoop);
+      setVoiceUI(true);
     }
   }
 
