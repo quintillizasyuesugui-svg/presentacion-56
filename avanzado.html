@@ -402,12 +402,15 @@
   // el tamaño (scale) — todo 1:1 con el dedo, sin animación de por medio mientras
   // se toca, para que se sienta directo.
   //
-  // El toque escucha en la IMAGEN, no en la celda: la celda ocupa siempre el
-  // lienzo entero (inset:0) así que si escuchara ahí, la de más arriba taparía
-  // el toque a todas las de abajo sin importar dónde se toque. La imagen, en
-  // cambio, tiene el transform (escala/posición) puesto encima, así que su
-  // área de toque se achica y se mueve junto con lo que se ve — tocar donde
-  // hoy no hay nada de esa imagen deja pasar el toque a la que esté debajo.
+  // El toque escucha tanto en la imagen como en la celda:
+  // - La imagen (transformada) tiene su área de toque justo donde se ve —
+  //   eso es lo que permite tocar una imagen chica para elegirla aunque haya
+  //   otra encima en otra parte del lienzo (la celda es pointer-events:none
+  //   por defecto, así el toque pasa a través hacia lo que sí se ve ahí).
+  // - Pero una vez que una imagen queda activa (.editor-cell.active), su
+  //   celda vuelve a responder en TODO el lienzo (pointer-events:auto) — así
+  //   arrastrar o pellizcar no falla si el dedo se corre un poco fuera del
+  //   recuadro exacto de una imagen chica o muy achicada.
   function attachEditorGestures(cell, img, state, onGrab) {
     const pointers = new Map();
     let startDist = null;
@@ -420,8 +423,8 @@
     }
     apply();
 
-    img.addEventListener('pointerdown', (e) => {
-      img.setPointerCapture(e.pointerId);
+    function onDown(e) {
+      e.currentTarget.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       onGrab();
 
@@ -434,9 +437,9 @@
         startMid = { x: e.clientX, y: e.clientY };
       }
       startXY = { x: state.x, y: state.y };
-    });
+    }
 
-    img.addEventListener('pointermove', (e) => {
+    function onMove(e) {
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // % relativo al lienzo entero (la celda), no a la imagen ya achicada —
@@ -456,7 +459,7 @@
         state.y = clamp(startXY.y + ((p.y - startMid.y) / rect.height) * 100, -100, 100);
       }
       apply();
-    });
+    }
 
     function release(e) {
       pointers.delete(e.pointerId);
@@ -467,8 +470,13 @@
         startMid = { x: p.x, y: p.y };
       }
     }
-    img.addEventListener('pointerup', release);
-    img.addEventListener('pointercancel', release);
+
+    [cell, img].forEach((el) => {
+      el.addEventListener('pointerdown', onDown);
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointercancel', release);
+    });
   }
 
   editorCancel.addEventListener('click', () => closeOverlay(editorOverlay));

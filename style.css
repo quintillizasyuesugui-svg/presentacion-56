@@ -792,16 +792,25 @@ body.dragging-active { user-select: none; }
   border-radius: var(--radius-md);
   overflow: hidden;
   margin: 14px 0;
+  /* Refuerzo: que el navegador nunca interprete un pellizco acá adentro
+     como su propio zoom de página, sea cual sea el elemento exacto tocado. */
+  touch-action: none;
 }
 
 .editor-cell {
   position: absolute;
   inset: 0;
-  /* Ocupa el lienzo entero siempre — sin esto, la celda de arriba tapa el
-     toque a las de abajo. El toque real lo recibe .editor-img (ver abajo),
-     que sí se achica/mueve junto con el transform. */
+  /* Por defecto no ocupa nada — si no, la celda de arriba tapa el toque a
+     las de abajo. El toque lo recibe .editor-img (ver abajo), que se
+     achica/mueve junto con el transform, dejando pasar el toque a lo que
+     esté debajo donde esa imagen no tiene nada. */
   pointer-events: none;
 }
+
+/* La imagen activa, en cambio, sí responde en todo el lienzo — así arrastrar
+   o pellizcar no falla si el dedo se corre un poco fuera de su recuadro
+   exacto (más un problema cuanto más chica está la imagen). */
+.editor-cell.active { pointer-events: auto; }
 
 /* Sólo se nota cuando hay más de una capa (unir imágenes) — marca cuál responde al dedo */
 .editor-frame:has(.editor-cell + .editor-cell) .editor-cell { opacity: 0.75; }
