@@ -52,6 +52,11 @@
   <div class="modal-card editor-card">
     <h2 id="editorTitle">Tamaño y posición</h2>
     <div class="editor-frame" id="editorFrame"></div>
+
+    <!-- Unir imágenes: elegir por miniatura siempre funciona, aunque en el
+         lienzo una imagen grande tape a las demás o estén muy juntas -->
+    <div class="layer-list" id="layerList" hidden></div>
+
     <p class="editor-hint" id="editorHint">Arrastrá con el dedo para mover · pellizcá para achicar o agrandar</p>
 
     <!-- Respaldo por si el arrastre/pellizco no responde bien en algún celular —
@@ -268,6 +273,7 @@
   const editorOverlay = document.getElementById('editorOverlay');
   const editorTitle = document.getElementById('editorTitle');
   const editorFrame = document.getElementById('editorFrame');
+  const layerList = document.getElementById('layerList');
   const editorHint = document.getElementById('editorHint');
   const editorCancel = document.getElementById('editorCancel');
   const editorConfirm = document.getElementById('editorConfirm');
@@ -298,6 +304,7 @@
       ? 'Tocá una imagen para traerla al frente, arrastrá para ubicarla donde quieras, pellizcá para achicarla o agrandarla'
       : 'Arrastrá con el dedo para mover · pellizcá para achicar o agrandar';
     buildEditorFrame();
+    buildLayerList();
     openOverlay(editorOverlay);
   }
 
@@ -320,6 +327,27 @@
     });
   }
 
+  // Miniaturas para elegir cuál imagen está activa — no depende de tocar el
+  // lienzo, así que sigue funcionando aunque una imagen grande tape a las
+  // demás o estén muy juntas para tocarlas con precisión.
+  function buildLayerList() {
+    layerList.innerHTML = '';
+    if (editorMode !== 'combine' || editorRecords.length < 2) {
+      layerList.hidden = true;
+      return;
+    }
+    layerList.hidden = false;
+    editorRecords.forEach((record, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'layer-thumb';
+      if (i === activeCellIndex) btn.classList.add('active');
+      btn.innerHTML = `<img src="${record.src}" alt=""><span>${i + 1}</span>`;
+      btn.addEventListener('click', () => setActiveCell(i));
+      layerList.appendChild(btn);
+    });
+  }
+
   // La misma imagen que responde al dedo es la que mueven los botones —
   // ambos caminos terminan escribiendo el mismo { scale, x, y } y pintándolo igual.
   function applyCellTransform(i) {
@@ -333,6 +361,7 @@
   function setActiveCell(i) {
     activeCellIndex = i;
     cellEls.forEach((cell, idx) => cell.classList.toggle('active', idx === i));
+    Array.from(layerList.children).forEach((btn, idx) => btn.classList.toggle('active', idx === i));
     // La traemos al frente del lienzo — si estaba tapada por otra, ahora se ve
     // y se puede agarrar. El orden final en el DOM es el que se usa al armar
     // el collage, así lo que se ve arriba acá queda arriba en la imagen final.
