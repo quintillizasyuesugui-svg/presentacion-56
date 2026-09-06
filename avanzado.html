@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- maximum-scale/user-scalable=no: sin esto, el navegador puede tomar el
+       pellizco como su propio zoom de página en vez de dejárselo al editor
+       (pasa en algunos celulares aunque el CSS diga touch-action: none). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <title>Modo avanzado</title>
   <link rel="stylesheet" href="style.css">
 </head>
