@@ -797,8 +797,10 @@ body.dragging-active { user-select: none; }
 .editor-cell {
   position: absolute;
   inset: 0;
-  touch-action: none;
-  cursor: grab;
+  /* Ocupa el lienzo entero siempre — sin esto, la celda de arriba tapa el
+     toque a las de abajo. El toque real lo recibe .editor-img (ver abajo),
+     que sí se achica/mueve junto con el transform. */
+  pointer-events: none;
 }
 
 /* Sólo se nota cuando hay más de una capa (unir imágenes) — marca cuál responde al dedo */
@@ -815,6 +817,8 @@ body.dragging-active { user-select: none; }
   user-select: none;
   -webkit-user-drag: none;
   touch-action: none;
+  pointer-events: auto;
+  cursor: grab;
 }
 
 .editor-hint {

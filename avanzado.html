@@ -363,6 +363,13 @@
   // Arrastrar con un dedo mueve la imagen (translate %); con dos, pellizcar cambia
   // el tamaño (scale) — todo 1:1 con el dedo, sin animación de por medio mientras
   // se toca, para que se sienta directo.
+  //
+  // El toque escucha en la IMAGEN, no en la celda: la celda ocupa siempre el
+  // lienzo entero (inset:0) así que si escuchara ahí, la de más arriba taparía
+  // el toque a todas las de abajo sin importar dónde se toque. La imagen, en
+  // cambio, tiene el transform (escala/posición) puesto encima, así que su
+  // área de toque se achica y se mueve junto con lo que se ve — tocar donde
+  // hoy no hay nada de esa imagen deja pasar el toque a la que esté debajo.
   function attachEditorGestures(cell, img, state, onGrab) {
     const pointers = new Map();
     let startDist = null;
@@ -375,8 +382,8 @@
     }
     apply();
 
-    cell.addEventListener('pointerdown', (e) => {
-      cell.setPointerCapture(e.pointerId);
+    img.addEventListener('pointerdown', (e) => {
+      img.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       onGrab();
 
@@ -391,9 +398,11 @@
       startXY = { x: state.x, y: state.y };
     });
 
-    cell.addEventListener('pointermove', (e) => {
+    img.addEventListener('pointermove', (e) => {
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // % relativo al lienzo entero (la celda), no a la imagen ya achicada —
+      // así el número guardado sigue significando lo mismo pase lo que pase.
       const rect = cell.getBoundingClientRect();
 
       if (pointers.size === 2) {
@@ -420,8 +429,8 @@
         startMid = { x: p.x, y: p.y };
       }
     }
-    cell.addEventListener('pointerup', release);
-    cell.addEventListener('pointercancel', release);
+    img.addEventListener('pointerup', release);
+    img.addEventListener('pointercancel', release);
   }
 
   editorCancel.addEventListener('click', () => closeOverlay(editorOverlay));
