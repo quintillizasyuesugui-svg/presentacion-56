@@ -38,13 +38,24 @@
     <p id="voiceHeard" class="voice-heard" hidden></p>
 
     <div class="btn-row utility-row">
-      <button class="btn small" onclick="fullscreen()">📺 Pantalla</button>
+      <button class="btn small" onclick="openFullscreenPicker()">📺 Pantalla</button>
       <button class="btn small voice" id="voiceBtn" onclick="toggleVoice()">🎤 Voz</button>
       <a class="btn small" href="manage.html">🖼️ Imágenes</a>
       <a class="btn small icon-only" href="avanzado.html" aria-label="Modo avanzado">☰</a>
     </div>
   </div>
 
+</div>
+
+<div class="modal-overlay" id="fsOverlay" hidden>
+  <div class="modal-card">
+    <h2>Pantalla completa</h2>
+    <p>¿En qué pantalla?</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="fsPhoneBtn">📱 Mi celular</button>
+      <button type="button" class="btn primary" id="fsPcBtn">🖥️ La PC</button>
+    </div>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -212,14 +223,44 @@
     }
   }
 
-  function fullscreen() {
-    socket.emit('cine');
+  // El botón "Pantalla" puede referirse a dos pantallas distintas (el celular
+  // con el control, o la PC/proyector con pantalla.html) — antes hacía las
+  // dos cosas a la vez sin preguntar, así que ahora se elige primero cuál.
+  const fsOverlay = document.getElementById('fsOverlay');
+  const fsPhoneBtn = document.getElementById('fsPhoneBtn');
+  const fsPcBtn = document.getElementById('fsPcBtn');
+
+  function openFullscreenPicker() {
+    fsOverlay.hidden = false;
+    requestAnimationFrame(() => fsOverlay.classList.add('show'));
+  }
+
+  function closeFullscreenPicker() {
+    fsOverlay.classList.remove('show');
+    setTimeout(() => { fsOverlay.hidden = true; }, 200);
+  }
+
+  function requestFullscreenLocal() {
     const el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen();
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
     else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
     else if (el.msRequestFullscreen) el.msRequestFullscreen();
   }
+
+  fsPhoneBtn.addEventListener('click', () => {
+    closeFullscreenPicker();
+    requestFullscreenLocal();
+  });
+
+  fsPcBtn.addEventListener('click', () => {
+    closeFullscreenPicker();
+    socket.emit('cine'); // pantalla.html se pone fullscreen sola si hace falta
+  });
+
+  fsOverlay.addEventListener('click', (event) => {
+    if (event.target === fsOverlay) closeFullscreenPicker();
+  });
 </script>
 
 </body>
