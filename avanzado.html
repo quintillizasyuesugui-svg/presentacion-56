@@ -301,6 +301,10 @@
 
       const img = document.createElement('img');
       img.className = 'editor-img';
+      // Unir imágenes: por defecto cada una llena su recuadro (sin bordes
+      // negros), recortando lo que sobre. Tamaño y posición (una sola imagen)
+      // sigue mostrándola entera por defecto, como en pantalla.html.
+      if (editorMode === 'combine') img.classList.add('fill');
       img.src = record.src;
       cell.appendChild(img);
       editorFrame.appendChild(cell);
@@ -458,7 +462,10 @@
 
   // Arma el collage final en un canvas de 1920x1080 (mismo 16:9 que asume el
   // resto de la app) replicando en cada celda el mismo encuadre que se vio en
-  // la vista previa (object-fit: contain + el pellizco/arrastre del usuario).
+  // la vista previa (object-fit: cover + el pellizco/arrastre del usuario).
+  // Cover en vez de contain: llena la celda sin bordes negros, recortando lo
+  // que sobre — por eso hace falta recortar el dibujo a los límites de la
+  // celda, si no la imagen se derramaría sobre la celda vecina.
   async function buildCombinedImage(records, states) {
     const W = 1920, H = 1080;
     const canvas = document.createElement('canvas');
@@ -474,14 +481,19 @@
       const state = states[i];
       const cellX = i * cellW;
 
-      const containScale = Math.min(cellW / img.naturalWidth, H / img.naturalHeight);
-      const finalScale = containScale * state.scale;
+      const fitScale = Math.max(cellW / img.naturalWidth, H / img.naturalHeight);
+      const finalScale = fitScale * state.scale;
       const drawW = img.naturalWidth * finalScale;
       const drawH = img.naturalHeight * finalScale;
       const centerX = cellX + cellW / 2 + (state.x / 100) * cellW;
       const centerY = H / 2 + (state.y / 100) * H;
 
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cellX, 0, cellW, H);
+      ctx.clip();
       ctx.drawImage(img, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+      ctx.restore();
     }
 
     try {
