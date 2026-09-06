@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Modo avanzado</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="control">
+<div class="app">
+
+  <div class="app-header">
+    <h1>Modo avanzado</h1>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando…</span>
+    </div>
+  </div>
+
+  <div class="panel advanced-panel">
+    <div class="btn-row">
+      <button type="button" class="btn secondary" id="combineBtn">🧩 Unir imágenes</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn secondary" id="resizeBtn">🖼️ Tamaño y posición</button>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="btn-row">
+    <a class="btn" href="control.html">⬅️ Volver</a>
+  </div>
+
+</div>
+
+<!-- Paso 1: elegir imagen(es) de la lista -->
+<div class="modal-overlay" id="pickerOverlay" hidden>
+  <div class="modal-card picker-card">
+    <h2 id="pickerTitle">Elegí una imagen</h2>
+    <p id="pickerHint">Tocá para seleccionar.</p>
+    <div class="picker-list" id="pickerList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn" id="pickerCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="pickerNext" disabled>Siguiente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Paso 2: vista previa con arrastre/pellizco, igual a como se va a ver en pantalla -->
+<div class="modal-overlay" id="editorOverlay" hidden>
+  <div class="modal-card editor-card">
+    <h2 id="editorTitle">Tamaño y posición</h2>
+    <div class="editor-frame" id="editorFrame"></div>
+    <p class="editor-hint" id="editorHint">Arrastrá con el dedo para mover · pellizcá para achicar o agrandar</p>
+
+    <!-- Respaldo por si el arrastre/pellizco no responde bien en algún celular —
+         actúan siempre sobre la imagen tildada (marcada con el borde celeste) -->
+    <div class="editor-controls">
+      <button type="button" class="chip-btn" data-nudge="left" aria-label="Mover a la izquierda">◀</button>
+      <button type="button" class="chip-btn" data-nudge="up" aria-label="Mover arriba">▲</button>
+      <button type="button" class="chip-btn" data-nudge="down" aria-label="Mover abajo">▼</button>
+      <button type="button" class="chip-btn" data-nudge="right" aria-label="Mover a la derecha">▶</button>
+      <span class="editor-controls-gap"></span>
+      <button type="button" class="chip-btn" data-nudge="zoom-out" aria-label="Achicar">－</button>
+      <button type="button" class="chip-btn" data-nudge="zoom-in" aria-label="Agrandar">＋</button>
+      <button type="button" class="chip-btn" data-nudge="reset">Centrar</button>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn" id="editorCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="editorConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmación propia para "Remover" (en vez del cartel nativo del navegador) -->
+<div class="modal-overlay" id="confirmOverlay" hidden>
+  <div class="modal-card">
+    <h2>Separar unión</h2>
+    <p id="confirmMessage">¿Separar esta diapositiva combinada en las imágenes originales?</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="confirmCancel">Cancelar</button>
+      <button type="button" class="btn danger-solid" id="confirmAccept">Separar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="alert" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  socket.on('connect', () => {
+    statusDot.classList.add('online');
+    statusText.textContent = 'Conectado';
+  });
+  socket.on('disconnect', () => {
+    statusDot.classList.remove('online');
+    statusText.textContent = 'Sin conexión';
+  });
+
+  const combineBtn = document.getElementById('combineBtn');
+  const resizeBtn = document.getElementById('resizeBtn');
+
+  // ---- Aviso propio (en vez de alert()) ----
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  function showToast(message) {
+    toast.textContent = message;
+    toast.hidden = false;
+    requestAnimationFrame(() => toast.classList.add('show'));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => { toast.hidden = true; }, 200);
+    }, 3200);
+  }
+
+  // ---- Confirmación propia (en vez de confirm()) ----
+  const confirmOverlay = document.getElementById('confirmOverlay');
+  const confirmCancel = document.getElementById('confirmCancel');
+  const confirmAccept = document.getElementById('confirmAccept');
+  function askConfirm(message) {
+    return new Promise(resolve => {
+      confirmOverlay.querySelector('#confirmMessage').textContent = message;
+      confirmOverlay.hidden = false;
+      requestAnimationFrame(() => confirmOverlay.classList.add('show'));
+      function cleanup(result) {
+        confirmOverlay.classList.remove('show');
+        setTimeout(() => { confirmOverlay.hidden = true; }, 200);
+        confirmAccept.removeEventListener('click', onAccept);
+        confirmCancel.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      const onAccept = () => cleanup(true);
+      const onCancel = () => cleanup(false);
+      confirmAccept.addEventListener('click', onAccept);
+      confirmCancel.addEventListener('click', onCancel);
+    });
+  }
+
+  function openOverlay(el) {
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('show'));
+  }
+  function closeOverlay(el) {
+    el.classList.remove('show');
+    setTimeout(() => { el.hidden = true; }, 200);
+  }
+
+  // ---- Paso 1: elegir imagen(es) ----
+  const pickerOverlay = document.getElementById('pickerOverlay');
+  const pickerTitle = document.getElementById('pickerTitle');
+  const pickerHint = document.getElementById('pickerHint');
+  const pickerList = document.getElementById('pickerList');
+  const pickerCancel = document.getElementById('pickerCancel');
+  const pickerNext = document.getElementById('pickerNext');
+
+  let advancedImages = [];  // último /api/images cargado para el picker
+  let pickerMode = null;    // 'combine' | 'resize'
+  let pickerSelection = []; // records tildados, en orden en que se tildaron
+
+  combineBtn.addEventListener('click', () => openPicker('combine'));
+  resizeBtn.addEventListener('click', () => openPicker('resize'));
+
+  async function openPicker(mode) {
+    pickerMode = mode;
+    pickerSelection = [];
+    pickerNext.disabled = true;
+    pickerTitle.textContent = mode === 'combine' ? 'Elegí de 2 a 4 imágenes' : 'Elegí una imagen';
+    pickerHint.textContent = mode === 'combine'
+      ? 'Tocá para tildar (máximo 4). Una combinada no se puede volver a unir.'
+      : 'Tocá la imagen que querés ajustar.';
+
+    try {
+      const res = await fetch('/api/images');
+      advancedImages = await res.json();
+    } catch (err) {
+      showToast('No se pudieron cargar las imágenes.');
+      return;
+    }
+    renderPickerList();
+    openOverlay(pickerOverlay);
+  }
+
+  pickerCancel.addEventListener('click', () => closeOverlay(pickerOverlay));
+
+  function renderPickerList() {
+    pickerList.innerHTML = '';
+    advancedImages.forEach((record, i) => {
+      const merged = !!record.originals;
+      const selected = pickerSelection.some(r => r.id === record.id);
+
+      const row = document.createElement('div');
+      row.className = 'picker-row';
+      if (selected) row.classList.add('selected');
+      if (pickerMode === 'combine' && merged) row.classList.add('disabled');
+      // El id de Cloudinary es un hash sin sentido para quien mira la lista —
+      // mejor mostrar la posición, que es justo lo que importa acá.
+      row.innerHTML = `
+        <span class="picker-check" aria-hidden="true"></span>
+        <img class="picker-thumb" src="${record.src}" alt="">
+        <span class="picker-label">${merged ? '🧩 Diapositiva combinada' : 'Imagen ' + (i + 1)}</span>
+        ${merged ? '<button type="button" class="chip-btn" data-action="uncombine">Remover</button>' : ''}
+      `;
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="uncombine"]')) return;
+        onPickRow(record);
+      });
+      const unBtn = row.querySelector('[data-action="uncombine"]');
+      if (unBtn) unBtn.addEventListener('click', (e) => { e.stopPropagation(); requestUncombine(record.id); });
+      pickerList.appendChild(row);
+    });
+  }
+
+  function onPickRow(record) {
+    if (pickerMode === 'combine') {
+      if (record.originals) return; // una combinada no se puede re-unir
+      const idx = pickerSelection.findIndex(r => r.id === record.id);
+      if (idx !== -1) {
+        pickerSelection.splice(idx, 1);
+      } else {
+        if (pickerSelection.length >= 4) { showToast('Máximo 4 imágenes.'); return; }
+        pickerSelection.push(record);
+      }
+      pickerNext.disabled = pickerSelection.length < 2;
+    } else {
+      pickerSelection = [record];
+      pickerNext.disabled = false;
+    }
+    renderPickerList();
+  }
+
+  pickerNext.addEventListener('click', () => {
+    let records;
+    if (pickerMode === 'combine') {
+      // El collage queda de izquierda a derecha según el orden actual del
+      // deck, no según el orden en que se tildaron — más predecible.
+      const ids = new Set(pickerSelection.map(r => r.id));
+      records = advancedImages.filter(r => ids.has(r.id));
+    } else {
+      records = [pickerSelection[0]];
+    }
+    closeOverlay(pickerOverlay);
+    openEditor(pickerMode, records);
+  });
+
+  async function requestUncombine(id) {
+    const ok = await askConfirm('¿Separar esta diapositiva combinada en las imágenes originales?');
+    if (!ok) return;
+    try {
+      const res = await fetch('/api/images/' + id + '/uncombine', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al separar.');
+      advancedImages = data;
+      renderPickerList();
+      showToast('Imágenes separadas.');
+    } catch (err) {
+      showToast(err.message);
+    }
+  }
+
+  // ---- Paso 2: vista previa con arrastre/pellizco ----
+  const editorOverlay = document.getElementById('editorOverlay');
+  const editorTitle = document.getElementById('editorTitle');
+  const editorFrame = document.getElementById('editorFrame');
+  const editorHint = document.getElementById('editorHint');
+  const editorCancel = document.getElementById('editorCancel');
+  const editorConfirm = document.getElementById('editorConfirm');
+
+  let editorMode = null;
+  let editorRecords = [];
+  let editorStates = [];   // { scale, x, y } por imagen, mismo índice que editorRecords
+  let activeCellIndex = 0;
+
+  function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+  function openEditor(mode, records) {
+    editorMode = mode;
+    editorRecords = records;
+    editorStates = records.map(r => r.transform ? { ...r.transform } : { scale: 1, x: 0, y: 0 });
+    activeCellIndex = 0;
+    editorTitle.textContent = mode === 'combine' ? 'Acomodá las imágenes' : 'Tamaño y posición';
+    editorHint.textContent = mode === 'combine'
+      ? 'Tocá una imagen para elegirla, arrastrá para moverla, pellizcá para achicarla o agrandarla'
+      : 'Arrastrá con el dedo para mover · pellizcá para achicar o agrandar';
+    buildEditorFrame();
+    openOverlay(editorOverlay);
+  }
+
+  function buildEditorFrame() {
+    editorFrame.innerHTML = '';
+    editorRecords.forEach((record, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'editor-cell';
+      if (i === activeCellIndex) cell.classList.add('active');
+
+      const img = document.createElement('img');
+      img.className = 'editor-img';
+      img.src = record.src;
+      cell.appendChild(img);
+      editorFrame.appendChild(cell);
+
+      attachEditorGestures(cell, img, editorStates[i], () => setActiveCell(i));
+    });
+  }
+
+  // La misma imagen que responde al dedo es la que mueven los botones —
+  // ambos caminos terminan escribiendo el mismo { scale, x, y } y pintándolo igual.
+  function applyCellTransform(i) {
+    const cell = editorFrame.children[i];
+    if (!cell) return;
+    const img = cell.querySelector('.editor-img');
+    const s = editorStates[i];
+    img.style.transform = `translate(${s.x}%, ${s.y}%) scale(${s.scale})`;
+  }
+
+  function setActiveCell(i) {
+    if (activeCellIndex === i) return;
+    activeCellIndex = i;
+    Array.from(editorFrame.children).forEach((cell, idx) => cell.classList.toggle('active', idx === i));
+  }
+
+  // Botones de respaldo — mismo efecto que el dedo, para cuando el arrastre o
+  // el pellizco no responden bien (pantallas chicas, navegadores raros, etc.)
+  const MOVE_STEP = 8;   // % del cuadro por toque
+  const ZOOM_STEP = 1.15; // factor multiplicativo por toque
+
+  document.querySelectorAll('[data-nudge]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const s = editorStates[activeCellIndex];
+      switch (btn.dataset.nudge) {
+        case 'left': s.x = clamp(s.x - MOVE_STEP, -100, 100); break;
+        case 'right': s.x = clamp(s.x + MOVE_STEP, -100, 100); break;
+        case 'up': s.y = clamp(s.y - MOVE_STEP, -100, 100); break;
+        case 'down': s.y = clamp(s.y + MOVE_STEP, -100, 100); break;
+        case 'zoom-in': s.scale = clamp(s.scale * ZOOM_STEP, 0.4, 3.5); break;
+        case 'zoom-out': s.scale = clamp(s.scale / ZOOM_STEP, 0.4, 3.5); break;
+        case 'reset': s.scale = 1; s.x = 0; s.y = 0; break;
+      }
+      applyCellTransform(activeCellIndex);
+    });
+  });
+
+  // Arrastrar con un dedo mueve la imagen (translate %); con dos, pellizcar cambia
+  // el tamaño (scale) — todo 1:1 con el dedo, sin animación de por medio mientras
+  // se toca, para que se sienta directo.
+  function attachEditorGestures(cell, img, state, onGrab) {
+    const pointers = new Map();
+    let startDist = null;
+    let startScale = 1;
+    let startMid = null;
+    let startXY = null;
+
+    function apply() {
+      img.style.transform = `translate(${state.x}%, ${state.y}%) scale(${state.scale})`;
+    }
+    apply();
+
+    cell.addEventListener('pointerdown', (e) => {
+      cell.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      onGrab();
+
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        startDist = Math.hypot(a.x - b.x, a.y - b.y);
+        startScale = state.scale;
+        startMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      } else {
+        startMid = { x: e.clientX, y: e.clientY };
+      }
+      startXY = { x: state.x, y: state.y };
+    });
+
+    cell.addEventListener('pointermove', (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const rect = cell.getBoundingClientRect();
+
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        state.scale = clamp(startScale * (dist / startDist), 0.4, 3.5);
+        state.x = clamp(startXY.x + ((mid.x - startMid.x) / rect.width) * 100, -100, 100);
+        state.y = clamp(startXY.y + ((mid.y - startMid.y) / rect.height) * 100, -100, 100);
+      } else if (pointers.size === 1) {
+        const p = [...pointers.values()][0];
+        state.x = clamp(startXY.x + ((p.x - startMid.x) / rect.width) * 100, -100, 100);
+        state.y = clamp(startXY.y + ((p.y - startMid.y) / rect.height) * 100, -100, 100);
+      }
+      apply();
+    });
+
+    function release(e) {
+      pointers.delete(e.pointerId);
+      // Si queda un dedo apoyado, recalcula el punto de partida para que no salte
+      if (pointers.size === 1) {
+        const p = [...pointers.values()][0];
+        startXY = { x: state.x, y: state.y };
+        startMid = { x: p.x, y: p.y };
+      }
+    }
+    cell.addEventListener('pointerup', release);
+    cell.addEventListener('pointercancel', release);
+  }
+
+  editorCancel.addEventListener('click', () => closeOverlay(editorOverlay));
+
+  editorConfirm.addEventListener('click', async () => {
+    editorConfirm.disabled = true;
+    try {
+      if (editorMode === 'resize') {
+        const record = editorRecords[0];
+        const res = await fetch('/api/images/' + record.id + '/transform', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editorStates[0])
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar el ajuste.');
+        showToast('Ajuste guardado.');
+      } else {
+        editorConfirm.textContent = '⏳ Uniendo…';
+        const dataUri = await buildCombinedImage(editorRecords, editorStates);
+        const res = await fetch('/api/images/combine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: editorRecords.map(r => r.id), dataUri })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al unir las imágenes.');
+        showToast('Imágenes unidas.');
+      }
+      closeOverlay(editorOverlay);
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      editorConfirm.disabled = false;
+      editorConfirm.textContent = 'Confirmar';
+    }
+  });
+
+  function loadImageEl(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous'; // necesario para poder leer el canvas (Cloudinary permite CORS)
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('No se pudo cargar una de las imágenes.'));
+      image.src = src;
+    });
+  }
+
+  // Arma el collage final en un canvas de 1920x1080 (mismo 16:9 que asume el
+  // resto de la app) replicando en cada celda el mismo encuadre que se vio en
+  // la vista previa (object-fit: contain + el pellizco/arrastre del usuario).
+  async function buildCombinedImage(records, states) {
+    const W = 1920, H = 1080;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    const cellW = W / records.length;
+    for (let i = 0; i < records.length; i++) {
+      const img = await loadImageEl(records[i].src);
+      const state = states[i];
+      const cellX = i * cellW;
+
+      const containScale = Math.min(cellW / img.naturalWidth, H / img.naturalHeight);
+      const finalScale = containScale * state.scale;
+      const drawW = img.naturalWidth * finalScale;
+      const drawH = img.naturalHeight * finalScale;
+      const centerX = cellX + cellW / 2 + (state.x / 100) * cellW;
+      const centerY = H / 2 + (state.y / 100) * H;
+
+      ctx.drawImage(img, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+    }
+
+    try {
+      return canvas.toDataURL('image/jpeg', 0.92);
+    } catch (err) {
+      throw new Error('No se pudo armar la imagen combinada (revisá la conexión).');
+    }
+  }
+</script>
+
+</body>
+</html>

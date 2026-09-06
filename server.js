@@ -18,7 +18,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(__dirname));
-app.use(express.json());
+// Límite alto porque /api/images/combine manda el collage ya armado como data URI en el body
+app.use(express.json({ limit: '20mb' }));
 
 app.get('/', (req, res) => {
   res.redirect('/pantalla.html');
@@ -130,10 +131,11 @@ function notifyImagesChanged() {
   io.emit('imagenesActualizadas');
 }
 
-// GET /images — array simple de src, para pantalla.html y control.html
+// GET /images — { src, transform } por diapositiva, para pantalla.html y control.html
+// (transform es el ajuste de tamaño/posición del Modo avanzado; null si nunca se tocó)
 app.get("/images", async (req, res) => {
   try {
-    res.json((await readOrder()).map(r => r.src));
+    res.json((await readOrder()).map(r => ({ src: r.src, transform: r.transform || null })));
   } catch (err) {
     console.error(err);
     res.status(500).send("Error en servidor");
@@ -212,6 +214,122 @@ app.delete('/api/images/*id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al borrar la imagen.' });
+  }
+});
+
+// ---- Tamaño y posición (Modo avanzado) ----
+// Ajuste no destructivo: sólo guarda { scale, x, y } junto a la imagen en el
+// orden — pantalla.html lo aplica con CSS al mostrarla, la imagen original no cambia.
+app.post('/api/images/*id/transform', async (req, res) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
+    const { scale, x, y } = req.body;
+
+    const valid = Number.isFinite(scale) && scale >= 0.3 && scale <= 4 &&
+      Number.isFinite(x) && x >= -100 && x <= 100 &&
+      Number.isFinite(y) && y >= -100 && y <= 100;
+    if (!valid) {
+      return res.status(400).json({ error: 'Ajuste inválido.' });
+    }
+
+    const order = await readOrder();
+    const record = order.find(r => r.id === id);
+    if (!record) {
+      return res.status(404).json({ error: 'Imagen no encontrada.' });
+    }
+
+    record.transform = { scale, x, y };
+    await writeOrder(order);
+    notifyImagesChanged();
+    res.json(order);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar el ajuste.' });
+  }
+});
+
+// ---- Unir imágenes (Modo avanzado) ----
+// El collage ya viene armado desde el celular (canvas) en dataUri — acá sólo se
+// sube como una imagen más y se reemplazan las 2-4 originales por esa única
+// diapositiva. "originals" guarda esas imágenes completas (con su propio ajuste
+// de tamaño/posición si tenían) para poder deshacer la unión con /uncombine.
+app.post('/api/images/combine', async (req, res) => {
+  if (!cloudinaryReady) {
+    return res.status(500).json({
+      error: 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá .env.example.'
+    });
+  }
+  try {
+    const { ids, dataUri } = req.body;
+    if (!Array.isArray(ids) || ids.length < 2 || ids.length > 4 || new Set(ids).size !== ids.length) {
+      return res.status(400).json({ error: 'Elegí entre 2 y 4 imágenes distintas para unir.' });
+    }
+    if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'No se recibió la imagen combinada.' });
+    }
+
+    const order = await readOrder();
+    const removedIndexes = ids.map(id => order.findIndex(r => r.id === id));
+    if (removedIndexes.some(i => i === -1)) {
+      return res.status(400).json({ error: 'Alguna de las imágenes ya no existe.' });
+    }
+    if (removedIndexes.some(i => order[i].originals)) {
+      return res.status(400).json({ error: 'Una diapositiva combinada no se puede volver a unir.' });
+    }
+
+    const removedSet = new Set(removedIndexes);
+    // El orden de "originals" sigue el orden actual del deck, no el orden en que
+    // se tildaron en el celular — así el collage queda de izquierda a derecha
+    // como están hoy las diapositivas.
+    const originals = order.filter((r, i) => removedSet.has(i));
+
+    const result = await cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' });
+    const merged = { id: result.public_id, src: result.secure_url, originals };
+
+    const next = [];
+    let inserted = false;
+    order.forEach((record, i) => {
+      if (removedSet.has(i)) {
+        if (!inserted) { next.push(merged); inserted = true; }
+        return;
+      }
+      next.push(record);
+    });
+
+    await writeOrder(next);
+    notifyImagesChanged();
+    res.json(next);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al unir las imágenes.' });
+  }
+});
+
+// ---- Deshacer una unión ----
+app.post('/api/images/*id/uncombine', async (req, res) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
+    const order = await readOrder();
+    const idx = order.findIndex(r => r.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Imagen no encontrada.' });
+    }
+    const record = order[idx];
+    if (!record.originals) {
+      return res.status(400).json({ error: 'Esta diapositiva no es una unión.' });
+    }
+
+    if (record.id.startsWith('presentacion/') && cloudinaryReady) {
+      await cloudinary.uploader.destroy(record.id).catch(() => {});
+    }
+
+    const next = [...order.slice(0, idx), ...record.originals, ...order.slice(idx + 1)];
+    await writeOrder(next);
+    notifyImagesChanged();
+    res.json(next);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al separar la unión.' });
   }
 });
 

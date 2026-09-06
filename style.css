@@ -107,7 +107,17 @@ body.pantalla {
 
 #imgBg.show { opacity: 1; }
 
-/* Imagen nítida, siempre completa — nunca recortada */
+/* Envoltorio que recibe el ajuste de tamaño/posición del Modo avanzado (celular).
+   Sin transición propia — el transform se aplica de un salto en el mismo instante
+   en que #img está oculta por el crossfade, así que el salto no se ve. */
+.img-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Imagen nítida — completa por defecto (nunca recortada); el ajuste manual
+   por imagen (si lo hay) vive en el transform de .img-frame, no acá. */
 #img {
   position: absolute;
   inset: 0;
@@ -116,7 +126,6 @@ body.pantalla {
   object-fit: contain;
   opacity: 0;
   transform: scale(1.04);
-  z-index: 2;
   transition: opacity var(--dur-slide) var(--ease-out), transform var(--dur-slide) var(--ease-out);
 }
 
@@ -406,14 +415,24 @@ body.control {
   border-color: var(--gray-600);
 }
 
-/* Pantalla completa / Voz / Gestionar imágenes — de uso ocasional, más chicas */
-.utility-row { gap: 8px; }
+/* Pantalla completa / Voz / Gestionar imágenes — de uso ocasional, más chicas.
+   flex-wrap para que en celulares muy angostos (~280px) el ☰ pase a una
+   segunda línea en vez de desbordar el ancho de la pantalla. */
+.utility-row { gap: 8px; flex-wrap: wrap; }
 .utility-row .btn {
   flex: 1;
   min-height: 48px;
   padding: 0.5rem 0.5rem;
   font-size: 0.8rem;
   gap: 0.35rem;
+}
+
+/* El ☰ de Modo avanzado no compite en ancho con los botones de texto */
+.utility-row .btn.icon-only {
+  flex: none;
+  width: 48px;
+  padding: 0;
+  font-size: 1.1rem;
 }
 
 .voice-status {
@@ -489,6 +508,8 @@ body.control {
   background: var(--gray-850);
   border: 1px solid var(--gray-700);
   border-radius: var(--radius-sm);
+  cursor: grab;
+  touch-action: none;
   transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 
@@ -502,24 +523,6 @@ body.control {
 
 /* Evita que el texto se seleccione mientras se arrastra por toda la lista */
 body.dragging-active { user-select: none; }
-
-.drag-handle {
-  flex: none;
-  display: grid;
-  grid-template-columns: repeat(2, 4px);
-  grid-auto-rows: 4px;
-  gap: 3px;
-  padding: 10px 6px;
-  cursor: grab;
-  touch-action: none;
-}
-
-.drag-handle .dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--gray-500);
-}
 
 .order-badge {
   flex: none;
@@ -611,8 +614,12 @@ body.dragging-active { user-select: none; }
   inset: 0;
   z-index: 50;
   display: flex;
-  align-items: center;
+  /* "safe center": centra si entra entero; si no entra (celular acostado, pantalla
+     chica), se ancla arriba y el overlay hace scroll — así los botones de abajo
+     (Confirmar/Cancelar) siempre quedan alcanzables en vez de cortados fuera de vista */
+  align-items: safe center;
   justify-content: center;
+  overflow-y: auto;
   padding: 20px;
   background: rgba(5, 8, 12, 0.6);
   backdrop-filter: blur(4px);
@@ -679,6 +686,167 @@ body.dragging-active { user-select: none; }
   }
 }
 
+/* ---- Modo avanzado (control.html): unir imágenes / tamaño y posición ---- */
+
+.advanced-panel { gap: 12px; }
+
+.picker-card, .editor-card { max-width: 380px; }
+
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: -4px -4px 16px;
+  padding: 4px;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.picker-row:active { background: var(--gray-800); transform: scale(0.98); }
+.picker-row.selected { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); }
+
+/* Una combinada no se puede volver a unir — se ve pero no se puede tildar */
+.picker-row.disabled { opacity: 0.5; cursor: default; }
+.picker-row.disabled:active { transform: none; }
+
+.picker-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gray-700);
+  background: #000;
+}
+
+.picker-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-check {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--gray-500);
+  color: transparent;
+  font-size: 0.85rem;
+  font-weight: 800;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.picker-check::after { content: '✓'; }
+
+.picker-row.selected .picker-check {
+  background: var(--primary-400);
+  border-color: var(--primary-400);
+  color: var(--gray-950);
+}
+
+.chip-btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary-300);
+  background: transparent;
+  border: 1.5px solid var(--primary-700);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.chip-btn:active { transform: scale(0.95); }
+
+/* Simula el escenario de pantalla.html (16:9) para que la vista previa se
+   parezca a como se va a ver de verdad en la pantalla grande. */
+.editor-frame {
+  position: relative;
+  display: flex;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 14px 0;
+}
+
+.editor-cell {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.editor-cell + .editor-cell { border-left: 1px solid rgba(255, 255, 255, 0.15); }
+
+/* Sólo se nota cuando hay más de una celda (unir imágenes) — marca cuál responde al dedo */
+.editor-frame:has(.editor-cell + .editor-cell) .editor-cell { opacity: 0.75; }
+.editor-frame:has(.editor-cell + .editor-cell) .editor-cell.active { opacity: 1; }
+.editor-cell.active { outline: 2px solid var(--primary-400); outline-offset: -2px; }
+
+.editor-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+.editor-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 16px;
+}
+
+/* Botones de respaldo del editor — mover/achicar/agrandar sin depender del gesto */
+.editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.editor-controls .chip-btn {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 1rem;
+}
+
+.editor-controls-gap { flex-basis: 100%; height: 0; }
+
+@media (min-width: 360px) {
+  .editor-controls-gap { flex-basis: auto; width: 10px; height: auto; }
+}
+
 .connection-hint {
   text-align: center;
   color: var(--text-muted);
@@ -691,4 +859,18 @@ body.dragging-active { user-select: none; }
 
 @media (max-width: 360px) {
   .panel { padding: 18px; gap: 18px; }
+  /* Celulares muy angostos (~280px): el ☰ de ancho fijo + 3 botones de texto
+     no entran con el espaciado normal — se lo achica un poco a todo. */
+  body.control { padding-left: 14px; padding-right: 14px; }
+  .utility-row { gap: 5px; }
+  .utility-row .btn { padding-left: 0.35rem; padding-right: 0.35rem; font-size: 0.72rem; }
+  .utility-row .btn.icon-only { width: 40px; }
+
+  /* Gestionar imágenes: la fila (miniatura + nombre + ▲▼🗑) no entra completa
+     en ~280px con el tamaño normal — se achica todo un poco. */
+  .image-row { gap: 8px; padding: 8px; }
+  .order-badge { width: 22px; height: 22px; font-size: 0.7rem; }
+  .thumb { width: 44px; height: 26px; }
+  .row-actions { gap: 4px; }
+  .icon-btn { width: 32px; height: 32px; }
 }

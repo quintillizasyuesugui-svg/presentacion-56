@@ -87,11 +87,6 @@
       row.className = 'image-row';
       row.dataset.id = id;
       row.innerHTML = `
-        <span class="drag-handle" aria-hidden="true">
-          <span class="dot"></span><span class="dot"></span>
-          <span class="dot"></span><span class="dot"></span>
-          <span class="dot"></span><span class="dot"></span>
-        </span>
         <span class="order-badge">${i + 1}</span>
         <img class="thumb" src="${src}" alt="">
         <span class="filename-label">${id.split('/').pop()}</span>
@@ -116,13 +111,19 @@
       row.querySelector('[data-action="up"]').addEventListener('click', () => move(i, -1));
       row.querySelector('[data-action="down"]').addEventListener('click', () => move(i, 1));
       row.querySelector('[data-action="delete"]').addEventListener('click', () => remove(id));
-      row.querySelector('.drag-handle').addEventListener('pointerdown', (e) => startDrag(e, row));
+      // Toda la fila se puede arrastrar para reordenar de un tirón, PERO las
+      // flechas ▲▼ siguen ahí como respaldo — por si el arrastre no anda bien
+      // en algún celular (mismo criterio que los botones del editor).
+      row.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.icon-btn')) return;
+        startDrag(e, row);
+      });
       imageList.appendChild(row);
     });
   }
 
   // ---- Arrastrar con el dedo (o el mouse) para reordenar ----
-  // Las flechas ▲▼ siguen andando igual — esto es un atajo más rápido, no un reemplazo.
+  // Se agarra de cualquier parte de la fila, no de un agarradero chiquito.
   function startDrag(e, row) {
     e.preventDefault();
     const handle = e.currentTarget;

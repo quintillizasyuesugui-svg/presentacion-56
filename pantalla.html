@@ -10,7 +10,9 @@
 
 <div class="stage">
   <img id="imgBg" src="" alt="" aria-hidden="true">
-  <img id="img" src="" alt="">
+  <div class="img-frame" id="imgFrame">
+    <img id="img" src="" alt="">
+  </div>
 </div>
 
 <div class="hud" id="hud">0 / 0</div>
@@ -39,6 +41,7 @@
   let started = false; // recién true cuando se recibe "mostrar" o un salto por número
 
   const img = document.getElementById('img');
+  const imgFrame = document.getElementById('imgFrame');
   const imgBg = document.getElementById('imgBg');
   const hud = document.getElementById('hud');
   const progressFill = document.getElementById('progressFill');
@@ -300,8 +303,14 @@
       imgBg.classList.add('show');
       if (index === diapositivas.length - 1) confetti();
     };
-    img.src = diapositivas[index];
-    imgBg.src = diapositivas[index];
+    const slide = diapositivas[index];
+    img.src = slide.src;
+    imgBg.src = slide.src;
+    // Ajuste de tamaño/posición del Modo avanzado (celular) — sin transición
+    // propia: el crossfade de #img ya tapa el salto al cambiar de diapositiva.
+    imgFrame.style.transform = slide.transform
+      ? `translate(${slide.transform.x}%, ${slide.transform.y}%) scale(${slide.transform.scale})`
+      : 'none';
   });
 
   function confetti() {
