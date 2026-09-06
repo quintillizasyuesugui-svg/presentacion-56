@@ -172,13 +172,15 @@
   combineBtn.addEventListener('click', () => openPicker('combine'));
   resizeBtn.addEventListener('click', () => openPicker('resize'));
 
+  const MAX_COMBINE = 30; // mismo tope que valida server.js en /api/images/combine
+
   async function openPicker(mode) {
     pickerMode = mode;
     pickerSelection = [];
     pickerNext.disabled = true;
-    pickerTitle.textContent = mode === 'combine' ? 'Elegí de 2 a 4 imágenes' : 'Elegí una imagen';
+    pickerTitle.textContent = mode === 'combine' ? `Elegí de 2 a ${MAX_COMBINE} imágenes` : 'Elegí una imagen';
     pickerHint.textContent = mode === 'combine'
-      ? 'Tocá para tildar (máximo 4). Una combinada no se puede volver a unir.'
+      ? `Tocá para tildar (máximo ${MAX_COMBINE}). Una combinada no se puede volver a unir.`
       : 'Tocá la imagen que querés ajustar.';
 
     try {
@@ -229,7 +231,7 @@
       if (idx !== -1) {
         pickerSelection.splice(idx, 1);
       } else {
-        if (pickerSelection.length >= 4) { showToast('Máximo 4 imágenes.'); return; }
+        if (pickerSelection.length >= MAX_COMBINE) { showToast(`Máximo ${MAX_COMBINE} imágenes.`); return; }
         pickerSelection.push(record);
       }
       pickerNext.disabled = pickerSelection.length < 2;
@@ -292,10 +294,17 @@
     activeCellIndex = 0;
     if (mode === 'combine') {
       // Nada de secciones automáticas — todas arrancan superpuestas al centro,
-      // apenas escalonadas en vertical para que se puedan agarrar por separado.
+      // apenas escalonadas en vertical para que se puedan agarrar por separado
+      // (con la miniatura de abajo también se puede elegir cualquiera igual).
       // El usuario las arrastra a donde quiera (arriba, abajo, al lado, etc.).
-      const mid = (records.length - 1) / 2;
-      editorStates = records.map((r, i) => ({ scale: 0.6, x: 0, y: (i - mid) * 22 }));
+      // El escalonado y el tamaño se acotan según cuántas son, para que con
+      // muchas imágenes (hasta 30) no arranquen la mitad fuera del lienzo.
+      const n = records.length;
+      const mid = (n - 1) / 2;
+      const spread = Math.min(60, n * 12); // recorrido total del escalonado, no crece sin límite
+      const step = n > 1 ? spread / (n - 1) : 0;
+      const scale = clamp(0.9 / Math.sqrt(n), 0.22, 0.6);
+      editorStates = records.map((r, i) => ({ scale, x: 0, y: (i - mid) * step }));
     } else {
       editorStates = records.map(r => r.transform ? { ...r.transform } : { scale: 1, x: 0, y: 0 });
     }

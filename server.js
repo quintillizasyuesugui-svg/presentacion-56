@@ -250,7 +250,7 @@ app.post('/api/images/*id/transform', async (req, res) => {
 
 // ---- Unir imágenes (Modo avanzado) ----
 // El collage ya viene armado desde el celular (canvas) en dataUri — acá sólo se
-// sube como una imagen más y se reemplazan las 2-4 originales por esa única
+// sube como una imagen más y se reemplazan las 2-30 originales por esa única
 // diapositiva. "originals" guarda esas imágenes completas (con su propio ajuste
 // de tamaño/posición si tenían) para poder deshacer la unión con /uncombine.
 app.post('/api/images/combine', async (req, res) => {
@@ -261,8 +261,8 @@ app.post('/api/images/combine', async (req, res) => {
   }
   try {
     const { ids, dataUri } = req.body;
-    if (!Array.isArray(ids) || ids.length < 2 || ids.length > 4 || new Set(ids).size !== ids.length) {
-      return res.status(400).json({ error: 'Elegí entre 2 y 4 imágenes distintas para unir.' });
+    if (!Array.isArray(ids) || ids.length < 2 || ids.length > 30 || new Set(ids).size !== ids.length) {
+      return res.status(400).json({ error: 'Elegí entre 2 y 30 imágenes distintas para unir.' });
     }
     if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image/')) {
       return res.status(400).json({ error: 'No se recibió la imagen combinada.' });
