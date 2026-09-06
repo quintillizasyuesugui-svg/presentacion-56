@@ -274,19 +274,28 @@
 
   let editorMode = null;
   let editorRecords = [];
-  let editorStates = [];   // { scale, x, y } por imagen, mismo índice que editorRecords
+  let editorStates = [];   // { scale, x, y } por imagen, mismo índice que editorRecords — x/y e y son % del lienzo completo, no de una celda
   let activeCellIndex = 0;
+  let cellEls = [];        // elementos <div class="editor-cell">, mismo índice que editorRecords (el orden en el DOM cambia al traer una al frente, así que no sirve para ubicarlas por índice)
 
   function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
   function openEditor(mode, records) {
     editorMode = mode;
     editorRecords = records;
-    editorStates = records.map(r => r.transform ? { ...r.transform } : { scale: 1, x: 0, y: 0 });
     activeCellIndex = 0;
+    if (mode === 'combine') {
+      // Nada de secciones automáticas — todas arrancan superpuestas al centro,
+      // apenas escalonadas en vertical para que se puedan agarrar por separado.
+      // El usuario las arrastra a donde quiera (arriba, abajo, al lado, etc.).
+      const mid = (records.length - 1) / 2;
+      editorStates = records.map((r, i) => ({ scale: 0.6, x: 0, y: (i - mid) * 22 }));
+    } else {
+      editorStates = records.map(r => r.transform ? { ...r.transform } : { scale: 1, x: 0, y: 0 });
+    }
     editorTitle.textContent = mode === 'combine' ? 'Acomodá las imágenes' : 'Tamaño y posición';
     editorHint.textContent = mode === 'combine'
-      ? 'Tocá una imagen para elegirla, arrastrá para moverla, pellizcá para achicarla o agrandarla'
+      ? 'Tocá una imagen para traerla al frente, arrastrá para ubicarla donde quieras, pellizcá para achicarla o agrandarla'
       : 'Arrastrá con el dedo para mover · pellizcá para achicar o agrandar';
     buildEditorFrame();
     openOverlay(editorOverlay);
@@ -294,6 +303,7 @@
 
   function buildEditorFrame() {
     editorFrame.innerHTML = '';
+    cellEls = [];
     editorRecords.forEach((record, i) => {
       const cell = document.createElement('div');
       cell.className = 'editor-cell';
@@ -301,13 +311,10 @@
 
       const img = document.createElement('img');
       img.className = 'editor-img';
-      // Unir imágenes: por defecto cada una llena su recuadro (sin bordes
-      // negros), recortando lo que sobre. Tamaño y posición (una sola imagen)
-      // sigue mostrándola entera por defecto, como en pantalla.html.
-      if (editorMode === 'combine') img.classList.add('fill');
       img.src = record.src;
       cell.appendChild(img);
       editorFrame.appendChild(cell);
+      cellEls[i] = cell;
 
       attachEditorGestures(cell, img, editorStates[i], () => setActiveCell(i));
     });
@@ -316,7 +323,7 @@
   // La misma imagen que responde al dedo es la que mueven los botones —
   // ambos caminos terminan escribiendo el mismo { scale, x, y } y pintándolo igual.
   function applyCellTransform(i) {
-    const cell = editorFrame.children[i];
+    const cell = cellEls[i];
     if (!cell) return;
     const img = cell.querySelector('.editor-img');
     const s = editorStates[i];
@@ -324,9 +331,12 @@
   }
 
   function setActiveCell(i) {
-    if (activeCellIndex === i) return;
     activeCellIndex = i;
-    Array.from(editorFrame.children).forEach((cell, idx) => cell.classList.toggle('active', idx === i));
+    cellEls.forEach((cell, idx) => cell.classList.toggle('active', idx === i));
+    // La traemos al frente del lienzo — si estaba tapada por otra, ahora se ve
+    // y se puede agarrar. El orden final en el DOM es el que se usa al armar
+    // el collage, así lo que se ve arriba acá queda arriba en la imagen final.
+    editorFrame.appendChild(cellEls[i]);
   }
 
   // Botones de respaldo — mismo efecto que el dedo, para cuando el arrastre o
@@ -431,7 +441,12 @@
         showToast('Ajuste guardado.');
       } else {
         editorConfirm.textContent = '⏳ Uniendo…';
-        const dataUri = await buildCombinedImage(editorRecords, editorStates);
+        // El orden real de "atrás hacia adelante" es el orden actual en el DOM
+        // (cambia cada vez que se toca una imagen para traerla al frente).
+        const stackOrder = Array.from(editorFrame.children).map(cell => cellEls.indexOf(cell));
+        const orderedRecords = stackOrder.map(i => editorRecords[i]);
+        const orderedStates = stackOrder.map(i => editorStates[i]);
+        const dataUri = await buildCombinedImage(orderedRecords, orderedStates);
         const res = await fetch('/api/images/combine', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -461,11 +476,11 @@
   }
 
   // Arma el collage final en un canvas de 1920x1080 (mismo 16:9 que asume el
-  // resto de la app) replicando en cada celda el mismo encuadre que se vio en
-  // la vista previa (object-fit: cover + el pellizco/arrastre del usuario).
-  // Cover en vez de contain: llena la celda sin bordes negros, recortando lo
-  // que sobre — por eso hace falta recortar el dibujo a los límites de la
-  // celda, si no la imagen se derramaría sobre la celda vecina.
+  // resto de la app), un solo lienzo compartido — no hay celdas ni secciones,
+  // cada imagen se dibuja donde el usuario la dejó (posición y tamaño son %
+  // del lienzo completo, igual que en la vista previa). "records"/"states"
+  // ya vienen en el orden de atrás hacia adelante (ver editorConfirm), así
+  // la que se veía arriba en la vista previa queda arriba acá también.
   async function buildCombinedImage(records, states) {
     const W = 1920, H = 1080;
     const canvas = document.createElement('canvas');
@@ -475,25 +490,18 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
 
-    const cellW = W / records.length;
     for (let i = 0; i < records.length; i++) {
       const img = await loadImageEl(records[i].src);
       const state = states[i];
-      const cellX = i * cellW;
 
-      const fitScale = Math.max(cellW / img.naturalWidth, H / img.naturalHeight);
+      const fitScale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
       const finalScale = fitScale * state.scale;
       const drawW = img.naturalWidth * finalScale;
       const drawH = img.naturalHeight * finalScale;
-      const centerX = cellX + cellW / 2 + (state.x / 100) * cellW;
+      const centerX = W / 2 + (state.x / 100) * W;
       const centerY = H / 2 + (state.y / 100) * H;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(cellX, 0, cellW, H);
-      ctx.clip();
       ctx.drawImage(img, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
-      ctx.restore();
     }
 
     try {

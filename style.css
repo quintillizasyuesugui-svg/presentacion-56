@@ -779,10 +779,12 @@ body.dragging-active { user-select: none; }
 .chip-btn:active { transform: scale(0.95); }
 
 /* Simula el escenario de pantalla.html (16:9) para que la vista previa se
-   parezca a como se va a ver de verdad en la pantalla grande. */
+   parezca a como se va a ver de verdad en la pantalla grande. Es un solo
+   lienzo compartido — no hay columnas ni secciones: cada imagen (.editor-cell)
+   es una capa libre superpuesta a las demás, del mismo tamaño que el lienzo
+   entero, y se ubica dentro con su propio transform (ver .editor-img). */
 .editor-frame {
   position: relative;
-  display: flex;
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
@@ -793,16 +795,13 @@ body.dragging-active { user-select: none; }
 }
 
 .editor-cell {
-  position: relative;
-  flex: 1;
-  overflow: hidden;
+  position: absolute;
+  inset: 0;
   touch-action: none;
   cursor: grab;
 }
 
-.editor-cell + .editor-cell { border-left: 1px solid rgba(255, 255, 255, 0.15); }
-
-/* Sólo se nota cuando hay más de una celda (unir imágenes) — marca cuál responde al dedo */
+/* Sólo se nota cuando hay más de una capa (unir imágenes) — marca cuál responde al dedo */
 .editor-frame:has(.editor-cell + .editor-cell) .editor-cell { opacity: 0.75; }
 .editor-frame:has(.editor-cell + .editor-cell) .editor-cell.active { opacity: 1; }
 .editor-cell.active { outline: 2px solid var(--primary-400); outline-offset: -2px; }
@@ -817,9 +816,6 @@ body.dragging-active { user-select: none; }
   -webkit-user-drag: none;
   touch-action: none;
 }
-
-/* Unir imágenes: llena el recuadro (recorta) en vez de dejar bordes negros */
-.editor-img.fill { object-fit: cover; }
 
 .editor-hint {
   text-align: center;
