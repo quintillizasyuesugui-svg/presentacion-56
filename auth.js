@@ -48,7 +48,7 @@
         ` : ''}
 
         <div id="authOld">
-          <input type="text" id="authPin" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+          <input type="password" id="authPin" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
           <div class="btn-row">
             <button type="button" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
           </div>
