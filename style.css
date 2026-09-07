@@ -1070,68 +1070,85 @@ body.dragging-active { user-select: none; }
   letter-spacing: 0.01em;
 }
 
-/* El anillo entero está inclinado en 3D (perspective + rotateX) y gira
-   sobre ese plano inclinado en vez de girar plano — así el frente se ve
-   más cerca/grande y el fondo más lejos/chico, como un anillo real
-   orbitando, no un círculo 2D. Gira parejo (linear — con ease se nota el
-   "salto" en cada vuelta). El pulso de brillo/tamaño de cada puntito va
-   aparte, en el <span> de adentro de cada <i>: si se anima junto con el
-   rotate+translateX que lo posiciona, ese transform se pisa y los
-   puntitos saltan al centro en vez de pulsar en su lugar. */
+/* Los 3 puntitos nunca rotan — son círculos planos que sólo se mueven en
+   translate()+scale(), así que siempre "miran de frente" a quien los ve,
+   nunca de canto. La sensación de 3D sale de que orbitan en una ELIPSE
+   (más ancha que alta, como un aro visto de costado) en vez de un
+   círculo, agrandándose y aclarándose cuando están "adelante" (abajo de
+   la elipse) y achicándose/apagándose cuando están "atrás" (arriba) — el
+   mismo truco que un aro inclinado de verdad, sin necesitar rotación 3D
+   (que además, compuesta con la posición de cada puntito, los terminaba
+   aplastando de forma pareja).
+   Un intento anterior usaba rotateX en 3D real para inclinar el anillo:
+   se descartó porque el contra-giro para "enderezar" cada puntito sólo
+   cancela bien la inclinación en un punto del aro, no en los otros (el
+   orden en que se componen rotate()+translateX()+rotateX() no es el
+   mismo para cada uno) — quedaban unos redondos y otros aplastados. */
 .auth-spinner {
   width: 48px;
-  height: 48px;
+  height: 34px;
   position: relative;
-  transform-style: preserve-3d;
-  animation: authSpinnerSpin 1.2s linear infinite;
 }
-.auth-spinner i {
+.auth-spinner span {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 0;
-  height: 0;
-}
-.auth-spinner i:nth-child(1) { transform: rotate(0deg) translateX(19px); }
-.auth-spinner i:nth-child(2) { transform: rotate(120deg) translateX(19px); }
-.auth-spinner i:nth-child(3) { transform: rotate(240deg) translateX(19px); }
-
-.auth-spinner i span {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  margin: -5px;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px;
   border-radius: 50%;
-  animation: authSpinnerPulseDot 1.2s ease-in-out infinite;
+  animation: authSpinnerOrbit 1.2s linear infinite;
 }
-.auth-spinner i:nth-child(2) span { animation-delay: -0.4s; }
-.auth-spinner i:nth-child(3) span { animation-delay: -0.8s; }
+.auth-spinner span:nth-child(2) { animation-delay: -0.4s; }
+.auth-spinner span:nth-child(3) { animation-delay: -0.8s; }
 
-/* Degradé radial (claro arriba a la izquierda, oscuro abajo a la derecha)
-   para que cada puntito se vea como una esfera con luz, no un círculo
-   plano — más la sombra propia, que lo despega del fondo. */
+/* Degradé radial de varios pasos (blanco → color → color oscuro) más 2
+   sombras internas (una clara arriba-izquierda, una oscura abajo-derecha)
+   para que cada puntito se vea como una esferita rellena y con volumen de
+   verdad, no un círculo plano con un tinte. La sombra de afuera lo
+   despega del fondo y el glow de color lo hace sentir "prendido". */
 .auth-spinner.blue span {
-  background: radial-gradient(circle at 35% 30%, #eafcff 0%, var(--primary-300) 25%, var(--primary-400) 55%, var(--primary-700) 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 10px 1px rgba(52, 205, 250, 0.55);
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, var(--primary-200) 20%, var(--primary-400) 48%, var(--primary-700) 82%, var(--primary-900) 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.55),
+    inset -2px -2px 3px rgba(0, 0, 0, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 10px 1px rgba(52, 205, 250, 0.55);
 }
 .auth-spinner.red span {
-  background: radial-gradient(circle at 35% 30%, #fff0f0 0%, var(--red-300) 25%, var(--red-400) 55%, var(--red-600) 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 10px 1px rgba(255, 107, 107, 0.55);
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, var(--red-300) 20%, var(--red-400) 48%, var(--red-600) 82%, #6e1418 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.55),
+    inset -2px -2px 3px rgba(0, 0, 0, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 10px 1px rgba(255, 107, 107, 0.55);
 }
 
-@keyframes authSpinnerSpin {
-  from { transform: perspective(220px) rotateX(55deg) rotateZ(0deg); }
-  to   { transform: perspective(220px) rotateX(55deg) rotateZ(360deg); }
-}
-@keyframes authSpinnerPulseDot {
-  0%, 100% { opacity: 0.25; transform: scale(0.7); }
-  50% { opacity: 1; transform: scale(1); }
+/* 5 paradas = 0°/90°/180°/270°/360° de la elipse (rx 17px, ry 6px).
+   Adelante (90°, abajo) el puntito queda más grande y brillante; atrás
+   (270°, arriba) más chico y apagado — la profundidad la da eso, no un
+   giro. linear porque es movimiento constante (una órbita), no algo que
+   entra o sale. */
+@keyframes authSpinnerOrbit {
+  0%   { transform: translate(17px, 0) scale(0.9); opacity: 0.65; }
+  25%  { transform: translate(0, 6px) scale(1.15); opacity: 1; }
+  50%  { transform: translate(-17px, 0) scale(0.9); opacity: 0.65; }
+  75%  { transform: translate(0, -6px) scale(0.65); opacity: 0.35; }
+  100% { transform: translate(17px, 0) scale(0.9); opacity: 0.65; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Sin la vuelta ni la inclinación en movimiento (podría marear); el
-     pulso de cada puntito, quieto en su lugar, ya comunica "cargando". */
-  .auth-spinner { animation: none; transform: none; }
+  /* Sin la órbita (es movimiento de posición, no sólo un fundido); los 3
+     puntitos quedan quietos, repartidos en un círculo parejo, con sólo un
+     parpadeo suave de opacidad — eso ya comunica "cargando". */
+  .auth-spinner span { animation: authSpinnerPulseStatic 1.2s ease-in-out infinite; }
+  .auth-spinner span:nth-child(1) { transform: translate(17px, 0); }
+  .auth-spinner span:nth-child(2) { transform: translate(-8.5px, 14.7px); animation-delay: 0.2s; }
+  .auth-spinner span:nth-child(3) { transform: translate(-8.5px, -14.7px); animation-delay: 0.4s; }
+}
+@keyframes authSpinnerPulseStatic {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
 }
 
 .auth-name-badge {
