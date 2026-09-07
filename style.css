@@ -151,6 +151,13 @@ body.pantalla {
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
+.hud-left {
+  left: max(16px, env(safe-area-inset-left));
+  right: auto;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .progress-track {
   position: fixed;
   left: 0;
@@ -934,3 +941,41 @@ body.dragging-active { user-select: none; }
   .row-actions { gap: 4px; }
   .icon-btn { width: 32px; height: 32px; }
 }
+
+/* ---- PIN por persona (auth.js: manage.html / avanzado.html) ---- */
+
+.auth-gate input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--gray-850);
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.auth-gate input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+}
+
+.auth-gate input::placeholder { color: var(--text-muted); }
+
+.auth-gate .auth-divider {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 14px 0;
+}
+
+.auth-gate #authOld:last-child { margin-bottom: 0; }
+
+.auth-name-badge {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.auth-name-badge:hover { color: var(--text); }

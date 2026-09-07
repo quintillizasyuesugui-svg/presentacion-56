@@ -16,6 +16,7 @@
 </div>
 
 <div class="hud" id="hud">0 / 0</div>
+<div class="hud hud-left" id="authBadge" hidden></div>
 
 <div class="progress-track">
   <div class="progress-fill" id="progressFill"></div>
@@ -33,6 +34,7 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="auth.js"></script>
 <script>
   const socket = io();
 
@@ -44,6 +46,7 @@
   const imgFrame = document.getElementById('imgFrame');
   const imgBg = document.getElementById('imgBg');
   const hud = document.getElementById('hud');
+  const authBadge = document.getElementById('authBadge');
   const progressFill = document.getElementById('progressFill');
   const waiting = document.getElementById('waiting');
   const waitingHint = document.getElementById('waitingHint');
@@ -220,8 +223,11 @@
   }
   initBrainSphere();
 
+  // Cada pantalla muestra sólo lo suyo: con el PIN de una persona ve nomás
+  // sus propias fotos; con el PIN admin ve el show combinado de todos (para
+  // el proyector/TV principal). /api/images ya viene filtrado por dueño.
   function refreshSlides() {
-    fetch('/images')
+    authFetch('/api/images')
       .then(res => res.json())
       .then(images => {
         diapositivas = images;
@@ -232,8 +238,13 @@
       })
       .catch(err => console.error('Error loading images:', err));
   }
-  refreshSlides();
-  socket.on('imagenesActualizadas', refreshSlides);
+
+  ensureAuthed().then((auth) => {
+    authBadge.hidden = false;
+    authBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    refreshSlides();
+    socket.on('imagenesActualizadas', refreshSlides);
+  });
 
   function updateHud() {
     hud.textContent = index + ' / ' + diapositivas.length;

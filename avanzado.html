@@ -15,6 +15,7 @@
   <div class="app-header">
     <h1>Modo avanzado</h1>
     <div class="status">
+      <span class="auth-name-badge" id="authNameBadge" hidden title="Tocá para cambiar de persona"></span>
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Conectando…</span>
     </div>
@@ -97,6 +98,7 @@
 <div class="toast" id="toast" role="alert" hidden></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="auth.js"></script>
 <script>
   const socket = io();
   const statusDot = document.getElementById('statusDot');
@@ -187,8 +189,8 @@
       : 'Tocá la imagen que querés ajustar.';
 
     try {
-      const res = await fetch('/api/images');
-      advancedImages = await res.json();
+      const res = await authFetch('/api/images');
+      advancedImages = await res.json(); // sólo las propias (o todas, si es admin)
     } catch (err) {
       showToast('No se pudieron cargar las imágenes.');
       return;
@@ -263,7 +265,7 @@
     const ok = await askConfirm('¿Separar esta diapositiva combinada en las imágenes originales?');
     if (!ok) return;
     try {
-      const res = await fetch('/api/images/' + id + '/uncombine', { method: 'POST' });
+      const res = await authFetch('/api/images/' + id + '/uncombine', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al separar.');
       advancedImages = data;
@@ -489,7 +491,7 @@
     try {
       if (editorMode === 'resize') {
         const record = editorRecords[0];
-        const res = await fetch('/api/images/' + record.id + '/transform', {
+        const res = await authFetch('/api/images/' + record.id + '/transform', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editorStates[0])
@@ -505,7 +507,7 @@
         const orderedRecords = stackOrder.map(i => editorRecords[i]);
         const orderedStates = stackOrder.map(i => editorStates[i]);
         const dataUri = await buildCombinedImage(orderedRecords, orderedStates);
-        const res = await fetch('/api/images/combine', {
+        const res = await authFetch('/api/images/combine', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: editorRecords.map(r => r.id), dataUri })
@@ -568,6 +570,17 @@
       throw new Error('No se pudo armar la imagen combinada (revisá la conexión).');
     }
   }
+
+  // Identificar quién es (pide PIN o registra) antes de habilitar unir/ajustar.
+  const authNameBadge = document.getElementById('authNameBadge');
+  ensureAuthed().then((auth) => {
+    authNameBadge.hidden = false;
+    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    // Acá no hay un modal de confirmación genérico (el único que existe es el
+    // de "Separar unión") — como logoutAuth() sólo pide el PIN de nuevo al
+    // recargar, no hace falta uno: es una acción fácil de deshacer.
+    authNameBadge.addEventListener('click', () => logoutAuth());
+  });
 </script>
 
 </body>

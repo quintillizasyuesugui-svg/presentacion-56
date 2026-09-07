@@ -12,6 +12,7 @@
   <div class="app-header">
     <h1>Control</h1>
     <div class="status">
+      <span class="auth-name-badge" id="authNameBadge" hidden title="Tocá para cambiar de persona"></span>
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Conectando…</span>
     </div>
@@ -59,10 +60,12 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="auth.js"></script>
 <script>
   const socket = io();
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
+  const authNameBadge = document.getElementById('authNameBadge');
 
   socket.on('connect', () => {
     statusDot.classList.add('online');
@@ -81,16 +84,24 @@
   let voiceActive = false;
 
   // Total de diapositivas reales — acota qué números tiene sentido reconocer por voz
-  // (si hay 8 imágenes, acepta "1".."8"; si hay 3, sólo "1".."3").
+  // (si hay 8 imágenes, acepta "1".."8"; si hay 3, sólo "1".."3"). Cuenta las
+  // propias de quien está controlando (o todas, con el PIN admin) — mismo
+  // criterio que pantalla.html, para que los números coincidan con lo que se ve ahí.
   let totalSlides = 0;
   function refreshSlideCount() {
-    fetch('/images')
+    authFetch('/api/images')
       .then(res => res.json())
       .then(images => { totalSlides = images.length; })
       .catch(err => console.error('Error loading images:', err));
   }
-  refreshSlideCount();
-  socket.on('imagenesActualizadas', refreshSlideCount);
+
+  ensureAuthed().then((auth) => {
+    authNameBadge.hidden = false;
+    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authNameBadge.addEventListener('click', () => logoutAuth());
+    refreshSlideCount();
+    socket.on('imagenesActualizadas', refreshSlideCount);
+  });
 
   // Sinónimos aceptados por comando — cubre variaciones comunes al hablar
   const VOICE_COMMANDS = {
