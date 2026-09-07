@@ -151,6 +151,8 @@ body.pantalla {
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
+.hud[hidden] { display: none; }
+
 .hud-left {
   left: max(16px, env(safe-area-inset-left));
   right: auto;
@@ -996,3 +998,4 @@ body.dragging-active { user-select: none; }
   cursor: pointer;
 }
 .auth-name-badge:hover { color: var(--text); }
+.auth-name-badge[hidden] { display: none; }

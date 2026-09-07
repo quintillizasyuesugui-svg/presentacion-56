@@ -249,7 +249,10 @@
   });
 
   function updateHud() {
-    hud.textContent = index + ' / ' + diapositivas.length;
+    // "index" arranca en 0 (la primera diapositiva) pero a la gente se le
+    // muestra el show empezando en 1 — antes de arrancar (waiting) se queda
+    // en 0, igual que el criterio que ya usaba updateProgress() para la barra.
+    hud.textContent = (started ? index + 1 : 0) + ' / ' + diapositivas.length;
   }
 
   function updateProgress() {
@@ -289,6 +292,7 @@
       index = 0;
       started = true;
       waiting.classList.add('hide');
+      authBadge.hidden = true; // deja de taparle una esquina a las fotos
     } else if (accion === 'siguiente') {
       index++;
       if (index >= diapositivas.length) index = 0;
@@ -302,6 +306,7 @@
       index = n - 1;
       started = true;
       waiting.classList.add('hide');
+      authBadge.hidden = true;
     } else {
       return;
     }
