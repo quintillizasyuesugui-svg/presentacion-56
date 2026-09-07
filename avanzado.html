@@ -15,7 +15,8 @@
   <div class="app-header">
     <div class="header-id">
       <h1>Modo avanzado</h1>
-      <span class="auth-name-badge" id="authNameBadge" hidden title="Tocá para cambiar de persona"></span>
+      <span class="auth-name-badge" id="authNameBadge" hidden></span>
+      <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
     </div>
     <div class="status">
       <span class="status-dot" id="statusDot"></span>
@@ -575,13 +576,12 @@
 
   // Identificar quién es (pide PIN o registra) antes de habilitar unir/ajustar.
   const authNameBadge = document.getElementById('authNameBadge');
+  const logoutBtn = document.getElementById('logoutBtn');
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
     authNameBadge.textContent = authBadgeText(auth);
-    // Acá no hay un modal de confirmación genérico (el único que existe es el
-    // de "Separar unión") — como logoutAuth() sólo pide el PIN de nuevo al
-    // recargar, no hace falta uno: es una acción fácil de deshacer.
-    authNameBadge.addEventListener('click', () => logoutAuth());
+    logoutBtn.hidden = false;
+    logoutBtn.addEventListener('click', () => logoutAuth());
   });
 </script>
 

@@ -12,7 +12,8 @@
   <div class="app-header">
     <div class="header-id">
       <h1>Gestionar imágenes</h1>
-      <span class="auth-name-badge" id="authNameBadge" hidden title="Tocá para cambiar de persona"></span>
+      <span class="auth-name-badge" id="authNameBadge" hidden></span>
+      <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
     </div>
     <div class="status">
       <span class="status-dot" id="statusDot"></span>
@@ -56,6 +57,7 @@
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
   const authNameBadge = document.getElementById('authNameBadge');
+  const logoutBtn = document.getElementById('logoutBtn');
 
   socket.on('connect', () => {
     statusDot.classList.add('online');
@@ -292,7 +294,8 @@
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
     authNameBadge.textContent = authBadgeText(auth);
-    authNameBadge.addEventListener('click', async () => {
+    logoutBtn.hidden = false;
+    logoutBtn.addEventListener('click', async () => {
       const ok = await askConfirm('¿Salir y entrar como otra persona en este celular?');
       if (ok) logoutAuth();
     });
