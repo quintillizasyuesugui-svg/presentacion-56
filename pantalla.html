@@ -239,7 +239,9 @@
       .catch(err => console.error('Error loading images:', err));
   }
 
-  ensureAuthed().then((auth) => {
+  // Acá no se da de alta gente nueva — eso se hace desde el celular
+  // (control.html/manage.html). Esta pantalla sólo pide el PIN ya asignado.
+  ensureAuthed({ allowRegister: false }).then((auth) => {
     authBadge.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
     refreshSlides();

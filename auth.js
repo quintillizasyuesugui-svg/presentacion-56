@@ -25,14 +25,18 @@
     return data;
   }
 
-  function buildGate() {
+  // allowRegister=false arma sólo el bloque de PIN, sin "Soy nuevo/a" — para
+  // pantalla.html: en el proyector/TV no tiene sentido dar de alta gente
+  // nueva, eso se hace desde el propio celular (control.html/manage.html).
+  function buildGate(allowRegister) {
     const el = document.createElement('div');
     el.className = 'modal-overlay auth-gate';
     el.innerHTML = `
       <div class="modal-card">
-        <h2>¿Quién sos?</h2>
-        <p id="authError">Elegí una opción para entrar.</p>
+        <h2>${allowRegister ? '¿Quién sos?' : 'Ingresá tu PIN'}</h2>
+        <p id="authError">${allowRegister ? 'Elegí una opción para entrar.' : 'Es el PIN que te dieron al registrarte desde tu celular.'}</p>
 
+        ${allowRegister ? `
         <div id="authNew">
           <input type="text" id="authName" placeholder="Tu nombre" autocomplete="off" maxlength="40">
           <div class="btn-row">
@@ -41,25 +45,27 @@
         </div>
 
         <p class="auth-divider">— o —</p>
+        ` : ''}
 
         <div id="authOld">
-          <input type="text" id="authPin" placeholder="Ya tengo PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+          <input type="text" id="authPin" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
           <div class="btn-row">
-            <button type="button" class="btn" id="authLoginBtn" style="flex:1">Entrar con mi PIN</button>
+            <button type="button" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
           </div>
         </div>
       </div>`;
     return el;
   }
 
-  function showGate() {
+  function showGate(opts = {}) {
+    const allowRegister = opts.allowRegister !== false;
     return new Promise((resolve) => {
-      const gate = buildGate();
+      const gate = buildGate(allowRegister);
       document.body.appendChild(gate);
       const errorEl = gate.querySelector('#authError');
-      const nameInput = gate.querySelector('#authName');
+      const nameInput = gate.querySelector('#authName'); // null si allowRegister es false
       const pinInput = gate.querySelector('#authPin');
-      const registerBtn = gate.querySelector('#authRegisterBtn');
+      const registerBtn = gate.querySelector('#authRegisterBtn'); // ídem
       const loginBtn = gate.querySelector('#authLoginBtn');
       requestAnimationFrame(() => gate.classList.add('show'));
 
@@ -74,25 +80,28 @@
         // El PIN sólo se muestra en este momento — después queda guardado en
         // el celular y no hace falta volver a escribirlo en este dispositivo.
         errorEl.innerHTML = `¡Listo, ${auth.name}! Tu PIN es <strong>${auth.pin}</strong> — anotalo, te sirve para entrar desde otro celular.`;
-        registerBtn.disabled = true;
+        if (registerBtn) registerBtn.disabled = true;
         loginBtn.disabled = true;
-        nameInput.disabled = true;
+        if (nameInput) nameInput.disabled = true;
         pinInput.disabled = true;
         setTimeout(() => finish(auth), 2600);
       }
 
-      registerBtn.addEventListener('click', async () => {
-        const name = nameInput.value.trim();
-        if (!name) { errorEl.textContent = 'Escribí tu nombre primero.'; return; }
-        registerBtn.disabled = true;
-        try {
-          const auth = await callAuth('/api/auth/register', { name });
-          showPinOnce(auth);
-        } catch (err) {
-          errorEl.textContent = err.message;
-          registerBtn.disabled = false;
-        }
-      });
+      if (registerBtn) {
+        registerBtn.addEventListener('click', async () => {
+          const name = nameInput.value.trim();
+          if (!name) { errorEl.textContent = 'Escribí tu nombre primero.'; return; }
+          registerBtn.disabled = true;
+          try {
+            const auth = await callAuth('/api/auth/register', { name });
+            showPinOnce(auth);
+          } catch (err) {
+            errorEl.textContent = err.message;
+            registerBtn.disabled = false;
+          }
+        });
+        nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerBtn.click(); });
+      }
 
       loginBtn.addEventListener('click', async () => {
         const pin = pinInput.value.trim();
@@ -111,15 +120,17 @@
         }
       });
 
-      nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerBtn.click(); });
       pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginBtn.click(); });
     });
   }
 
   let authPromise = null;
+  let lastGateOpts = undefined; // para que un reintento tras 401 respete el mismo modo de puerta
 
-  // Se resuelve con { pin, name, isAdmin } una vez identificado.
-  window.ensureAuthed = function ensureAuthed() {
+  // Se resuelve con { pin, name, isAdmin } una vez identificado. Pasar
+  // { allowRegister: false } muestra sólo el ingreso por PIN (pantalla.html).
+  window.ensureAuthed = function ensureAuthed(opts) {
+    if (opts !== undefined) lastGateOpts = opts;
     if (authPromise) return authPromise;
     authPromise = (async () => {
       const stored = getStored();
@@ -133,7 +144,7 @@
           clearStored(); // el PIN ya no sirve (ej. people.json se reinició)
         }
       }
-      return showGate();
+      return showGate(lastGateOpts);
     })();
     return authPromise;
   };
