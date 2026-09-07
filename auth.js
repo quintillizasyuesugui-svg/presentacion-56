@@ -72,16 +72,20 @@
   // 2s antes de completar la acción. Se usa para login y para cerrar sesión;
   // el color distingue cuál es cuál (celeste = entrar, rojo = salir, a tono
   // con el color que ya tiene cada botón). La espera es deliberada (no por
-  // una tarea real que tarde eso) porque así lo pidió el usuario. El
-  // recorrido en elipse (no un giro 3D real) de cada puntito vive en
-  // style.css (ver .auth-spinner / @keyframes authSpinnerOrbit).
+  // una tarea real que tarde eso) porque así lo pidió el usuario. Cada
+  // puntito es un <i> que orbita (posición) con un <span> adentro que late
+  // (tamaño/brillo) — separados porque van animados con transform los dos
+  // y uno le pisaría el transform al otro si fueran el mismo elemento (ver
+  // style.css, .auth-spinner).
   function showActionSpinner(color, label) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay auth-spinner-overlay';
       overlay.innerHTML = `
         <div class="auth-spinner-box">
-          <div class="auth-spinner ${color}"><span></span><span></span><span></span></div>
+          <div class="auth-spinner ${color}">
+            <i><span></span></i><i><span></span></i><i><span></span></i>
+          </div>
           <p>${label}</p>
         </div>`;
       document.body.appendChild(overlay);
