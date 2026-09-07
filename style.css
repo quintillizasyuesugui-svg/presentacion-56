@@ -970,14 +970,139 @@ body.dragging-active { user-select: none; }
 
 .auth-gate input::placeholder { color: var(--text-muted); }
 
-.auth-gate .auth-divider {
+.auth-gate #authOld:last-child { margin-bottom: 0; }
+
+/* #authChoice también es .btn-row (display:flex), que le gana a [hidden]
+   porque un estilo de autor pisa al estilo por defecto del navegador aunque
+   tengan la misma especificidad — sin esto, los 2 botones de elegir se
+   quedaban visibles superpuestos con el formulario de nombre/PIN. */
+.auth-gate #authChoice[hidden] { display: none; }
+
+.auth-gate .auth-back {
+  display: block;
+  width: 100%;
   text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
   color: var(--text-muted);
-  font-size: 0.8rem;
-  margin: 14px 0;
+  font-size: 0.85rem;
+  font-family: inherit;
+  margin: 12px 0 0;
+  cursor: pointer;
+}
+.auth-gate .auth-back:hover { color: var(--text); }
+
+/* La puerta de PIN entra distinto del resto de los modales (que sólo hacen
+   scale): arranca como un círculo chico al centro y se abre primero hacia
+   los costados, recién al final hacia arriba/abajo hasta ocupar la tarjeta
+   entera. calc(50% - 8px) en vez de un % fijo porque el alto de la tarjeta
+   cambia según el paso (elegir/nombre/PIN) y así el punto de partida sigue
+   siendo un círculo de 16px sin importar cuál. */
+.auth-gate .modal-card {
+  transform: none;
+  clip-path: inset(calc(50% - 8px) calc(50% - 8px) round 999px);
+  opacity: 0;
 }
 
-.auth-gate #authOld:last-child { margin-bottom: 0; }
+.auth-gate.show .modal-card {
+  animation: authCardReveal var(--dur-slide) var(--ease-out) forwards;
+}
+
+@keyframes authCardReveal {
+  0% {
+    clip-path: inset(calc(50% - 8px) calc(50% - 8px) round 999px);
+    opacity: 0;
+  }
+  30% {
+    clip-path: inset(calc(50% - 8px) calc(50% - 8px) round 999px);
+    opacity: 1;
+  }
+  55% {
+    clip-path: inset(calc(50% - 8px) 0 round 999px);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 round var(--radius-lg));
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-gate .modal-card {
+    clip-path: none;
+    transition: opacity var(--dur-base) linear;
+  }
+  .auth-gate.show .modal-card {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Aviso de "esperá N segundos" cuando se agotan los 3 intentos de PIN. */
+.auth-gate .auth-lock-msg {
+  text-align: center;
+  color: var(--red-300);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin: -4px 0 12px;
+}
+
+/* Overlay chico para "Entrando…" / "Cerrando sesión…": círculo de 3
+   puntitos girando ~3s (ver showActionSpinner en auth.js). El color lo pone
+   el llamador para que combine con el botón que lo disparó (celeste =
+   Entrar, rojo = Cerrar sesión). */
+.auth-spinner-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.auth-spinner-box p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.auth-spinner {
+  width: 44px;
+  height: 44px;
+  position: relative;
+  animation: authSpinnerSpin 1.1s linear infinite;
+}
+.auth-spinner span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px;
+  border-radius: 50%;
+}
+.auth-spinner span:nth-child(1) { transform: rotate(0deg) translateX(18px); opacity: 1; }
+.auth-spinner span:nth-child(2) { transform: rotate(120deg) translateX(18px); opacity: 0.55; }
+.auth-spinner span:nth-child(3) { transform: rotate(240deg) translateX(18px); opacity: 0.3; }
+
+.auth-spinner.blue span { background: var(--primary-400); }
+.auth-spinner.red span { background: var(--red-400); }
+
+@keyframes authSpinnerSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Gira infinito, así que bajo reduced-motion no lo frenamos del todo
+     (dejaría de comunicar "cargando") — lo cambiamos por un parpadeo
+     suave de los 3 puntitos en vez de la rotación completa. */
+  .auth-spinner { animation: none; }
+  .auth-spinner span { animation: authSpinnerPulse 1.2s ease-in-out infinite; }
+  .auth-spinner span:nth-child(2) { animation-delay: 0.2s; }
+  .auth-spinner span:nth-child(3) { animation-delay: 0.4s; }
+}
+@keyframes authSpinnerPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
 
 .auth-name-badge {
   display: block;
