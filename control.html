@@ -97,7 +97,7 @@
 
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
-    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authNameBadge.textContent = authBadgeText(auth);
     authNameBadge.addEventListener('click', () => logoutAuth());
     refreshSlideCount();
     socket.on('imagenesActualizadas', refreshSlideCount);

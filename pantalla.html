@@ -241,7 +241,7 @@
 
   ensureAuthed().then((auth) => {
     authBadge.hidden = false;
-    authBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authBadge.textContent = authBadgeText(auth);
     refreshSlides();
     socket.on('imagenesActualizadas', refreshSlides);
   });

@@ -289,7 +289,7 @@
   // Primero identificar quién es (pide PIN o registra) — recién ahí carga sus imágenes.
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
-    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authNameBadge.textContent = authBadgeText(auth);
     authNameBadge.addEventListener('click', async () => {
       const ok = await askConfirm('¿Salir y entrar como otra persona en este celular?');
       if (ok) logoutAuth();
