@@ -1070,37 +1070,43 @@ body.dragging-active { user-select: none; }
   letter-spacing: 0.01em;
 }
 
-/* Los 3 puntitos nunca rotan — son círculos planos que sólo se mueven en
-   translate()+scale(), así que siempre "miran de frente" a quien los ve,
-   nunca de canto. La sensación de 3D sale de que orbitan en una ELIPSE
-   (más ancha que alta, como un aro visto de costado) en vez de un
-   círculo, agrandándose y aclarándose cuando están "adelante" (abajo de
-   la elipse) y achicándose/apagándose cuando están "atrás" (arriba) — el
-   mismo truco que un aro inclinado de verdad, sin necesitar rotación 3D
-   (que además, compuesta con la posición de cada puntito, los terminaba
-   aplastando de forma pareja).
-   Un intento anterior usaba rotateX en 3D real para inclinar el anillo:
-   se descartó porque el contra-giro para "enderezar" cada puntito sólo
-   cancela bien la inclinación en un punto del aro, no en los otros (el
-   orden en que se componen rotate()+translateX()+rotateX() no es el
-   mismo para cada uno) — quedaban unos redondos y otros aplastados. */
+/* Los 3 puntitos nunca rotan y orbitan en un CÍRCULO parejo (no una
+   elipse aplastada) — de frente, como si la pantalla los mirara derecho,
+   no de perfil/inclinado. El "3D" no sale de la forma del recorrido sino
+   de cada puntito: son esferitas con degradé y sombra propia (ver más
+   abajo) que además laten de tamaño/brillo — ese pulso va en un <span>
+   aparte adentro del <i> que orbita, porque si el pulso (scale) se anima
+   junto con la posición (translate) en el mismo elemento, una de las dos
+   animaciones le pisa el transform a la otra.
+   (Antes se probó una elipse achatada simulando un aro inclinado, y antes
+   de eso un rotateX 3D real — las dos leían como "de costado", no de
+   frente, que es lo que se pidió.) */
 .auth-spinner {
-  width: 48px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   position: relative;
 }
-.auth-spinner span {
+.auth-spinner i {
   position: absolute;
   top: 50%;
   left: 50%;
+  width: 0;
+  height: 0;
+  animation: authSpinnerOrbit 1.2s linear infinite;
+}
+.auth-spinner i:nth-child(2) { animation-delay: -0.4s; }
+.auth-spinner i:nth-child(3) { animation-delay: -0.8s; }
+
+.auth-spinner i span {
+  position: absolute;
   width: 11px;
   height: 11px;
   margin: -5.5px;
   border-radius: 50%;
-  animation: authSpinnerOrbit 1.2s linear infinite;
+  animation: authSpinnerPulseDot 1.2s ease-in-out infinite;
 }
-.auth-spinner span:nth-child(2) { animation-delay: -0.4s; }
-.auth-spinner span:nth-child(3) { animation-delay: -0.8s; }
+.auth-spinner i:nth-child(2) span { animation-delay: -0.4s; }
+.auth-spinner i:nth-child(3) span { animation-delay: -0.8s; }
 
 /* Degradé radial de varios pasos (blanco → color → color oscuro) más 2
    sombras internas (una clara arriba-izquierda, una oscura abajo-derecha)
@@ -1124,27 +1130,38 @@ body.dragging-active { user-select: none; }
     0 0 10px 1px rgba(255, 107, 107, 0.55);
 }
 
-/* 5 paradas = 0°/90°/180°/270°/360° de la elipse (rx 17px, ry 6px).
-   Adelante (90°, abajo) el puntito queda más grande y brillante; atrás
-   (270°, arriba) más chico y apagado — la profundidad la da eso, no un
-   giro. linear porque es movimiento constante (una órbita), no algo que
-   entra o sale. */
+/* Círculo parejo (mismo radio en x e y — 17px), 8 paradas para que la
+   curva se sienta redonda y no un rebote entre 4 puntas. linear porque es
+   movimiento constante (una órbita), no algo que entra o sale. */
 @keyframes authSpinnerOrbit {
-  0%   { transform: translate(17px, 0) scale(0.9); opacity: 0.65; }
-  25%  { transform: translate(0, 6px) scale(1.15); opacity: 1; }
-  50%  { transform: translate(-17px, 0) scale(0.9); opacity: 0.65; }
-  75%  { transform: translate(0, -6px) scale(0.65); opacity: 0.35; }
-  100% { transform: translate(17px, 0) scale(0.9); opacity: 0.65; }
+  0%    { transform: translate(17px, 0); }
+  12.5% { transform: translate(12.02px, 12.02px); }
+  25%   { transform: translate(0, 17px); }
+  37.5% { transform: translate(-12.02px, 12.02px); }
+  50%   { transform: translate(-17px, 0); }
+  62.5% { transform: translate(-12.02px, -12.02px); }
+  75%   { transform: translate(0, -17px); }
+  87.5% { transform: translate(12.02px, -12.02px); }
+  100%  { transform: translate(17px, 0); }
+}
+/* Late de tamaño/brillo en su lugar — de acá sale la sensación de
+   volumen/profundidad, no de la forma del recorrido. */
+@keyframes authSpinnerPulseDot {
+  0%, 100% { opacity: 0.4; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* Sin la órbita (es movimiento de posición, no sólo un fundido); los 3
-     puntitos quedan quietos, repartidos en un círculo parejo, con sólo un
-     parpadeo suave de opacidad — eso ya comunica "cargando". */
-  .auth-spinner span { animation: authSpinnerPulseStatic 1.2s ease-in-out infinite; }
-  .auth-spinner span:nth-child(1) { transform: translate(17px, 0); }
-  .auth-spinner span:nth-child(2) { transform: translate(-8.5px, 14.7px); animation-delay: 0.2s; }
-  .auth-spinner span:nth-child(3) { transform: translate(-8.5px, -14.7px); animation-delay: 0.4s; }
+     puntitos quedan quietos, repartidos en el mismo círculo parejo, con
+     sólo un parpadeo suave de opacidad — eso ya comunica "cargando". */
+  .auth-spinner i { animation: none; }
+  .auth-spinner i:nth-child(1) { transform: translate(17px, 0); }
+  .auth-spinner i:nth-child(2) { transform: translate(-8.5px, 14.7px); }
+  .auth-spinner i:nth-child(3) { transform: translate(-8.5px, -14.7px); }
+  .auth-spinner i span { animation: authSpinnerPulseStatic 1.2s ease-in-out infinite; transform: none; }
+  .auth-spinner i:nth-child(2) span { animation-delay: 0.2s; }
+  .auth-spinner i:nth-child(3) span { animation-delay: 0.4s; }
 }
 @keyframes authSpinnerPulseStatic {
   0%, 100% { opacity: 0.3; }
