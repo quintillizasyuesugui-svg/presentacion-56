@@ -48,6 +48,26 @@ perderse — por eso ese servidor usa [Cloudinary](https://cloudinary.com)
 Sin estas variables, la pantalla y el control funcionan igual, pero el botón
 de subir imágenes en `/manage.html` no va a andar (avisa con un error claro).
 
+## 🔒 PIN por persona
+
+`/manage.html` y `/avanzado.html` piden identificarse antes de dejar subir,
+borrar o reordenar nada. El sistema se encarga solo, no hay que configurar
+usuarios a mano:
+
+- La primera vez, cada uno escribe su nombre y toca "Soy nuevo/a" — el
+  servidor le genera un PIN de 4 dígitos único (nadie lo elige) y se lo
+  muestra una vez en pantalla.
+- Ese PIN queda guardado en el celular (no lo vuelve a pedir en ese mismo
+  dispositivo). Para entrar desde otro celular, escribe el mismo PIN en
+  "Ya tengo PIN".
+- Cada persona sólo ve y puede tocar **sus propias** imágenes — las de los
+  demás ni aparecen en su lista. La pantalla proyectada (`pantalla.html`)
+  sigue mostrando el show combinado de todos, sin cambios ahí.
+- Los PIN se guardan en `people.json`, respaldado en Cloudinary igual que
+  `images-order.json` — sobrevive a los redeploys de Render sin base de datos.
+- Opcional: `ADMIN_PIN` en las variables de entorno da un PIN que ve y
+  controla las imágenes de todos (para vos, como organizador).
+
 ## 🧪 Local
 ```bash
 npm install

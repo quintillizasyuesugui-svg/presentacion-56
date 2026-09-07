@@ -12,6 +12,7 @@
   <div class="app-header">
     <h1>Gestionar imágenes</h1>
     <div class="status">
+      <span class="auth-name-badge" id="authNameBadge" hidden title="Tocá para cambiar de persona"></span>
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Conectando…</span>
     </div>
@@ -47,10 +48,12 @@
 <div class="toast" id="toast" role="alert" hidden></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="auth.js"></script>
 <script>
   const socket = io();
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
+  const authNameBadge = document.getElementById('authNameBadge');
 
   socket.on('connect', () => {
     statusDot.classList.add('online');
@@ -70,8 +73,8 @@
 
   async function loadImages() {
     try {
-      const res = await fetch('/api/images');
-      images = await res.json(); // [{ id, src }, ...]
+      const res = await authFetch('/api/images');
+      images = await res.json(); // sólo las imágenes de esta persona (o todas, si es admin)
       render();
     } catch (err) {
       console.error('Error loading images:', err);
@@ -183,7 +186,7 @@
 
   async function saveOrder() {
     try {
-      await fetch('/api/images/reorder', {
+      await authFetch('/api/images/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order: images.map(r => r.id) })
@@ -246,7 +249,7 @@
     const ok = await askConfirm('¿Eliminar esta imagen? Esta acción no se puede deshacer.');
     if (!ok) return;
     try {
-      const res = await fetch('/api/images/' + id, { method: 'DELETE' });
+      const res = await authFetch('/api/images/' + id, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al eliminar');
       images = data;
@@ -266,7 +269,7 @@
     uploadBtn.disabled = true;
     uploadBtn.textContent = '⏳ Subiendo…';
     try {
-      const res = await fetch('/api/images/upload', { method: 'POST', body: formData });
+      const res = await authFetch('/api/images/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al subir');
       images = data;
@@ -283,7 +286,16 @@
   // Si alguien más sube/borra/reordena desde otro dispositivo, esta vista se actualiza sola
   socket.on('imagenesActualizadas', loadImages);
 
-  loadImages();
+  // Primero identificar quién es (pide PIN o registra) — recién ahí carga sus imágenes.
+  ensureAuthed().then((auth) => {
+    authNameBadge.hidden = false;
+    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authNameBadge.addEventListener('click', async () => {
+      const ok = await askConfirm('¿Salir y entrar como otra persona en este celular?');
+      if (ok) logoutAuth();
+    });
+    loadImages();
+  });
 </script>
 
 </body>
