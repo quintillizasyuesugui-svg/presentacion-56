@@ -140,10 +140,11 @@
 
   window.getAuth = getStored;
 
-  // Texto del cartelito con nombre + PIN, para quien lo perdió o quiere
-  // pasarlo a otro celular — siempre visible, no sólo al registrarse.
-  window.authBadgeText = function authBadgeText(auth) {
-    return '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '') + ' · PIN ' + auth.pin;
+  // Texto del cartelito con nombre (+ PIN, para quien lo perdió o quiere
+  // pasarlo a otro celular). El PIN NO se muestra en pantalla.html — ese
+  // dispositivo lo puede estar viendo toda la sala, no sólo su dueño.
+  window.authBadgeText = function authBadgeText(auth, { showPin = true } = {}) {
+    return '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '') + (showPin ? ' · PIN ' + auth.pin : '');
   };
 
   window.logoutAuth = function logoutAuth() {
