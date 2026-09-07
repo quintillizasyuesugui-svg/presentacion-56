@@ -28,6 +28,11 @@
   // allowRegister=false arma sólo el bloque de PIN, sin "Soy nuevo/a" — para
   // pantalla.html: en el proyector/TV no tiene sentido dar de alta gente
   // nueva, eso se hace desde el propio celular (control.html/manage.html).
+  //
+  // Con allowRegister=true, primero se ven sólo 2 botones para elegir el
+  // camino — antes se mostraban los 2 formularios apilados (nombre arriba,
+  // "—o—" en el medio, PIN abajo) todo junto, y así entraban de una todos
+  // los datos aunque sólo hicieran falta unos pocos.
   function buildGate(allowRegister) {
     const el = document.createElement('div');
     el.className = 'modal-overlay auth-gate';
@@ -37,24 +42,71 @@
         <p id="authError">${allowRegister ? 'Elegí una opción para entrar.' : 'Es el PIN que te dieron al registrarte desde tu celular.'}</p>
 
         ${allowRegister ? `
-        <div id="authNew">
-          <input type="text" id="authName" placeholder="Tu nombre" autocomplete="off" maxlength="40">
-          <div class="btn-row">
-            <button type="button" class="btn primary" id="authRegisterBtn" style="flex:1">Soy nuevo/a — dame un PIN</button>
-          </div>
+        <div id="authChoice" class="btn-row">
+          <button type="button" class="btn primary" id="authChooseNewBtn" style="flex:1">🙋 Soy nuevo/a</button>
+          <button type="button" class="btn" id="authChooseOldBtn" style="flex:1">🔑 Ya tengo PIN</button>
         </div>
 
-        <p class="auth-divider">— o —</p>
+        <div id="authNew" hidden>
+          <input type="text" id="authName" placeholder="Tu nombre" autocomplete="off" maxlength="40">
+          <div class="btn-row">
+            <button type="button" class="btn primary" id="authRegisterBtn" style="flex:1">Dame un PIN</button>
+          </div>
+          <button type="button" class="auth-back" id="authBackFromNew">← Volver</button>
+        </div>
         ` : ''}
 
-        <div id="authOld">
+        <div id="authOld" ${allowRegister ? 'hidden' : ''}>
           <input type="password" id="authPin" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+          <p class="auth-lock-msg" id="authLockMsg" hidden></p>
           <div class="btn-row">
             <button type="button" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
           </div>
+          ${allowRegister ? '<button type="button" class="auth-back" id="authBackFromOld">← Volver</button>' : ''}
         </div>
       </div>`;
     return el;
+  }
+
+  // Overlay chico y aparte de la puerta de PIN — círculo de puntitos girando
+  // 5s antes de completar la acción. Se usa para login y para cerrar sesión;
+  // el color distingue cuál es cuál (celeste = entrar, rojo = salir, a tono
+  // con el color que ya tiene cada botón). La espera es deliberada (no por
+  // una tarea real que tarde eso) porque así lo pidió el usuario.
+  function showActionSpinner(color, label) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay auth-spinner-overlay';
+      overlay.innerHTML = `
+        <div class="auth-spinner-box">
+          <div class="auth-spinner ${color}"><span></span><span></span><span></span></div>
+          <p>${label}</p>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('show'));
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        setTimeout(() => { overlay.remove(); resolve(); }, 200);
+      }, 5000);
+    });
+  }
+
+  // Límite de intentos de PIN: 3 seguidos mal → 10s de espera con cuenta
+  // regresiva. Vive en localStorage (no en una variable) para que sobreviva
+  // a un refresh de página — si no, alcanzaba con recargar para saltearlo.
+  const LOCK_KEY = 'presentacionAuthLock';
+  const MAX_ATTEMPTS = 3;
+  const LOCK_MS = 10000;
+
+  function getLock() {
+    try { return JSON.parse(localStorage.getItem(LOCK_KEY)) || { attempts: 0, lockUntil: 0 }; }
+    catch { return { attempts: 0, lockUntil: 0 }; }
+  }
+  function setLock(lock) {
+    try { localStorage.setItem(LOCK_KEY, JSON.stringify(lock)); } catch { /* privado/bloqueado */ }
+  }
+  function clearLock() {
+    try { localStorage.removeItem(LOCK_KEY); } catch { /* privado/bloqueado */ }
   }
 
   function showGate(opts = {}) {
@@ -67,7 +119,69 @@
       const pinInput = gate.querySelector('#authPin');
       const registerBtn = gate.querySelector('#authRegisterBtn'); // ídem
       const loginBtn = gate.querySelector('#authLoginBtn');
+      // Sólo existen cuando allowRegister es true (ver buildGate) — null en pantalla.html.
+      const choiceBox = gate.querySelector('#authChoice');
+      const authNewBox = gate.querySelector('#authNew');
+      const authOldBox = gate.querySelector('#authOld');
+      const chooseNewBtn = gate.querySelector('#authChooseNewBtn');
+      const chooseOldBtn = gate.querySelector('#authChooseOldBtn');
+      const backFromNew = gate.querySelector('#authBackFromNew');
+      const backFromOld = gate.querySelector('#authBackFromOld');
+      const lockMsg = gate.querySelector('#authLockMsg');
       requestAnimationFrame(() => gate.classList.add('show'));
+
+      // Arranca mostrando sólo los 2 botones de elección; el formulario
+      // correspondiente (nombre o PIN) recién aparece al elegir uno.
+      function showChoice() {
+        choiceBox.hidden = false;
+        authNewBox.hidden = true;
+        authOldBox.hidden = true;
+        errorEl.textContent = 'Elegí una opción para entrar.';
+      }
+      function showNewForm() {
+        choiceBox.hidden = true;
+        authNewBox.hidden = false;
+        errorEl.textContent = '';
+        nameInput.focus();
+      }
+      function showOldForm() {
+        choiceBox.hidden = true;
+        authOldBox.hidden = false;
+        errorEl.textContent = '';
+        applyLockState();
+        if (!pinInput.disabled) pinInput.focus();
+      }
+      if (chooseNewBtn) chooseNewBtn.addEventListener('click', showNewForm);
+      if (chooseOldBtn) chooseOldBtn.addEventListener('click', showOldForm);
+      if (backFromNew) backFromNew.addEventListener('click', showChoice);
+      if (backFromOld) backFromOld.addEventListener('click', showChoice);
+
+      // Refleja el bloqueo por intentos fallidos (si hay uno vigente, incluso
+      // de antes de recargar la página) y arranca/actualiza la cuenta
+      // regresiva de a un segundo hasta que se cumpla.
+      let lockInterval = null;
+      function applyLockState() {
+        const lock = getLock();
+        const remaining = lock.lockUntil - Date.now();
+        if (remaining <= 0) {
+          if (lockInterval) { clearInterval(lockInterval); lockInterval = null; }
+          pinInput.disabled = false;
+          loginBtn.disabled = false;
+          lockMsg.hidden = true;
+          return false;
+        }
+        pinInput.disabled = true;
+        loginBtn.disabled = true;
+        lockMsg.hidden = false;
+        lockMsg.textContent = `Muchos intentos — esperá ${Math.ceil(remaining / 1000)}s para volver a probar.`;
+        if (!lockInterval) {
+          lockInterval = setInterval(() => {
+            if (!applyLockState()) return; // ya se cumplió el tiempo, se reactivó solo
+          }, 250);
+        }
+        return true;
+      }
+      applyLockState(); // por si authOld ya está visible de arranque (pantalla.html)
 
       function finish(auth) {
         setStored(auth);
@@ -104,19 +218,43 @@
       }
 
       loginBtn.addEventListener('click', async () => {
+        if (applyLockState()) return; // ya debería estar disabled, esto es por las dudas
         const pin = pinInput.value.trim();
         if (!pin) { errorEl.textContent = 'Escribí tu PIN.'; return; }
         loginBtn.disabled = true;
+        pinInput.disabled = true;
+        const spinnerDone = showActionSpinner('blue', 'Entrando…');
+        let auth, error;
         try {
           // /api/auth/login no devuelve el pin (no hace falta, el server ya lo
           // validó) — hay que pegarlo nosotros antes de guardar, si no
           // authFetch se queda sin PIN para mandar en el próximo pedido.
-          const auth = await callAuth('/api/auth/login', { pin });
-          finish(Object.assign({}, auth, { pin }));
+          auth = await callAuth('/api/auth/login', { pin });
         } catch (err) {
-          errorEl.textContent = err.message;
-          pinInput.value = '';
+          error = err;
+        }
+        await spinnerDone; // el spinner tarda sus 5s igual, sea rápido o lento el pedido real
+
+        if (!error) {
+          clearLock();
+          finish(Object.assign({}, auth, { pin }));
+          return;
+        }
+
+        pinInput.value = '';
+        const lock = getLock();
+        lock.attempts = (lock.attempts || 0) + 1;
+        if (lock.attempts >= MAX_ATTEMPTS) {
+          setLock({ attempts: 0, lockUntil: Date.now() + LOCK_MS });
+          errorEl.textContent = 'Muchos intentos fallidos.';
+          applyLockState();
+        } else {
+          setLock(lock);
+          const left = MAX_ATTEMPTS - lock.attempts;
+          errorEl.textContent = error.message + ` (te quedan ${left} intento${left === 1 ? '' : 's'})`;
+          pinInput.disabled = false;
           loginBtn.disabled = false;
+          pinInput.focus();
         }
       });
 
@@ -159,9 +297,11 @@
   };
 
   window.logoutAuth = function logoutAuth() {
-    clearStored();
-    authPromise = null;
-    location.reload();
+    showActionSpinner('red', 'Cerrando sesión…').then(() => {
+      clearStored();
+      authPromise = null;
+      location.reload();
+    });
   };
 
   // Wrapper de fetch: agrega el PIN guardado como header y, si el server
