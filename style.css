@@ -154,6 +154,7 @@ body.pantalla {
 .hud-left {
   left: max(16px, env(safe-area-inset-left));
   right: auto;
+  max-width: 55vw; /* no invade el contador "0 / 0" del otro extremo aunque el nombre sea largo */
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -348,7 +349,17 @@ body.control {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 4px;
+}
+
+/* Agrupa título + identidad (quién sos) para que el badge de PIN nunca
+   compita por ancho con el estado de conexión — ver .auth-name-badge. */
+.header-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0; /* deja que el badge se achique/trunque en vez de desbordar */
 }
 
 .app-header h1 {
@@ -361,6 +372,7 @@ body.control {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
   font-size: 0.8rem;
   color: var(--text-muted);
 }
@@ -974,8 +986,13 @@ body.dragging-active { user-select: none; }
 .auth-gate #authOld:last-child { margin-bottom: 0; }
 
 .auth-name-badge {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   cursor: pointer;
 }
 .auth-name-badge:hover { color: var(--text); }

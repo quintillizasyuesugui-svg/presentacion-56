@@ -241,7 +241,7 @@
 
   ensureAuthed().then((auth) => {
     authBadge.hidden = false;
-    authBadge.textContent = authBadgeText(auth);
+    authBadge.textContent = authBadgeText(auth, { showPin: false });
     refreshSlides();
     socket.on('imagenesActualizadas', refreshSlides);
   });
