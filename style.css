@@ -153,14 +153,6 @@ body.pantalla {
 
 .hud[hidden] { display: none; }
 
-.hud-left {
-  left: max(16px, env(safe-area-inset-left));
-  right: auto;
-  max-width: 55vw; /* no invade el contador "0 / 0" del otro extremo aunque el nombre sea largo */
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
 .progress-track {
   position: fixed;
   left: 0;
@@ -995,7 +987,58 @@ body.dragging-active { user-select: none; }
   white-space: nowrap;
   color: var(--text-muted);
   font-size: 0.72rem;
+}
+.auth-name-badge[hidden] { display: none; }
+
+/* Botón chico para cerrar sesión — deliberadamente rojo y con la palabra
+   "Cerrar sesión" en vez de dejar que el nombre solo sea clickeable, así
+   nadie lo toca sin querer sin saber qué hace. */
+.logout-btn {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--red-400);
+  font-size: 0.72rem;
+  font-weight: 700;
   cursor: pointer;
 }
-.auth-name-badge:hover { color: var(--text); }
-.auth-name-badge[hidden] { display: none; }
+.logout-btn:hover { color: var(--red-300); }
+.logout-btn[hidden] { display: none; }
+
+/* ---- Identidad en pantalla.html: nombre + cerrar sesión, agrupados como
+   un único bloque fijo en la esquina (se esconde entero al arrancar el
+   show, ver pantalla.html) ---- */
+.identity-corner {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 55vw;
+}
+.identity-corner[hidden] { display: none; }
+
+.identity-pill {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.5rem 1.1rem;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: clamp(0.8rem, 1.4vw, 0.95rem);
+}
+
+.identity-corner .logout-btn {
+  padding: 0.3rem 0.6rem;
+}
