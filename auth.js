@@ -99,8 +99,11 @@
         if (!pin) { errorEl.textContent = 'Escribí tu PIN.'; return; }
         loginBtn.disabled = true;
         try {
+          // /api/auth/login no devuelve el pin (no hace falta, el server ya lo
+          // validó) — hay que pegarlo nosotros antes de guardar, si no
+          // authFetch se queda sin PIN para mandar en el próximo pedido.
           const auth = await callAuth('/api/auth/login', { pin });
-          finish(auth);
+          finish(Object.assign({}, auth, { pin }));
         } catch (err) {
           errorEl.textContent = err.message;
           pinInput.value = '';
@@ -136,6 +139,12 @@
   };
 
   window.getAuth = getStored;
+
+  // Texto del cartelito con nombre + PIN, para quien lo perdió o quiere
+  // pasarlo a otro celular — siempre visible, no sólo al registrarse.
+  window.authBadgeText = function authBadgeText(auth) {
+    return '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '') + ' · PIN ' + auth.pin;
+  };
 
   window.logoutAuth = function logoutAuth() {
     clearStored();

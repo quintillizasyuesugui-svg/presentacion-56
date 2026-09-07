@@ -575,7 +575,7 @@
   const authNameBadge = document.getElementById('authNameBadge');
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
-    authNameBadge.textContent = '👤 ' + auth.name + (auth.isAdmin ? ' (todas)' : '');
+    authNameBadge.textContent = authBadgeText(auth);
     // Acá no hay un modal de confirmación genérico (el único que existe es el
     // de "Separar unión") — como logoutAuth() sólo pide el PIN de nuevo al
     // recargar, no hace falta uno: es una acción fácil de deshacer.
