@@ -379,6 +379,36 @@ body.pantalla {
 
 .fp-text-input:focus { outline: none; border-color: var(--primary-500); }
 
+/* Pestañas Letra/Color/Efecto — sólo un panel a la vez, así no hay que
+   scrollear las 3 secciones apiladas una atrás de la otra. */
+.fp-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  background: var(--gray-850);
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-pill);
+}
+
+.fp-tab-btn {
+  flex: 1;
+  min-height: 38px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.fp-tab-btn.active { background: var(--primary-400); color: var(--gray-950); }
+
+.fp-tab-panel[hidden] { display: none; }
+
 .fp-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -401,6 +431,23 @@ body.pantalla {
 }
 
 .fp-option-btn.selected { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); }
+
+/* Grid de efectos: carrusel horizontal (se desliza con el dedo hacia los
+   costados) en vez de una lista vertical larga — los 10 caben en una sola
+   fila que se recorre de lado, no scrolleando hacia abajo. */
+.fp-grid-h {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 128px;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fp-grid-h .fp-option-btn { scroll-snap-align: start; }
 
 .fp-range-row {
   display: flex;

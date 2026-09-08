@@ -115,7 +115,6 @@
     <div class="fp-section-label">Texto</div>
     <input type="text" id="fpText" class="fp-text-input" placeholder="Ej: ¡Gracias!" maxlength="60">
 
-    <div class="fp-section-label">Vista previa</div>
     <div class="fp-preview-stage" id="fpPreviewStage">
       <div id="fpPreviewText" class="fp-anim-target"></div>
     </div>
@@ -123,19 +122,30 @@
       <button type="button" class="chip-btn" id="fpReplayBtn">▶️ Repetir animación</button>
     </div>
 
-    <div class="fp-section-label">Tipo de letra</div>
-    <div class="fp-grid" id="fpFontGrid"></div>
+    <!-- Pestañas — así no hay que scrollear las 3 secciones apiladas, se ve
+         una por vez (el texto y la vista previa de arriba quedan siempre a
+         la vista, se actualizan solas cambies lo que cambies acá abajo). -->
+    <div class="fp-tabs" id="fpTabs" role="tablist">
+      <button type="button" class="fp-tab-btn" data-tab="letra">🔤 Letra</button>
+      <button type="button" class="fp-tab-btn" data-tab="color">🎨 Color</button>
+      <button type="button" class="fp-tab-btn" data-tab="efecto">✨ Efecto</button>
+    </div>
 
-    <div class="fp-section-label">Color</div>
-    <input type="color" id="fpColor" class="fp-color" value="#ffffff">
+    <div class="fp-tab-panel" data-tab="letra">
+      <div class="fp-grid" id="fpFontGrid"></div>
+    </div>
 
-    <div class="fp-section-label">Efecto</div>
-    <div class="fp-grid" id="fpEffectGrid"></div>
+    <div class="fp-tab-panel" data-tab="color" hidden>
+      <input type="color" id="fpColor" class="fp-color" value="#ffffff">
+    </div>
 
-    <div class="fp-section-label">Duración de la animación</div>
-    <div class="fp-range-row">
-      <input type="range" id="fpDuration" min="0.4" max="3" step="0.1" value="1">
-      <span class="fp-range-value" id="fpDurationValue">1.0s</span>
+    <div class="fp-tab-panel" data-tab="efecto" hidden>
+      <div class="fp-grid fp-grid-h" id="fpEffectGrid"></div>
+      <div class="fp-section-label">Duración de la animación</div>
+      <div class="fp-range-row">
+        <input type="range" id="fpDuration" min="0.4" max="3" step="0.1" value="1">
+        <span class="fp-range-value" id="fpDurationValue">1.0s</span>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -667,6 +677,16 @@
   const fpConfirm = document.getElementById('fpConfirm');
   const fpSendPc = document.getElementById('fpSendPc');
   const finalPhraseBtn = document.getElementById('finalPhraseBtn');
+  const fpTabs = document.getElementById('fpTabs');
+  const fpTabPanels = document.querySelectorAll('.fp-tab-panel');
+
+  function selectFpTab(tab) {
+    fpTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tab));
+    fpTabPanels.forEach((panel) => { panel.hidden = panel.dataset.tab !== tab; });
+  }
+  fpTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectFpTab(btn.dataset.tab));
+  });
 
   let fpState = { font: 'sans', color: '#ffffff', effect: 'fade', duration: 1 };
   let effectMiniTimer = null;
@@ -795,6 +815,7 @@
         buildFpGrid(fpFontGrid, FRASE_FONTS, fpState.font, selectFont);
         buildFpGrid(fpEffectGrid, FRASE_EFFECTS, fpState.effect, selectEffect);
         renderPreview();
+        selectFpTab('letra');
         openOverlay(fpOverlay);
       })
       .catch(() => showToast('No se pudo cargar tu frase final.'));
