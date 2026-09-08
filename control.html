@@ -35,8 +35,8 @@
   <!-- Zona de pulgar: lo que más se toca durante toda la presentación, abajo y grande -->
   <div class="panel nav-panel">
     <div class="btn-row nav-row">
-      <button class="btn secondary" onclick="enviar('anterior')">⬅️ Atrás</button>
-      <button class="btn primary" onclick="enviar('siguiente')">➡️ Siguiente</button>
+      <button class="btn secondary" id="anteriorBtn" onclick="enviar('anterior')">⬅️ Atrás</button>
+      <button class="btn primary" id="siguienteBtn" onclick="enviar('siguiente')">➡️ Siguiente</button>
     </div>
 
     <div id="voiceStatus" class="voice-status" hidden>
@@ -109,7 +109,24 @@
   // ahí) — este contador es sólo un espejo, avisado por socket al mismo
   // instante en que arranca cada cuenta regresiva allá.
   const autoCountdownInline = document.getElementById('autoCountdownInline');
+  const anteriorBtn = document.getElementById('anteriorBtn');
+  const siguienteBtn = document.getElementById('siguienteBtn');
   let autoAdvanceEndAt = null;
+
+  // Mientras el avance automático está prendido, Siguiente/Atrás no hacen
+  // nada en pantalla.html (ver aplicarCambio ahí) — acá los apagamos también
+  // a la vista, para que no parezca que están rotos.
+  function setNavButtonsDisabled(disabled) {
+    anteriorBtn.disabled = disabled;
+    siguienteBtn.disabled = disabled;
+  }
+
+  function refreshAutoAdvanceEnabled() {
+    authFetch('/api/avance-automatico')
+      .then(res => res.json())
+      .then(auto => setNavButtonsDisabled(!!(auto && auto.enabled)))
+      .catch(err => console.error('Error loading avance automático:', err));
+  }
 
   function formatCountdown(totalSeconds) {
     if (totalSeconds >= 60) {
@@ -133,9 +150,11 @@
     if (payload.tipo === 'cuenta') {
       autoAdvanceEndAt = Date.now() + payload.segundos * 1000;
       updateAutoCountdownInline();
+      setNavButtonsDisabled(true);
     } else if (payload.tipo === 'terminamos') {
       autoAdvanceEndAt = null;
       updateAutoCountdownInline();
+      setNavButtonsDisabled(false);
       showToast('🏁 Terminamos — avance automático desactivado.');
     }
   });
@@ -162,6 +181,8 @@
     logoutBtn.addEventListener('click', () => logoutAuth());
     refreshSlideCount();
     socket.on('imagenesActualizadas', refreshSlideCount);
+    refreshAutoAdvanceEnabled();
+    setInterval(refreshAutoAdvanceEnabled, 4000);
 
     // Vincula este socket a la sala de este dueño (por PIN) para recibir los
     // avisos del avance automático de SU PROPIA pantalla.html — nunca los de

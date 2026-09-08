@@ -155,7 +155,15 @@
   function refreshAutoAdvance() {
     authFetch('/api/avance-automatico')
       .then(res => res.json())
-      .then(auto => { autoAdvance = auto; })
+      .then(auto => {
+        autoAdvance = auto;
+        // Si el show ya arrancó y no hay ningún reloj corriendo todavía —
+        // por ejemplo, se apretó "Mostrar" antes de que este pedido
+        // terminara, o recién ahora se prendió desde otro dispositivo —
+        // lo arranca acá. Si YA hay uno corriendo, no lo toca (eso es lo
+        // que hace que sobreviva a este mismo refresco cada 4s).
+        if (started && !autoAdvanceTimer) scheduleAutoAdvance();
+      })
       .catch(err => console.error('Error loading avance automático:', err));
   }
 

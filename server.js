@@ -738,8 +738,19 @@ app.post('/api/images/reorder', requirePerson, async (req, res) => {
 
 io.on("connection", (socket) => {
   console.log("✨ Dispositivo vinculado");
-  socket.on("cambiar", (accion) => io.emit("cambiar", accion));
-  socket.on("cine", () => io.emit("cine"));
+
+  // "cambiar"/"cine" van SÓLO a la sala del propio dueño (según el PIN con el
+  // que el control se identificó) — antes se mandaban a TODAS las pantallas
+  // conectadas sin importar el PIN, así que cualquiera podía controlar la
+  // pantalla de cualquier otra persona. Si el socket todavía no se identificó
+  // (por ejemplo, llegó antes de que termine el login), no tiene sala propia
+  // todavía y el comando no va a ningún lado — mejor eso que mandarlo a ciegas.
+  socket.on("cambiar", (accion) => {
+    if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('cambiar', accion);
+  });
+  socket.on("cine", () => {
+    if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('cine');
+  });
 
   // Vincula este socket a la "sala" de su dueño (según el PIN) — así se le
   // puede mandar algo sólo a él/ella, como probar la frase final en su propia

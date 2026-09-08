@@ -1093,6 +1093,78 @@ body.dragging-active { user-select: none; }
 
 .advanced-panel { gap: 12px; }
 
+.section-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 4px 0 -6px 2px;
+}
+
+.section-label:first-child { margin-top: 0; }
+
+/* Cada acción de Modo avanzado es una tarjeta (ícono + título + descripción +
+   flechita) en vez de un botón gris plano — así se distinguen entre sí y se
+   entiende qué hace cada una sin tener que probarla. */
+.action-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.action-card:hover { border-color: var(--primary-600); background: var(--gray-800); }
+.action-card:active { transform: scale(0.98); }
+
+.action-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  background: rgba(52, 205, 250, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.action-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-title {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.action-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-chevron {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  font-weight: 300;
+}
+
 .picker-card, .editor-card, .fp-card { max-width: 380px; }
 
 .picker-list {
