@@ -21,6 +21,10 @@
     </div>
   </div>
 
+  <!-- Avance automático: aparece sólo si está prendido, con el mismo contador
+       en vivo que la pantalla — arrancan sincronizados al mismo instante. -->
+  <p class="auto-countdown-inline" id="autoCountdownInline" hidden></p>
+
   <!-- Se usa una sola vez, al arrancar — no necesita ser el botón más grande -->
   <div class="btn-row">
     <button class="btn ghost" onclick="enviar('mostrar')">▶️ Mostrar</button>
@@ -50,6 +54,8 @@
   </div>
 
 </div>
+
+<div class="toast" id="toast" role="alert" hidden></div>
 
 <div class="modal-overlay" id="fsOverlay" hidden>
   <div class="modal-card">
@@ -84,6 +90,56 @@
     socket.emit('cambiar', accion);
   }
 
+  // ---- Aviso propio (en vez de alert()) ----
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  function showToast(message) {
+    toast.textContent = message;
+    toast.hidden = false;
+    requestAnimationFrame(() => toast.classList.add('show'));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => { toast.hidden = true; }, 200);
+    }, 3200);
+  }
+
+  // ---- Avance automático: contador en vivo, sincronizado con pantalla.html ----
+  // pantalla.html es la que de verdad pasa las diapositivas (esto es 100% local
+  // ahí) — este contador es sólo un espejo, avisado por socket al mismo
+  // instante en que arranca cada cuenta regresiva allá.
+  const autoCountdownInline = document.getElementById('autoCountdownInline');
+  let autoAdvanceEndAt = null;
+
+  function formatCountdown(totalSeconds) {
+    if (totalSeconds >= 60) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return m + 'm ' + String(s).padStart(2, '0') + 's';
+    }
+    return totalSeconds + 's';
+  }
+
+  function updateAutoCountdownInline() {
+    if (!autoAdvanceEndAt) { autoCountdownInline.hidden = true; return; }
+    const remaining = Math.max(0, Math.ceil((autoAdvanceEndAt - Date.now()) / 1000));
+    autoCountdownInline.hidden = false;
+    autoCountdownInline.textContent = '⏱️ Siguiente en ' + formatCountdown(remaining);
+  }
+  setInterval(updateAutoCountdownInline, 1000);
+
+  socket.on('avanceAutoAviso', (payload) => {
+    if (!payload) return;
+    if (payload.tipo === 'cuenta') {
+      autoAdvanceEndAt = Date.now() + payload.segundos * 1000;
+      updateAutoCountdownInline();
+    } else if (payload.tipo === 'terminamos') {
+      autoAdvanceEndAt = null;
+      updateAutoCountdownInline();
+      showToast('🏁 Terminamos — avance automático desactivado.');
+    }
+  });
+
   let recognition;
   let voiceActive = false;
 
@@ -106,6 +162,13 @@
     logoutBtn.addEventListener('click', () => logoutAuth());
     refreshSlideCount();
     socket.on('imagenesActualizadas', refreshSlideCount);
+
+    // Vincula este socket a la sala de este dueño (por PIN) para recibir los
+    // avisos del avance automático de SU PROPIA pantalla.html — nunca los de
+    // otra persona. Se repite en cada reconexión, igual que en pantalla.html.
+    function identificarSocket() { socket.emit('identificar', auth.pin); }
+    identificarSocket();
+    socket.on('connect', identificarSocket);
   });
 
   // Sinónimos aceptados por comando — cubre variaciones comunes al hablar

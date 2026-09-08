@@ -264,12 +264,18 @@ app.post('/api/auth/login', async (req, res) => {
 const FRASES_FILE = path.join(__dirname, 'frases-finales.json');
 const CLOUD_FRASES_PUBLIC_ID = 'presentacion/frases-finales';
 
-// Los 10 tipos de letra y 10 efectos son un menú cerrado (no texto libre) —
+// Los 10 tipos de letra y los efectos son un menú cerrado (no texto libre) —
 // así el cliente sólo manda una "key" y acá se valida contra esta lista,
 // nunca CSS/HTML suelto. El nombre visible y la fuente real de cada uno
 // viven en el HTML (avanzado.html/pantalla.html), acá sólo importa la key.
+// Los primeros 10 entran una vez y quedan quietos; los últimos 8 (a partir
+// de "pulse") se mueven todo el tiempo que la frase está en pantalla.
 const FRASE_FONTS = ['sans', 'serif', 'script', 'display', 'casual', 'geometric', 'bold-script', 'poster', 'calligraphy', 'huge'];
-const FRASE_EFFECTS = ['fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave'];
+const FRASE_EFFECTS = [
+  'fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave',
+  'pulse', 'float', 'sway', 'shimmer', 'rainbow', 'shake', 'flicker', 'spin',
+  'bounce-loop', 'wiggle', 'jelly'
+];
 const FRASE_POSITIONS = ['top', 'middle', 'bottom'];
 const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
 
@@ -378,6 +384,96 @@ app.post('/api/frase-final/send', requirePerson, (req, res) => {
   if (!parsed) return res.status(400).json({ error: 'Revisá el texto, la letra, el color o el efecto.' });
   io.to('owner:' + req.person.name).emit('fraseFinalAhora', parsed);
   res.json({ ok: true });
+});
+
+// ---- Avance automático (por persona) ----
+// Opcional: si está prendido, pantalla.html pasa sola a la siguiente diapositiva
+// cada tantos segundos, sin que nadie tenga que tocar "Siguiente" — sólo afecta
+// a la pantalla de esa persona (es 100% local ahí, no manda nada por socket).
+
+const AUTO_FILE = path.join(__dirname, 'avance-automatico.json');
+const CLOUD_AUTO_PUBLIC_ID = 'presentacion/avance-automatico';
+const AUTO_DEFAULT = { enabled: false, seconds: 120 };
+
+async function readLocalAuto() {
+  try {
+    return JSON.parse(await fs.readFile(AUTO_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readCloudAutoBackup() {
+  if (!cloudinaryReady) return null;
+  try {
+    const url = cloudinary.url(CLOUD_AUTO_PUBLIC_ID, { resource_type: 'raw', secure: true }) + `?t=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('No se pudo leer el respaldo de avance automático en Cloudinary:', err.message);
+    return null;
+  }
+}
+
+async function readAutoList() {
+  let list = await readLocalAuto();
+  if (!list) list = await readCloudAutoBackup();
+  return list || [];
+}
+
+async function writeAutoList(list) {
+  await fs.writeFile(AUTO_FILE, JSON.stringify(list, null, 2));
+  if (!cloudinaryReady) return;
+  try {
+    const dataUri = 'data:application/json;base64,' + Buffer.from(JSON.stringify(list)).toString('base64');
+    await cloudinary.uploader.upload(dataUri, {
+      public_id: CLOUD_AUTO_PUBLIC_ID,
+      resource_type: 'raw',
+      overwrite: true,
+      invalidate: true
+    });
+  } catch (err) {
+    console.error('No se pudo respaldar el avance automático en Cloudinary:', err.message);
+  }
+}
+
+// Entre 3 segundos y 1 hora — evita un valor absurdo (0s en loop infinito, o
+// tan largo que en la práctica nunca avanza).
+function parseAutoBody(body) {
+  const enabled = !!(body || {}).enabled;
+  const rawSeconds = Number((body || {}).seconds);
+  const seconds = Number.isFinite(rawSeconds) ? Math.min(3600, Math.max(3, Math.round(rawSeconds))) : null;
+  if (seconds === null) return null;
+  return { enabled, seconds };
+}
+
+app.get('/api/avance-automatico', requirePerson, async (req, res) => {
+  try {
+    const list = await readAutoList();
+    const mine = list.find(r => r.owner === req.person.name);
+    res.json(mine ? { enabled: mine.enabled, seconds: mine.seconds } : AUTO_DEFAULT);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error en servidor' });
+  }
+});
+
+app.post('/api/avance-automatico', requirePerson, async (req, res) => {
+  try {
+    const parsed = parseAutoBody(req.body);
+    if (!parsed) return res.status(400).json({ error: 'Duración inválida.' });
+
+    const list = await readAutoList();
+    const idx = list.findIndex(r => r.owner === req.person.name);
+    const record = { owner: req.person.name, ...parsed };
+    if (idx === -1) list.push(record); else list[idx] = record;
+    await writeAutoList(list);
+    res.json(parsed);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar el avance automático.' });
+  }
 });
 
 // GET /images — { src, transform } por diapositiva, para pantalla.html y control.html
@@ -652,10 +748,22 @@ io.on("connection", (socket) => {
   socket.on("identificar", async (pin) => {
     try {
       const person = await identify(pin);
-      if (person) socket.join('owner:' + person.name);
+      if (person) {
+        socket.join('owner:' + person.name);
+        socket.ownerName = person.name; // para poder re-emitir avisos del avance automático a esta misma sala
+      }
     } catch (err) {
       console.error('No se pudo identificar el socket:', err.message);
     }
+  });
+
+  // Aviso del avance automático de pantalla.html (es 100% local ahí — esto es
+  // sólo para que el/la dueña se entere también desde su control, ej. el
+  // celular, sin tener que estar mirando la pantalla grande todo el tiempo).
+  // Sólo le llega a sus propios dispositivos (misma sala 'owner:'), nunca a
+  // los de otra persona.
+  socket.on("avanceAutoAviso", (payload) => {
+    if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('avanceAutoAviso', payload);
   });
 });
 

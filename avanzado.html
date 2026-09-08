@@ -39,6 +39,9 @@
     <div class="btn-row">
       <button type="button" class="btn secondary" id="finalPhraseBtn">💬 Frase final</button>
     </div>
+    <div class="btn-row">
+      <button type="button" class="btn secondary" id="autoAdvanceBtn">⏱️ Avance automático</button>
+    </div>
   </div>
 
   <div class="spacer"></div>
@@ -169,6 +172,35 @@
     </div>
     <div class="btn-row" style="margin-top: 12px;">
       <button type="button" class="btn secondary" id="fpSendPc">📺 Enviar a PC</button>
+    </div>
+  </div>
+</div>
+
+<!-- Avance automático: opcional -- si esta prendido, tu pantalla pasa sola de
+     diapositiva sin que nadie toque "Siguiente"; mientras esta prendido, los
+     botones manuales de Siguiente/Atras quedan sin efecto en tu pantalla. -->
+<div class="modal-overlay" id="autoOverlay" hidden>
+  <div class="modal-card">
+    <h2>Avance automatico</h2>
+    <p>Pasa sola a la siguiente diapositiva cada tanto, sin apretar nada. Solo afecta a tu propia pantalla.</p>
+
+    <div class="btn-row" id="autoToggleRow" style="margin-bottom: 18px;">
+      <button type="button" class="fp-option-btn" data-key="off">Apagado</button>
+      <button type="button" class="fp-option-btn" data-key="on">Prendido</button>
+    </div>
+
+    <div class="fp-section-label">Cada cuanto pasa a la siguiente</div>
+    <div class="fp-range-row">
+      <input type="number" id="autoValue" min="1" step="1" value="2" class="fp-text-input" style="margin-bottom: 0;">
+      <div class="btn-row" id="autoUnitRow" style="flex: none;">
+        <button type="button" class="fp-option-btn" data-key="seconds">Segundos</button>
+        <button type="button" class="fp-option-btn" data-key="minutes">Minutos</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top: 18px;">
+      <button type="button" class="btn" id="autoCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="autoConfirm">Confirmar</button>
     </div>
   </div>
 </div>
@@ -665,6 +697,8 @@
     { key: 'calligraphy', label: 'Caligrafía', family: "'Great Vibes', cursive" },
     { key: 'huge', label: 'Gigante', family: "'Anton', sans-serif" }
   ];
+  // Los primeros 10 entran una vez y quedan quietos; los últimos 8 (a partir
+  // de "Latido") se mueven todo el tiempo que la frase está en pantalla.
   const FRASE_EFFECTS = [
     { key: 'fade', label: '✨ Fundido' },
     { key: 'slide-up', label: '⬆️ Deslizar arriba' },
@@ -675,7 +709,18 @@
     { key: 'confetti', label: '🎉 Confeti' },
     { key: 'rotate', label: '🔄 Girar' },
     { key: 'glow', label: '💡 Destello' },
-    { key: 'wave', label: '🌊 Ola' }
+    { key: 'wave', label: '🌊 Ola' },
+    { key: 'pulse', label: '💓 Latido' },
+    { key: 'float', label: '🎈 Flotar' },
+    { key: 'sway', label: '🌴 Balanceo' },
+    { key: 'shimmer', label: '🌟 Brillo' },
+    { key: 'rainbow', label: '🌈 Arcoíris' },
+    { key: 'shake', label: '📳 Vibración' },
+    { key: 'flicker', label: '🕯️ Parpadeo' },
+    { key: 'spin', label: '🌀 Giro continuo' },
+    { key: 'bounce-loop', label: '⚡ Rebote continuo' },
+    { key: 'wiggle', label: '🐍 Vaivén' },
+    { key: 'jelly', label: '🍮 Gelatina' }
   ];
 
   const fpOverlay = document.getElementById('fpOverlay');
@@ -921,6 +966,77 @@
       showToast(err.message);
     } finally {
       fpSendPc.disabled = false;
+    }
+  });
+
+  // ---- Avance automático: opcional, sólo afecta a la pantalla propia ----
+  const autoAdvanceBtn = document.getElementById('autoAdvanceBtn');
+  const autoOverlay = document.getElementById('autoOverlay');
+  const autoToggleRow = document.getElementById('autoToggleRow');
+  const autoUnitRow = document.getElementById('autoUnitRow');
+  const autoValue = document.getElementById('autoValue');
+  const autoCancel = document.getElementById('autoCancel');
+  const autoConfirm = document.getElementById('autoConfirm');
+
+  let autoState = { enabled: false, unit: 'seconds' };
+
+  function selectAutoToggle(key) {
+    autoState.enabled = key === 'on';
+    autoToggleRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.key === key);
+    });
+  }
+  autoToggleRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectAutoToggle(btn.dataset.key));
+  });
+
+  function selectAutoUnit(key) {
+    autoState.unit = key;
+    autoUnitRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.key === key);
+    });
+  }
+  autoUnitRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectAutoUnit(btn.dataset.key));
+  });
+
+  autoAdvanceBtn.addEventListener('click', () => {
+    authFetch('/api/avance-automatico')
+      .then(res => res.json())
+      .then((saved) => {
+        // El servidor siempre guarda en segundos — acá se elige mostrarlo en
+        // minutos si da un número redondo, para no forzar "120" en vez de "2".
+        const useMinutes = saved.seconds >= 60 && saved.seconds % 60 === 0;
+        autoState = { enabled: !!saved.enabled, unit: useMinutes ? 'minutes' : 'seconds' };
+        autoValue.value = useMinutes ? saved.seconds / 60 : saved.seconds;
+        selectAutoToggle(autoState.enabled ? 'on' : 'off');
+        selectAutoUnit(autoState.unit);
+        openOverlay(autoOverlay);
+      })
+      .catch(() => showToast('No se pudo cargar el avance automático.'));
+  });
+
+  autoCancel.addEventListener('click', () => closeOverlay(autoOverlay));
+
+  autoConfirm.addEventListener('click', async () => {
+    const raw = parseFloat(autoValue.value);
+    if (!Number.isFinite(raw) || raw <= 0) { showToast('Poné un número mayor a 0.'); return; }
+    const seconds = Math.round(autoState.unit === 'minutes' ? raw * 60 : raw);
+    autoConfirm.disabled = true;
+    try {
+      const res = await authFetch('/api/avance-automatico', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: autoState.enabled, seconds })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar.');
+      showToast('Avance automático guardado.');
+      closeOverlay(autoOverlay);
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      autoConfirm.disabled = false;
     }
   });
 

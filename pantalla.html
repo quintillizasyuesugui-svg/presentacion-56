@@ -21,6 +21,7 @@
 </div>
 
 <div class="hud" id="hud">0 / 0</div>
+<div class="auto-badge" id="autoBadge" hidden></div>
 <div class="identity-corner" id="identityCorner" hidden>
   <div class="identity-pill" id="authBadge"></div>
   <button type="button" class="logout-btn" id="logoutBtn">Cerrar sesión</button>
@@ -61,6 +62,7 @@
   const imgFrame = document.getElementById('imgFrame');
   const imgBg = document.getElementById('imgBg');
   const hud = document.getElementById('hud');
+  const autoBadge = document.getElementById('autoBadge');
   const identityCorner = document.getElementById('identityCorner');
   const authBadge = document.getElementById('authBadge');
   const logoutBtn = document.getElementById('logoutBtn');
@@ -141,6 +143,59 @@
     showingFinal = false;
     finalIsPreview = false;
     finalPhrase.classList.remove('show');
+  }
+
+  // ---- Avance automático: opcional, 100% local a esta pantalla ----
+  // No manda nada por socket — sólo llama a aplicarCambio('siguiente') acá
+  // mismo, así que no le afecta a nadie más ni a ningún otro dispositivo.
+  let autoAdvance = null; // { enabled, seconds }
+  let autoAdvanceTimer = null;
+  let autoAdvanceEndAt = null; // Date.now() del próximo salto — sólo para pintar la cuenta regresiva
+
+  function refreshAutoAdvance() {
+    authFetch('/api/avance-automatico')
+      .then(res => res.json())
+      .then(auto => { autoAdvance = auto; })
+      .catch(err => console.error('Error loading avance automático:', err));
+  }
+
+  function formatCountdown(totalSeconds) {
+    if (totalSeconds >= 60) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return m + 'm ' + String(s).padStart(2, '0') + 's';
+    }
+    return totalSeconds + 's';
+  }
+
+  // Corre siempre, una vez por segundo — sólo pinta algo si hay una cuenta
+  // regresiva activa (autoAdvanceEndAt). No decide nada por su cuenta: el
+  // salto de verdad lo hace el setTimeout de scheduleAutoAdvance().
+  function updateAutoBadge() {
+    if (!autoAdvanceEndAt) { autoBadge.hidden = true; return; }
+    const remaining = Math.max(0, Math.ceil((autoAdvanceEndAt - Date.now()) / 1000));
+    autoBadge.hidden = false;
+    autoBadge.textContent = '⏱️ Siguiente en ' + formatCountdown(remaining);
+  }
+  setInterval(updateAutoBadge, 1000);
+
+  // Se reprograma después de CUALQUIER cambio de diapositiva (manual o
+  // automático) — así el reloj arranca de nuevo cada vez, en vez de sumarse
+  // al que ya venía corriendo. El refresco silencioso de cada 4s (arriba)
+  // sólo actualiza el DATO guardado — nunca llama a esta función — así que
+  // la cuenta regresiva no se reinicia ni se corta por esas actualizaciones.
+  function scheduleAutoAdvance() {
+    if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+    autoAdvanceEndAt = null;
+    if (!started || !autoAdvance || !autoAdvance.enabled) { updateAutoBadge(); return; }
+    autoAdvanceEndAt = Date.now() + autoAdvance.seconds * 1000;
+    updateAutoBadge();
+    // Le avisa al control (celular) para que arranque el mismo contador en
+    // vivo, al mismo instante — así los dos relojes quedan sincronizados.
+    socket.emit('avanceAutoAviso', { tipo: 'cuenta', segundos: autoAdvance.seconds });
+    autoAdvanceTimer = setTimeout(() => {
+      aplicarCambio('siguiente', { auto: true });
+    }, autoAdvance.seconds * 1000);
   }
 
   // ---- Red neuronal esférica 3D (pantalla de espera) ----
@@ -337,13 +392,18 @@
     logoutBtn.addEventListener('click', () => logoutAuth());
     refreshSlides();
     refreshFraseFinal();
+    refreshAutoAdvance();
     socket.on('imagenesActualizadas', refreshSlides);
     // Respaldo silencioso: si el socket no avisa (reconexión, proxy, etc.),
     // igual nos enteramos de imágenes nuevas/borradas sin tocar lo que ya
     // se está mostrando — refreshSlides() sólo actualiza la lista y el HUD,
     // nunca el índice actual ni la imagen en pantalla. De paso, si alguien
-    // edita su frase final desde otro dispositivo, esta pantalla la toma sola.
-    setInterval(() => { refreshSlides(); refreshFraseFinal(); }, 4000);
+    // edita su frase final o su avance automático desde otro dispositivo,
+    // esta pantalla lo toma solo — pero refreshAutoAdvance() sólo actualiza
+    // el dato guardado, nunca reinicia la cuenta regresiva que ya está
+    // corriendo (eso sólo lo hace scheduleAutoAdvance(), al cambiar de
+    // diapositiva de verdad).
+    setInterval(() => { refreshSlides(); refreshFraseFinal(); refreshAutoAdvance(); }, 4000);
 
     // Vincula este socket a la sala de este dueño (por PIN) para que "Enviar
     // a PC" (Modo avanzado) le pueda mandar la frase sólo a esta pantalla, no
@@ -401,7 +461,19 @@
     setTimeout(() => fsIndicator.classList.remove('show'), 2000);
   });
 
-  socket.on('cambiar', (accion) => {
+  // "aplicarCambio" es la única función que mueve diapositivas — la llama
+  // tanto el socket (control remoto compartido) como el temporizador local
+  // de avance automático (con opts.auto = true). Así ambos caminos comparten
+  // toda la lógica de la frase final, el confetti, etc. sin duplicar nada.
+  function aplicarCambio(accion, opts = {}) {
+    const fromAuto = !!opts.auto;
+    // Avance automático prendido: los botones manuales de Siguiente/Atrás no
+    // hacen nada en ESTA pantalla (el reloj es el que manda) — "Mostrar" y el
+    // salto por número de voz siguen funcionando igual.
+    if (!fromAuto && autoAdvance && autoAdvance.enabled && (accion === 'siguiente' || accion === 'anterior')) {
+      return;
+    }
+
     if (accion === 'mostrar') {
       if (showingFinal) hideFinalPhrase();
       index = 0;
@@ -416,7 +488,7 @@
         // (se llegó al final del show), "Siguiente" arranca de nuevo desde 1.
         const wasPreview = finalIsPreview;
         hideFinalPhrase();
-        if (wasPreview) return;
+        if (wasPreview) { scheduleAutoAdvance(); return; }
         index = 0;
       } else if (diapositivas.length && index >= diapositivas.length - 1 && fraseFinal) {
         // Última diapositiva + hay una frase final propia configurada: en vez
@@ -424,6 +496,19 @@
         showFinalPhrase(fraseFinal);
         updateHud();
         updateProgress();
+        // Si fue el avance automático el que llegó hasta acá, termina el show
+        // solo — se desactiva (y avisa al servidor, para que no vuelva a
+        // prenderse solo si se recarga la página) en vez de seguir en loop.
+        if (fromAuto && autoAdvance && autoAdvance.enabled) {
+          autoAdvance.enabled = false;
+          scheduleAutoAdvance();
+          authFetch('/api/avance-automatico', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: false, seconds: autoAdvance.seconds })
+          }).catch(err => console.error('No se pudo desactivar el avance automático:', err));
+          socket.emit('avanceAutoAviso', { tipo: 'terminamos' });
+        }
         return; // no tocar #img/#imgBg mientras se muestra la frase
       } else {
         index++;
@@ -434,6 +519,7 @@
         // Volvemos a lo que ya estaba debajo (última diapositiva o la que se
         // veía antes de la prueba) — no hace falta tocar #img para nada.
         hideFinalPhrase();
+        scheduleAutoAdvance();
         return;
       }
       index--;
@@ -469,7 +555,11 @@
     imgFrame.style.transform = slide.transform
       ? `translate(${slide.transform.x}%, ${slide.transform.y}%) scale(${slide.transform.scale})`
       : 'none';
-  });
+
+    scheduleAutoAdvance();
+  }
+
+  socket.on('cambiar', (accion) => aplicarCambio(accion));
 
   function confetti() {
     const canvas = document.createElement('canvas');

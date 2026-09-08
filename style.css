@@ -153,6 +153,47 @@ body.pantalla {
 
 .hud[hidden] { display: none; }
 
+/* Cuenta regresiva del avance automático — misma pastilla que el HUD, pero
+   del lado izquierdo (arriba a la derecha ya lo ocupa el HUD). */
+.auto-badge {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1.1rem;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber-400);
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+}
+
+.auto-badge[hidden] { display: none; }
+
+/* Mismo aviso, pero para control.html (que no es pantalla completa, así que
+   no puede ser un badge flotante — va como una línea normal en el flujo). */
+.auto-countdown-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  color: var(--amber-400);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.auto-countdown-inline[hidden] { display: none; }
+
 .progress-track {
   position: fixed;
   left: 0;
@@ -326,6 +367,82 @@ body.pantalla {
   100% { opacity: 1; text-shadow: 0 0 24px currentColor, 0 0 48px currentColor; }
 }
 .fp-glow .fp-anim-target { animation: fpGlow var(--fp-duration, 1200ms) var(--ease-out) both; }
+
+/* ---- Efectos de movimiento continuo — a diferencia de los de arriba (que
+   entran una vez y quedan quietos), estos se mueven todo el tiempo que la
+   frase está en pantalla, en loop, mientras dure el show. ---- */
+
+@keyframes fpPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.fp-pulse .fp-anim-target { animation: fpPulse var(--fp-duration, 900ms) ease-in-out infinite; }
+
+@keyframes fpFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+.fp-float .fp-anim-target { animation: fpFloat var(--fp-duration, 1600ms) ease-in-out infinite; }
+
+@keyframes fpSway {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+.fp-sway .fp-anim-target { animation: fpSway var(--fp-duration, 1400ms) ease-in-out infinite; }
+
+@keyframes fpShimmer {
+  0%, 100% { text-shadow: 0 0 4px currentColor; }
+  50% { text-shadow: 0 0 26px currentColor, 0 0 46px currentColor; }
+}
+.fp-shimmer .fp-anim-target { animation: fpShimmer var(--fp-duration, 1200ms) ease-in-out infinite; }
+
+@keyframes fpRainbow {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+.fp-rainbow .fp-anim-target { animation: fpRainbow var(--fp-duration, 2000ms) linear infinite; }
+
+@keyframes fpShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.fp-shake .fp-anim-target { animation: fpShake var(--fp-duration, 250ms) linear infinite; }
+
+@keyframes fpFlicker {
+  0%, 19%, 21%, 23%, 54%, 56%, 100% { opacity: 1; }
+  20%, 22%, 55% { opacity: 0.3; }
+}
+.fp-flicker .fp-anim-target { animation: fpFlicker var(--fp-duration, 2000ms) linear infinite; }
+
+@keyframes fpSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.fp-spin .fp-anim-target { animation: fpSpin var(--fp-duration, 2200ms) linear infinite; }
+
+@keyframes fpBounceLoop {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-22px); }
+  50% { transform: translateY(0); }
+  65% { transform: translateY(-8px); }
+  80% { transform: translateY(0); }
+}
+.fp-bounce-loop .fp-anim-target { animation: fpBounceLoop var(--fp-duration, 1000ms) ease-in-out infinite; }
+
+@keyframes fpWiggle {
+  0%, 100% { transform: translateX(-14px); }
+  50% { transform: translateX(14px); }
+}
+.fp-wiggle .fp-anim-target { animation: fpWiggle var(--fp-duration, 1400ms) ease-in-out infinite; }
+
+@keyframes fpJelly {
+  0%, 100% { transform: scale(1, 1); }
+  25% { transform: scale(1.15, 0.85); }
+  50% { transform: scale(0.9, 1.1); }
+  75% { transform: scale(1.05, 0.95); }
+}
+.fp-jelly .fp-anim-target { animation: fpJelly var(--fp-duration, 900ms) ease-in-out infinite; }
 
 /* ---- Miniatura animada por botón de efecto (Modo avanzado) ---- */
 .fp-effect-btn {
