@@ -129,7 +129,8 @@
     renderFinalText(frase.text, frase.effect, duration);
 
     finalPhrase.style.setProperty('--fp-duration', (duration * 1000) + 'ms');
-    finalPhrase.className = '';
+    finalPhrase.style.setProperty('--fp-size-scale', frase.fontSize || 1);
+    finalPhrase.className = 'fp-pos-' + (frase.position || 'middle');
     void finalPhrase.offsetWidth; // fuerza reflow para poder repetir la animación
     finalPhrase.classList.add('show', 'fp-' + frase.effect);
 

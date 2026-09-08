@@ -270,7 +270,8 @@ const CLOUD_FRASES_PUBLIC_ID = 'presentacion/frases-finales';
 // viven en el HTML (avanzado.html/pantalla.html), acá sólo importa la key.
 const FRASE_FONTS = ['sans', 'serif', 'script', 'display', 'casual', 'geometric', 'bold-script', 'poster', 'calligraphy', 'huge'];
 const FRASE_EFFECTS = ['fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave'];
-const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1 };
+const FRASE_POSITIONS = ['top', 'middle', 'bottom'];
+const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
 
 async function readLocalFrases() {
   try {
@@ -322,10 +323,13 @@ function parseFraseBody(body) {
   const font = FRASE_FONTS.includes((body || {}).font) ? body.font : null;
   const effect = FRASE_EFFECTS.includes((body || {}).effect) ? body.effect : null;
   const color = typeof (body || {}).color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.color) ? body.color : null;
+  const position = FRASE_POSITIONS.includes((body || {}).position) ? body.position : null;
   const rawDuration = Number((body || {}).duration);
   const duration = Number.isFinite(rawDuration) ? Math.min(3, Math.max(0.4, rawDuration)) : null;
-  if (!text || !font || !effect || !color || duration === null) return null;
-  return { text, font, color, effect, duration };
+  const rawFontSize = Number((body || {}).fontSize);
+  const fontSize = Number.isFinite(rawFontSize) ? Math.min(1.8, Math.max(0.6, rawFontSize)) : null;
+  if (!text || !font || !effect || !color || !position || duration === null || fontSize === null) return null;
+  return { text, font, color, effect, duration, fontSize, position };
 }
 
 // GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
@@ -333,7 +337,15 @@ app.get('/api/frase-final', requirePerson, async (req, res) => {
   try {
     const frases = await readFrases();
     const mine = frases.find(f => f.owner === req.person.name);
-    res.json(mine ? { text: mine.text, font: mine.font, color: mine.color, effect: mine.effect, duration: mine.duration || 1 } : FRASE_DEFAULT);
+    res.json(mine ? {
+      text: mine.text,
+      font: mine.font,
+      color: mine.color,
+      effect: mine.effect,
+      duration: mine.duration || 1,
+      fontSize: mine.fontSize || 1,
+      position: mine.position || 'middle'
+    } : FRASE_DEFAULT);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error en servidor' });

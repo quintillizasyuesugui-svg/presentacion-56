@@ -129,10 +129,16 @@
       <button type="button" class="fp-tab-btn" data-tab="letra">🔤 Letra</button>
       <button type="button" class="fp-tab-btn" data-tab="color">🎨 Color</button>
       <button type="button" class="fp-tab-btn" data-tab="efecto">✨ Efecto</button>
+      <button type="button" class="fp-tab-btn" data-tab="posicion">📍 Posición</button>
     </div>
 
     <div class="fp-tab-panel" data-tab="letra">
-      <div class="fp-grid" id="fpFontGrid"></div>
+      <div class="fp-grid fp-grid-h" id="fpFontGrid"></div>
+      <div class="fp-section-label">Tamaño de letra</div>
+      <div class="fp-range-row">
+        <input type="range" id="fpFontSize" min="0.6" max="1.8" step="0.1" value="1">
+        <span class="fp-range-value" id="fpFontSizeValue">100%</span>
+      </div>
     </div>
 
     <div class="fp-tab-panel" data-tab="color" hidden>
@@ -145,6 +151,15 @@
       <div class="fp-range-row">
         <input type="range" id="fpDuration" min="0.4" max="3" step="0.1" value="1">
         <span class="fp-range-value" id="fpDurationValue">1.0s</span>
+      </div>
+    </div>
+
+    <div class="fp-tab-panel" data-tab="posicion" hidden>
+      <div class="fp-section-label">Dónde aparece en la pantalla</div>
+      <div class="btn-row" id="fpPositionRow">
+        <button type="button" class="fp-option-btn" data-key="top">⬆️ Arriba</button>
+        <button type="button" class="fp-option-btn" data-key="middle">⏺️ Medio</button>
+        <button type="button" class="fp-option-btn" data-key="bottom">⬇️ Abajo</button>
       </div>
     </div>
 
@@ -673,6 +688,9 @@
   const fpReplayBtn = document.getElementById('fpReplayBtn');
   const fpDuration = document.getElementById('fpDuration');
   const fpDurationValue = document.getElementById('fpDurationValue');
+  const fpFontSize = document.getElementById('fpFontSize');
+  const fpFontSizeValue = document.getElementById('fpFontSizeValue');
+  const fpPositionRow = document.getElementById('fpPositionRow');
   const fpCancel = document.getElementById('fpCancel');
   const fpConfirm = document.getElementById('fpConfirm');
   const fpSendPc = document.getElementById('fpSendPc');
@@ -688,8 +706,19 @@
     btn.addEventListener('click', () => selectFpTab(btn.dataset.tab));
   });
 
-  let fpState = { font: 'sans', color: '#ffffff', effect: 'fade', duration: 1 };
+  let fpState = { font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
   let effectMiniTimer = null;
+
+  function selectPosition(key) {
+    fpState.position = key;
+    fpPositionRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.key === key);
+    });
+    renderPreview();
+  }
+  fpPositionRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectPosition(btn.dataset.key));
+  });
 
   // Cada botón de efecto trae su propia mini pantalla negra que repite la
   // animación en loop (con un texto fijo "Hola", siempre a 1s) — así se ve de
@@ -770,10 +799,11 @@
     renderFpText(fpPreviewText, text, fpState.effect, fpState.duration);
 
     fpPreviewStage.style.setProperty('--fp-duration', (fpState.duration * 1000) + 'ms');
+    fpPreviewStage.style.setProperty('--fp-size-scale', fpState.fontSize);
 
     // Reinicia la animación CSS aunque el efecto sea el mismo de antes — sin
     // el "reflow" forzado (leer offsetWidth) el navegador no vuelve a jugarla.
-    fpPreviewStage.className = 'fp-preview-stage';
+    fpPreviewStage.className = 'fp-preview-stage fp-pos-' + fpState.position;
     void fpPreviewStage.offsetWidth;
     fpPreviewStage.classList.add('fp-' + fpState.effect);
   }
@@ -797,6 +827,11 @@
     fpDurationValue.textContent = fpState.duration.toFixed(1) + 's';
     renderPreview();
   });
+  fpFontSize.addEventListener('input', () => {
+    fpState.fontSize = parseFloat(fpFontSize.value);
+    fpFontSizeValue.textContent = Math.round(fpState.fontSize * 100) + '%';
+    renderPreview();
+  });
 
   function openFinalPhraseEditor() {
     authFetch('/api/frase-final')
@@ -807,13 +842,20 @@
           font: saved.font || 'sans',
           color: saved.color || '#ffffff',
           effect: saved.effect || 'fade',
-          duration: saved.duration || 1
+          duration: saved.duration || 1,
+          fontSize: saved.fontSize || 1,
+          position: saved.position || 'middle'
         };
         fpColor.value = fpState.color;
         fpDuration.value = fpState.duration;
         fpDurationValue.textContent = fpState.duration.toFixed(1) + 's';
+        fpFontSize.value = fpState.fontSize;
+        fpFontSizeValue.textContent = Math.round(fpState.fontSize * 100) + '%';
         buildFpGrid(fpFontGrid, FRASE_FONTS, fpState.font, selectFont);
         buildFpGrid(fpEffectGrid, FRASE_EFFECTS, fpState.effect, selectEffect);
+        fpPositionRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
+          btn.classList.toggle('selected', btn.dataset.key === fpState.position);
+        });
         renderPreview();
         selectFpTab('letra');
         openOverlay(fpOverlay);
@@ -830,7 +872,15 @@
   fpCancel.addEventListener('click', closeFinalPhraseEditor);
 
   function fpCurrentBody() {
-    return { text: fpText.value.trim(), font: fpState.font, color: fpState.color, effect: fpState.effect, duration: fpState.duration };
+    return {
+      text: fpText.value.trim(),
+      font: fpState.font,
+      color: fpState.color,
+      effect: fpState.effect,
+      duration: fpState.duration,
+      fontSize: fpState.fontSize,
+      position: fpState.position
+    };
   }
 
   fpConfirm.addEventListener('click', async () => {

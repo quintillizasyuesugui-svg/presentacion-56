@@ -239,8 +239,13 @@ body.pantalla {
 
 #finalPhrase.show { opacity: 1; visibility: visible; }
 
+/* Posición elegida en el editor — por default queda centrado (sin clase) */
+#finalPhrase.fp-pos-top, .fp-preview-stage.fp-pos-top { align-items: flex-start; }
+#finalPhrase.fp-pos-bottom, .fp-preview-stage.fp-pos-bottom { align-items: flex-end; }
+
 #finalPhraseText {
-  font-size: clamp(2rem, 8vw, 5.5rem);
+  /* --fp-size-scale lo pone JS según el slider de "Tamaño de letra" (1 = 100%) */
+  font-size: calc(clamp(2rem, 8vw, 5.5rem) * var(--fp-size-scale, 1));
   font-weight: 700;
   line-height: 1.25;
   max-width: 90vw;
@@ -265,7 +270,7 @@ body.pantalla {
 }
 
 .fp-preview-stage #fpPreviewText {
-  font-size: clamp(1rem, 5.5vw, 1.9rem);
+  font-size: calc(clamp(1rem, 5.5vw, 1.9rem) * var(--fp-size-scale, 1));
   font-weight: 700;
   text-align: center;
   word-break: break-word;
@@ -431,6 +436,9 @@ body.pantalla {
 }
 
 .fp-option-btn.selected { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); }
+
+#fpPositionRow.btn-row { margin-bottom: 4px; }
+#fpPositionRow .fp-option-btn { flex: 1; }
 
 /* Grid de efectos: carrusel horizontal (se desliza con el dedo hacia los
    costados) en vez de una lista vertical larga — los 10 caben en una sola
