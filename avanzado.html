@@ -8,6 +8,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <title>Modo avanzado</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Los 10 tipos de letra de "Frase final" — se cargan acá y en pantalla.html,
+       que es donde realmente se ven en las dos vistas previas. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body class="control">
 <div class="app">
@@ -30,6 +35,9 @@
     </div>
     <div class="btn-row">
       <button type="button" class="btn secondary" id="resizeBtn">🖼️ Tamaño y posición</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn secondary" id="finalPhraseBtn">💬 Frase final</button>
     </div>
   </div>
 
@@ -94,6 +102,48 @@
     <div class="btn-row">
       <button type="button" class="btn" id="confirmCancel">Cancelar</button>
       <button type="button" class="btn danger-solid" id="confirmAccept">Separar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Frase final: mensaje propio que aparece cuando TU show llega al final -->
+<div class="modal-overlay" id="fpOverlay" hidden>
+  <div class="modal-card fp-card">
+    <h2>Frase final</h2>
+    <p>Aparece en tu pantalla cuando termina tu propio show. La vista previa de abajo se actualiza sola mientras editás.</p>
+
+    <div class="fp-section-label">Texto</div>
+    <input type="text" id="fpText" class="fp-text-input" placeholder="Ej: ¡Gracias!" maxlength="60">
+
+    <div class="fp-section-label">Vista previa</div>
+    <div class="fp-preview-stage" id="fpPreviewStage">
+      <div id="fpPreviewText" class="fp-anim-target"></div>
+    </div>
+    <div class="btn-row" style="margin-bottom: 18px;">
+      <button type="button" class="chip-btn" id="fpReplayBtn">▶️ Repetir animación</button>
+    </div>
+
+    <div class="fp-section-label">Tipo de letra</div>
+    <div class="fp-grid" id="fpFontGrid"></div>
+
+    <div class="fp-section-label">Color</div>
+    <input type="color" id="fpColor" class="fp-color" value="#ffffff">
+
+    <div class="fp-section-label">Efecto</div>
+    <div class="fp-grid" id="fpEffectGrid"></div>
+
+    <div class="fp-section-label">Duración de la animación</div>
+    <div class="fp-range-row">
+      <input type="range" id="fpDuration" min="0.4" max="3" step="0.1" value="1">
+      <span class="fp-range-value" id="fpDurationValue">1.0s</span>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn" id="fpCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="fpConfirm">💾 Confirmar</button>
+    </div>
+    <div class="btn-row" style="margin-top: 12px;">
+      <button type="button" class="btn secondary" id="fpSendPc">📺 Enviar a PC</button>
     </div>
   </div>
 </div>
@@ -574,7 +624,236 @@
     }
   }
 
-  // Identificar quién es (pide PIN o registra) antes de habilitar unir/ajustar.
+  // ---- Frase final: texto propio que aparece cuando TU show llega al final ----
+  // Las keys tienen que coincidir 1:1 con FRASE_FONTS/FRASE_EFFECTS de server.js
+  // (que valida contra esa misma lista) y con pantalla.html (que las vuelve a
+  // usar para mostrar la frase de verdad, con las mismas fuentes/efectos).
+  const FRASE_FONTS = [
+    { key: 'sans', label: 'Moderna', family: "'Poppins', sans-serif" },
+    { key: 'serif', label: 'Elegante', family: "'Playfair Display', serif" },
+    { key: 'script', label: 'Manuscrita', family: "'Dancing Script', cursive" },
+    { key: 'display', label: 'Impacto', family: "'Bebas Neue', sans-serif" },
+    { key: 'casual', label: 'Divertida', family: "'Pacifico', cursive" },
+    { key: 'geometric', label: 'Geométrica', family: "'Montserrat', sans-serif" },
+    { key: 'bold-script', label: 'Retro', family: "'Lobster', cursive" },
+    { key: 'poster', label: 'Póster', family: "'Oswald', sans-serif" },
+    { key: 'calligraphy', label: 'Caligrafía', family: "'Great Vibes', cursive" },
+    { key: 'huge', label: 'Gigante', family: "'Anton', sans-serif" }
+  ];
+  const FRASE_EFFECTS = [
+    { key: 'fade', label: '✨ Fundido' },
+    { key: 'slide-up', label: '⬆️ Deslizar arriba' },
+    { key: 'slide-down', label: '⬇️ Deslizar abajo' },
+    { key: 'zoom', label: '🔍 Zoom' },
+    { key: 'bounce', label: '🏀 Rebote' },
+    { key: 'typewriter', label: '⌨️ Máquina de escribir' },
+    { key: 'confetti', label: '🎉 Confeti' },
+    { key: 'rotate', label: '🔄 Girar' },
+    { key: 'glow', label: '💡 Destello' },
+    { key: 'wave', label: '🌊 Ola' }
+  ];
+
+  const fpOverlay = document.getElementById('fpOverlay');
+  const fpText = document.getElementById('fpText');
+  const fpColor = document.getElementById('fpColor');
+  const fpFontGrid = document.getElementById('fpFontGrid');
+  const fpEffectGrid = document.getElementById('fpEffectGrid');
+  const fpPreviewStage = document.getElementById('fpPreviewStage');
+  const fpPreviewText = document.getElementById('fpPreviewText');
+  const fpReplayBtn = document.getElementById('fpReplayBtn');
+  const fpDuration = document.getElementById('fpDuration');
+  const fpDurationValue = document.getElementById('fpDurationValue');
+  const fpCancel = document.getElementById('fpCancel');
+  const fpConfirm = document.getElementById('fpConfirm');
+  const fpSendPc = document.getElementById('fpSendPc');
+  const finalPhraseBtn = document.getElementById('finalPhraseBtn');
+
+  let fpState = { font: 'sans', color: '#ffffff', effect: 'fade', duration: 1 };
+  let effectMiniTimer = null;
+
+  // Cada botón de efecto trae su propia mini pantalla negra que repite la
+  // animación en loop (con un texto fijo "Hola", siempre a 1s) — así se ve de
+  // qué se trata cada uno sin tener que elegirlo primero. Se re-juegan todas
+  // juntas cada 2.2s; renderFpText es la misma función que arma la vista
+  // previa grande, así el resultado es idéntico salvo el tamaño.
+  function playEffectMinis() {
+    document.querySelectorAll('#fpEffectGrid .fp-effect-btn').forEach((btn) => {
+      const key = btn.dataset.key;
+      const stage = btn.querySelector('.fp-mini-stage');
+      const target = btn.querySelector('.fp-anim-target');
+      renderFpText(target, 'Hola', key, 1);
+      stage.style.setProperty('--fp-duration', '900ms');
+      stage.className = 'fp-mini-stage';
+      void stage.offsetWidth;
+      stage.classList.add('fp-' + key);
+    });
+  }
+  function startEffectMiniLoop() {
+    playEffectMinis();
+    if (effectMiniTimer) clearInterval(effectMiniTimer);
+    effectMiniTimer = setInterval(playEffectMinis, 2200);
+  }
+
+  function buildFpGrid(container, items, selectedKey, onPick) {
+    container.innerHTML = '';
+    items.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      if (item.key === selectedKey) btn.classList.add('selected');
+      btn.dataset.key = item.key;
+
+      if (item.family) {
+        // Tipo de letra: el botón mismo se escribe con esa fuente, ya es su
+        // propia muestra — no hace falta nada más.
+        btn.classList.add('fp-option-btn');
+        btn.textContent = item.label;
+        btn.style.fontFamily = item.family;
+      } else {
+        // Efecto: mini pantalla que juega la animación en loop + el nombre debajo.
+        btn.classList.add('fp-option-btn', 'fp-effect-btn');
+        btn.innerHTML = '<span class="fp-mini-stage"><span class="fp-anim-target"></span></span>' +
+          '<span class="fp-mini-label">' + item.label + '</span>';
+      }
+
+      btn.addEventListener('click', () => onPick(item.key));
+      container.appendChild(btn);
+    });
+    if (items === FRASE_EFFECTS) startEffectMiniLoop();
+  }
+
+  // Wrapea cada letra en su propio <span> — lo necesitan "Ola" (cada letra
+  // rebota con su propio delay) y "Máquina de escribir" (cada letra aparece
+  // una después de la otra). Los demás efectos animan el bloque entero, así
+  // que van con el texto plano nomás.
+  function renderFpText(el, text, effect, duration) {
+    el.innerHTML = '';
+    if (effect === 'typewriter' || effect === 'wave') {
+      const baseStep = effect === 'typewriter' ? 45 : 60;
+      const stepMs = baseStep * duration;
+      [...text].forEach((ch, i) => {
+        const span = document.createElement('span');
+        span.className = 'fp-letter';
+        span.textContent = ch === ' ' ? ' ' : ch;
+        span.style.animationDelay = (i * stepMs) + 'ms';
+        el.appendChild(span);
+      });
+    } else {
+      el.textContent = text;
+    }
+  }
+
+  function renderPreview() {
+    const font = FRASE_FONTS.find(f => f.key === fpState.font) || FRASE_FONTS[0];
+    fpPreviewText.style.fontFamily = font.family;
+    fpPreviewText.style.color = fpState.color;
+    const text = fpText.value.trim() || 'Gracias';
+    renderFpText(fpPreviewText, text, fpState.effect, fpState.duration);
+
+    fpPreviewStage.style.setProperty('--fp-duration', (fpState.duration * 1000) + 'ms');
+
+    // Reinicia la animación CSS aunque el efecto sea el mismo de antes — sin
+    // el "reflow" forzado (leer offsetWidth) el navegador no vuelve a jugarla.
+    fpPreviewStage.className = 'fp-preview-stage';
+    void fpPreviewStage.offsetWidth;
+    fpPreviewStage.classList.add('fp-' + fpState.effect);
+  }
+
+  function selectFont(key) {
+    fpState.font = key;
+    buildFpGrid(fpFontGrid, FRASE_FONTS, fpState.font, selectFont);
+    renderPreview();
+  }
+  function selectEffect(key) {
+    fpState.effect = key;
+    buildFpGrid(fpEffectGrid, FRASE_EFFECTS, fpState.effect, selectEffect);
+    renderPreview();
+  }
+
+  fpText.addEventListener('input', renderPreview);
+  fpColor.addEventListener('input', () => { fpState.color = fpColor.value; renderPreview(); });
+  fpReplayBtn.addEventListener('click', renderPreview);
+  fpDuration.addEventListener('input', () => {
+    fpState.duration = parseFloat(fpDuration.value);
+    fpDurationValue.textContent = fpState.duration.toFixed(1) + 's';
+    renderPreview();
+  });
+
+  function openFinalPhraseEditor() {
+    authFetch('/api/frase-final')
+      .then(res => res.json())
+      .then((saved) => {
+        fpText.value = saved.text || '';
+        fpState = {
+          font: saved.font || 'sans',
+          color: saved.color || '#ffffff',
+          effect: saved.effect || 'fade',
+          duration: saved.duration || 1
+        };
+        fpColor.value = fpState.color;
+        fpDuration.value = fpState.duration;
+        fpDurationValue.textContent = fpState.duration.toFixed(1) + 's';
+        buildFpGrid(fpFontGrid, FRASE_FONTS, fpState.font, selectFont);
+        buildFpGrid(fpEffectGrid, FRASE_EFFECTS, fpState.effect, selectEffect);
+        renderPreview();
+        openOverlay(fpOverlay);
+      })
+      .catch(() => showToast('No se pudo cargar tu frase final.'));
+  }
+
+  function closeFinalPhraseEditor() {
+    if (effectMiniTimer) { clearInterval(effectMiniTimer); effectMiniTimer = null; }
+    closeOverlay(fpOverlay);
+  }
+
+  finalPhraseBtn.addEventListener('click', openFinalPhraseEditor);
+  fpCancel.addEventListener('click', closeFinalPhraseEditor);
+
+  function fpCurrentBody() {
+    return { text: fpText.value.trim(), font: fpState.font, color: fpState.color, effect: fpState.effect, duration: fpState.duration };
+  }
+
+  fpConfirm.addEventListener('click', async () => {
+    const body = fpCurrentBody();
+    if (!body.text) { showToast('Escribí una frase primero.'); return; }
+    fpConfirm.disabled = true;
+    try {
+      const res = await authFetch('/api/frase-final', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar la frase.');
+      showToast('Frase final guardada.');
+      closeFinalPhraseEditor();
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      fpConfirm.disabled = false;
+    }
+  });
+
+  fpSendPc.addEventListener('click', async () => {
+    const body = fpCurrentBody();
+    if (!body.text) { showToast('Escribí una frase primero.'); return; }
+    fpSendPc.disabled = true;
+    try {
+      const res = await authFetch('/api/frase-final/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al enviar.');
+      showToast('Enviada a tu pantalla.');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      fpSendPc.disabled = false;
+    }
+  });
+
+  // ---- Identificar quién es (pide PIN o registra) antes de habilitar unir/ajustar.
   const authNameBadge = document.getElementById('authNameBadge');
   const logoutBtn = document.getElementById('logoutBtn');
   ensureAuthed().then((auth) => {

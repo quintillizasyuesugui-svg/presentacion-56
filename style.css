@@ -214,6 +214,224 @@ body.pantalla {
   max-width: 34ch;
 }
 
+/* ==================================================
+   FRASE FINAL — mensaje de cierre (pantalla.html), y su vista previa
+   compartida en el editor de Modo avanzado (avanzado.html).
+   Las clases fp-<efecto> son las mismas en los dos lugares, así la vista
+   previa del celular se ve exactamente igual que en la pantalla real.
+   ================================================== */
+
+#finalPhrase {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background: #000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out), visibility var(--dur-base) var(--ease-out);
+}
+
+#finalPhrase.show { opacity: 1; visibility: visible; }
+
+#finalPhraseText {
+  font-size: clamp(2rem, 8vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 90vw;
+  word-break: break-word;
+}
+
+/* Vista previa chica (Modo avanzado) — mismo lienzo 16:9 que ya usa el editor
+   de tamaño/posición, para que se vea "como en la pantalla real" a escala. */
+.fp-preview-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 1rem;
+  margin-bottom: 16px;
+}
+
+.fp-preview-stage #fpPreviewText {
+  font-size: clamp(1rem, 5.5vw, 1.9rem);
+  font-weight: 700;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.fp-letter { display: inline-block; white-space: pre; }
+
+/* --fp-duration lo pone JS (en #finalPhrase/.fp-preview-stage/cada miniatura,
+   según el segundero elegido en el editor) — todos los efectos lo heredan de
+   ahí, así una sola perilla de "Duración" controla la velocidad de cualquiera
+   de los 10. Si nunca se puso (CSS viejo en caché, etc.) cada efecto cae a su
+   propio tiempo de siempre. ".fp-anim-target" es la clase compartida por el
+   texto real (#finalPhraseText), la vista previa grande (#fpPreviewText) y
+   cada miniatura del grid de efectos — así una sola regla por efecto alcanza
+   para los tres lugares. */
+@keyframes fpFade { from { opacity: 0; } to { opacity: 1; } }
+.fp-fade .fp-anim-target { animation: fpFade var(--fp-duration, 900ms) var(--ease-out) both; }
+
+@keyframes fpSlideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+.fp-slide-up .fp-anim-target { animation: fpSlideUp var(--fp-duration, 700ms) var(--ease-out) both; }
+
+@keyframes fpSlideDown { from { opacity: 0; transform: translateY(-40px); } to { opacity: 1; transform: translateY(0); } }
+.fp-slide-down .fp-anim-target { animation: fpSlideDown var(--fp-duration, 700ms) var(--ease-out) both; }
+
+@keyframes fpZoom { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+.fp-zoom .fp-anim-target { animation: fpZoom var(--fp-duration, 650ms) var(--ease-out) both; }
+
+@keyframes fpBounce {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.15); }
+  70% { transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.fp-bounce .fp-anim-target, .fp-confetti .fp-anim-target { animation: fpBounce var(--fp-duration, 800ms) var(--ease-out) both; }
+
+@keyframes fpTypewriterLetter { from { opacity: 0; } to { opacity: 1; } }
+.fp-typewriter .fp-letter { opacity: 0; animation: fpTypewriterLetter 10ms linear forwards; }
+
+@keyframes fpWaveLetter {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.35em); }
+}
+.fp-wave .fp-anim-target { animation: fpFade 400ms var(--ease-out) both; }
+.fp-wave .fp-letter { animation: fpWaveLetter var(--fp-duration, 900ms) ease-in-out infinite; }
+
+@keyframes fpRotateIn { from { opacity: 0; transform: rotate(-25deg) scale(0.7); } to { opacity: 1; transform: rotate(0) scale(1); } }
+.fp-rotate .fp-anim-target { animation: fpRotateIn var(--fp-duration, 700ms) var(--ease-out) both; }
+
+@keyframes fpGlow {
+  0% { opacity: 0; text-shadow: 0 0 0 currentColor; }
+  40% { opacity: 1; }
+  100% { opacity: 1; text-shadow: 0 0 24px currentColor, 0 0 48px currentColor; }
+}
+.fp-glow .fp-anim-target { animation: fpGlow var(--fp-duration, 1200ms) var(--ease-out) both; }
+
+/* ---- Miniatura animada por botón de efecto (Modo avanzado) ---- */
+.fp-effect-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+}
+
+.fp-mini-stage {
+  height: 40px;
+  background: #000;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.fp-mini-stage .fp-anim-target {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.fp-mini-label { font-size: 0.8rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-anim-target, .fp-letter { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* ---- Editor de frase final (Modo avanzado) ---- */
+
+.fp-section-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.fp-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  background: var(--gray-850);
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.fp-text-input:focus { outline: none; border-color: var(--primary-500); }
+
+.fp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.fp-option-btn {
+  padding: 10px 8px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.92rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.fp-option-btn.selected { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); }
+
+.fp-range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.fp-range-row input[type="range"] { flex: 1; accent-color: var(--primary-400); }
+
+.fp-range-value {
+  flex: none;
+  min-width: 3.6em;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-300);
+  font-size: 0.9rem;
+}
+
+input[type="color"].fp-color {
+  width: 100%;
+  height: 48px;
+  padding: 4px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: 18px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -703,7 +921,7 @@ body.dragging-active { user-select: none; }
 
 .advanced-panel { gap: 12px; }
 
-.picker-card, .editor-card { max-width: 380px; }
+.picker-card, .editor-card, .fp-card { max-width: 380px; }
 
 .picker-list {
   display: flex;

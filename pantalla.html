@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pantalla</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Los 10 tipos de letra de "Frase final" — mismas keys/fuentes que en el
+       editor de Modo avanzado, para que se vea igual acá y en la vista previa. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body class="pantalla">
 
@@ -36,6 +41,13 @@
   <h2>🖥️ Presiona ESC para salir</h2>
 </div>
 
+<!-- Frase final: mensaje propio de cada persona, aparece cuando SU show llega
+     al final (ver socket 'cambiar' más abajo) o al probarlo desde "Enviar a
+     PC" en Modo avanzado (socket 'fraseFinalAhora'). -->
+<div id="finalPhrase">
+  <div id="finalPhraseText" class="fp-anim-target"></div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="auth.js"></script>
 <script>
@@ -57,6 +69,78 @@
   const waitingHint = document.getElementById('waitingHint');
   const fsIndicator = document.getElementById('fs-indicator');
   const fullscreenButton = document.getElementById('enterFullscreen');
+  const finalPhrase = document.getElementById('finalPhrase');
+  const finalPhraseText = document.getElementById('finalPhraseText');
+
+  // ---- Frase final: mensaje propio de cada persona al terminar SU show ----
+  // Mismas keys que FRASE_FONTS/FRASE_EFFECTS de server.js y de avanzado.html
+  // — server.js valida contra esa misma lista, así que las 3 tienen que
+  // coincidir siempre.
+  const FRASE_FONT_FAMILIES = {
+    sans: "'Poppins', sans-serif",
+    serif: "'Playfair Display', serif",
+    script: "'Dancing Script', cursive",
+    display: "'Bebas Neue', sans-serif",
+    casual: "'Pacifico', cursive",
+    geometric: "'Montserrat', sans-serif",
+    'bold-script': "'Lobster', cursive",
+    poster: "'Oswald', sans-serif",
+    calligraphy: "'Great Vibes', cursive",
+    huge: "'Anton', sans-serif"
+  };
+
+  let fraseFinal = null;      // la propia, guardada — la que cierra el show de verdad
+  let showingFinal = false;   // true mientras #finalPhrase está en pantalla
+  let finalIsPreview = false; // true si se está mostrando por "Enviar a PC" (no por llegar al final de verdad)
+
+  function refreshFraseFinal() {
+    authFetch('/api/frase-final')
+      .then(res => res.json())
+      .then(frase => { fraseFinal = (frase && frase.text) ? frase : null; })
+      .catch(err => console.error('Error loading frase final:', err));
+  }
+
+  // Igual que en el editor: máquina de escribir/ola necesitan cada letra en
+  // su propio <span> para animarse una por una; los demás efectos animan el
+  // bloque de texto entero.
+  function renderFinalText(text, effect, duration) {
+    finalPhraseText.innerHTML = '';
+    if (effect === 'typewriter' || effect === 'wave') {
+      const baseStep = effect === 'typewriter' ? 45 : 60;
+      const stepMs = baseStep * duration;
+      [...text].forEach((ch, i) => {
+        const span = document.createElement('span');
+        span.className = 'fp-letter';
+        span.textContent = ch === ' ' ? ' ' : ch;
+        span.style.animationDelay = (i * stepMs) + 'ms';
+        finalPhraseText.appendChild(span);
+      });
+    } else {
+      finalPhraseText.textContent = text;
+    }
+  }
+
+  function showFinalPhrase(frase, { preview } = {}) {
+    finalIsPreview = !!preview;
+    showingFinal = true;
+    const duration = frase.duration || 1;
+    finalPhraseText.style.fontFamily = FRASE_FONT_FAMILIES[frase.font] || FRASE_FONT_FAMILIES.sans;
+    finalPhraseText.style.color = frase.color || '#ffffff';
+    renderFinalText(frase.text, frase.effect, duration);
+
+    finalPhrase.style.setProperty('--fp-duration', (duration * 1000) + 'ms');
+    finalPhrase.className = '';
+    void finalPhrase.offsetWidth; // fuerza reflow para poder repetir la animación
+    finalPhrase.classList.add('show', 'fp-' + frase.effect);
+
+    if (frase.effect === 'confetti') confetti();
+  }
+
+  function hideFinalPhrase() {
+    showingFinal = false;
+    finalIsPreview = false;
+    finalPhrase.classList.remove('show');
+  }
 
   // ---- Red neuronal esférica 3D (pantalla de espera) ----
   // Los nodos viven en coordenadas (x,y,z) reales sobre una esfera y se rotan
@@ -251,7 +335,30 @@
     authBadge.textContent = authBadgeText(auth, { showPin: false });
     logoutBtn.addEventListener('click', () => logoutAuth());
     refreshSlides();
+    refreshFraseFinal();
     socket.on('imagenesActualizadas', refreshSlides);
+    // Respaldo silencioso: si el socket no avisa (reconexión, proxy, etc.),
+    // igual nos enteramos de imágenes nuevas/borradas sin tocar lo que ya
+    // se está mostrando — refreshSlides() sólo actualiza la lista y el HUD,
+    // nunca el índice actual ni la imagen en pantalla. De paso, si alguien
+    // edita su frase final desde otro dispositivo, esta pantalla la toma sola.
+    setInterval(() => { refreshSlides(); refreshFraseFinal(); }, 4000);
+
+    // Vincula este socket a la sala de este dueño (por PIN) para que "Enviar
+    // a PC" (Modo avanzado) le pueda mandar la frase sólo a esta pantalla, no
+    // a las de otras personas. Se repite en cada reconexión — la sala es por
+    // conexión de socket, no por dispositivo.
+    function identificarSocket() { socket.emit('identificar', auth.pin); }
+    identificarSocket();
+    socket.on('connect', identificarSocket);
+
+    // "Enviar a PC" desde el editor — la muestra ya mismo, sin esperar a que
+    // el show llegue al final de verdad. Al apretar "Siguiente" después, esta
+    // pantalla vuelve a lo que estaba mostrando antes (no arranca de nuevo).
+    socket.on('fraseFinalAhora', (frase) => {
+      if (!frase || !frase.text) return;
+      showFinalPhrase(frase, { preview: true });
+    });
   });
 
   function updateHud() {
@@ -295,20 +402,46 @@
 
   socket.on('cambiar', (accion) => {
     if (accion === 'mostrar') {
+      if (showingFinal) hideFinalPhrase();
       index = 0;
       started = true;
       waiting.classList.add('hide');
       identityCorner.hidden = true; // deja de taparle una esquina a las fotos
     } else if (accion === 'siguiente') {
-      index++;
-      if (index >= diapositivas.length) index = 0;
+      if (showingFinal) {
+        // Si era sólo una prueba ("Enviar a PC"), no tocó el índice — al
+        // cerrarla, lo de abajo ya es la diapositiva correcta, no hay que
+        // re-renderizar nada. Si en cambio era la frase final de verdad
+        // (se llegó al final del show), "Siguiente" arranca de nuevo desde 1.
+        const wasPreview = finalIsPreview;
+        hideFinalPhrase();
+        if (wasPreview) return;
+        index = 0;
+      } else if (diapositivas.length && index >= diapositivas.length - 1 && fraseFinal) {
+        // Última diapositiva + hay una frase final propia configurada: en vez
+        // de volver a la 1, se muestra el cierre.
+        showFinalPhrase(fraseFinal);
+        updateHud();
+        updateProgress();
+        return; // no tocar #img/#imgBg mientras se muestra la frase
+      } else {
+        index++;
+        if (index >= diapositivas.length) index = 0;
+      }
     } else if (accion === 'anterior') {
+      if (showingFinal) {
+        // Volvemos a lo que ya estaba debajo (última diapositiva o la que se
+        // veía antes de la prueba) — no hace falta tocar #img para nada.
+        hideFinalPhrase();
+        return;
+      }
       index--;
       if (index < 0) index = diapositivas.length - 1;
     } else if (/^[0-9]+$/.test(accion)) {
       // Salto directo por número de voz (ej. "3") — 1-indexado desde el control
       const n = parseInt(accion, 10);
       if (n < 1 || n > diapositivas.length) return;
+      if (showingFinal) hideFinalPhrase();
       index = n - 1;
       started = true;
       waiting.classList.add('hide');

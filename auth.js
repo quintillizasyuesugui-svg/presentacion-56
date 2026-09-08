@@ -136,6 +136,20 @@
       const lockMsg = gate.querySelector('#authLockMsg');
       requestAnimationFrame(() => gate.classList.add('show'));
 
+      // Nombre: sólo letras y espacios — nada de números ni símbolos. Se filtra
+      // al tipear (no sólo al enviar) para que se note al toque qué se acepta.
+      if (nameInput) {
+        nameInput.addEventListener('input', () => {
+          nameInput.value = nameInput.value.replace(/[^a-zA-ZÀ-ÿñÑ\s]/g, '');
+        });
+      }
+      // PIN: sólo dígitos, 4 como máximo. El pattern/inputmode del HTML sólo
+      // sugieren el teclado numérico en el celular, no bloquean un teclado
+      // físico — el filtro real va acá.
+      pinInput.addEventListener('input', () => {
+        pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+      });
+
       // Arranca mostrando sólo los 2 botones de elección; el formulario
       // correspondiente (nombre o PIN) recién aparece al elegir uno.
       function showChoice() {
@@ -211,6 +225,7 @@
         registerBtn.addEventListener('click', async () => {
           const name = nameInput.value.trim();
           if (!name) { errorEl.textContent = 'Escribí tu nombre primero.'; return; }
+          if (name.length < 2) { errorEl.textContent = 'El nombre tiene que tener al menos 2 letras.'; return; }
           registerBtn.disabled = true;
           try {
             const auth = await callAuth('/api/auth/register', { name });
@@ -227,6 +242,7 @@
         if (applyLockState()) return; // ya debería estar disabled, esto es por las dudas
         const pin = pinInput.value.trim();
         if (!pin) { errorEl.textContent = 'Escribí tu PIN.'; return; }
+        if (pin.length < 4) { errorEl.textContent = 'El PIN tiene 4 dígitos.'; return; }
         loginBtn.disabled = true;
         pinInput.disabled = true;
         const spinnerDone = showActionSpinner('blue', 'Entrando…');

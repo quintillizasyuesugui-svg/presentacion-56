@@ -255,6 +255,119 @@ app.post('/api/auth/login', async (req, res) => {
   res.json(person);
 });
 
+// ---- Frase final (por persona) ----
+// Cada persona configura su propio mensaje de cierre — aparece en pantalla.html
+// cuando SU show (sus propias diapositivas) llega al final. Mismo patrón de
+// persistencia que people.json/images-order.json: archivo local + respaldo
+// crudo en Cloudinary para sobrevivir a los redeploys de Render.
+
+const FRASES_FILE = path.join(__dirname, 'frases-finales.json');
+const CLOUD_FRASES_PUBLIC_ID = 'presentacion/frases-finales';
+
+// Los 10 tipos de letra y 10 efectos son un menú cerrado (no texto libre) —
+// así el cliente sólo manda una "key" y acá se valida contra esta lista,
+// nunca CSS/HTML suelto. El nombre visible y la fuente real de cada uno
+// viven en el HTML (avanzado.html/pantalla.html), acá sólo importa la key.
+const FRASE_FONTS = ['sans', 'serif', 'script', 'display', 'casual', 'geometric', 'bold-script', 'poster', 'calligraphy', 'huge'];
+const FRASE_EFFECTS = ['fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave'];
+const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1 };
+
+async function readLocalFrases() {
+  try {
+    return JSON.parse(await fs.readFile(FRASES_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readCloudFrasesBackup() {
+  if (!cloudinaryReady) return null;
+  try {
+    const url = cloudinary.url(CLOUD_FRASES_PUBLIC_ID, { resource_type: 'raw', secure: true }) + `?t=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('No se pudo leer el respaldo de frases finales en Cloudinary:', err.message);
+    return null;
+  }
+}
+
+async function readFrases() {
+  let frases = await readLocalFrases();
+  if (!frases) frases = await readCloudFrasesBackup();
+  return frases || [];
+}
+
+async function writeFrases(frases) {
+  await fs.writeFile(FRASES_FILE, JSON.stringify(frases, null, 2));
+  if (!cloudinaryReady) return;
+  try {
+    const dataUri = 'data:application/json;base64,' + Buffer.from(JSON.stringify(frases)).toString('base64');
+    await cloudinary.uploader.upload(dataUri, {
+      public_id: CLOUD_FRASES_PUBLIC_ID,
+      resource_type: 'raw',
+      overwrite: true,
+      invalidate: true
+    });
+  } catch (err) {
+    console.error('No se pudo respaldar las frases finales en Cloudinary:', err.message);
+  }
+}
+
+// Nada de texto/HTML suelto sin revisar: el color tiene que ser un hex de 6
+// dígitos y la letra/efecto tienen que estar en el menú cerrado de arriba.
+function parseFraseBody(body) {
+  const text = String((body || {}).text || '').trim().slice(0, 60);
+  const font = FRASE_FONTS.includes((body || {}).font) ? body.font : null;
+  const effect = FRASE_EFFECTS.includes((body || {}).effect) ? body.effect : null;
+  const color = typeof (body || {}).color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.color) ? body.color : null;
+  const rawDuration = Number((body || {}).duration);
+  const duration = Number.isFinite(rawDuration) ? Math.min(3, Math.max(0.4, rawDuration)) : null;
+  if (!text || !font || !effect || !color || duration === null) return null;
+  return { text, font, color, effect, duration };
+}
+
+// GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
+app.get('/api/frase-final', requirePerson, async (req, res) => {
+  try {
+    const frases = await readFrases();
+    const mine = frases.find(f => f.owner === req.person.name);
+    res.json(mine ? { text: mine.text, font: mine.font, color: mine.color, effect: mine.effect, duration: mine.duration || 1 } : FRASE_DEFAULT);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error en servidor' });
+  }
+});
+
+// POST /api/frase-final — guarda la frase de cierre propia
+app.post('/api/frase-final', requirePerson, async (req, res) => {
+  try {
+    const parsed = parseFraseBody(req.body);
+    if (!parsed) return res.status(400).json({ error: 'Revisá el texto, la letra, el color o el efecto.' });
+
+    const frases = await readFrases();
+    const idx = frases.findIndex(f => f.owner === req.person.name);
+    const record = { owner: req.person.name, ...parsed };
+    if (idx === -1) frases.push(record); else frases[idx] = record;
+    await writeFrases(frases);
+    res.json(parsed);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar la frase.' });
+  }
+});
+
+// POST /api/frase-final/send — la muestra ya mismo en la pantalla propia (para
+// probarla en el proyector real sin esperar a que termine el show). No hace
+// falta haberla guardado antes — manda el borrador tal cual está en el editor.
+app.post('/api/frase-final/send', requirePerson, (req, res) => {
+  const parsed = parseFraseBody(req.body);
+  if (!parsed) return res.status(400).json({ error: 'Revisá el texto, la letra, el color o el efecto.' });
+  io.to('owner:' + req.person.name).emit('fraseFinalAhora', parsed);
+  res.json({ ok: true });
+});
+
 // GET /images — { src, transform } por diapositiva, para pantalla.html y control.html
 // (transform es el ajuste de tamaño/posición del Modo avanzado; null si nunca se tocó)
 // Sin PIN — es la pantalla pública/el control, muestra el show combinado de todos.
@@ -519,6 +632,19 @@ io.on("connection", (socket) => {
   console.log("✨ Dispositivo vinculado");
   socket.on("cambiar", (accion) => io.emit("cambiar", accion));
   socket.on("cine", () => io.emit("cine"));
+
+  // Vincula este socket a la "sala" de su dueño (según el PIN) — así se le
+  // puede mandar algo sólo a él/ella, como probar la frase final en su propia
+  // pantalla sin que le aparezca a nadie más. Se repite en cada reconexión
+  // porque las salas son por socket (conexión), no por dispositivo.
+  socket.on("identificar", async (pin) => {
+    try {
+      const person = await identify(pin);
+      if (person) socket.join('owner:' + person.name);
+    } catch (err) {
+      console.error('No se pudo identificar el socket:', err.message);
+    }
+  });
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`🚀 Cinema en http://0.0.0.0:${PORT}`));
