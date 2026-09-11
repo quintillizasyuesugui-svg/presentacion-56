@@ -482,6 +482,33 @@ body.pantalla {
 }
 .fp-jelly .fp-anim-target { animation: fpJelly var(--fp-duration, 900ms) ease-in-out infinite; }
 
+@keyframes fpHeartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.22); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  70% { transform: scale(1); }
+}
+.fp-heartbeat .fp-anim-target { animation: fpHeartbeat var(--fp-duration, 1200ms) ease-in-out infinite; }
+
+@keyframes fpRock {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+.fp-rock .fp-anim-target { animation: fpRock var(--fp-duration, 1400ms) ease-in-out infinite; }
+
+@keyframes fpStretch {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.18, 0.86); }
+}
+.fp-stretch .fp-anim-target { animation: fpStretch var(--fp-duration, 900ms) ease-in-out infinite; }
+
+@keyframes fpNeon {
+  0%, 100% { text-shadow: 0 0 6px currentColor, 0 0 12px currentColor; }
+  50% { text-shadow: 0 0 18px currentColor, 0 0 36px currentColor, 0 0 54px currentColor; }
+}
+.fp-neon .fp-anim-target { animation: fpNeon var(--fp-duration, 1500ms) ease-in-out infinite; }
+
 /* ---- Miniatura animada por botón de efecto (Modo avanzado) ---- */
 .fp-effect-btn {
   display: flex;

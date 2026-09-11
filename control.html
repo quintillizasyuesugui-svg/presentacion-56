@@ -87,10 +87,6 @@
     <h2>Escribir en vivo</h2>
     <p id="lwStepHint"></p>
 
-    <div class="fp-tab-panel" data-step="letra">
-      <div class="fp-grid fp-grid-h" id="lwFontGrid"></div>
-    </div>
-
     <div class="fp-tab-panel" data-step="tamano" hidden>
       <div class="fp-range-row">
         <input type="range" id="lwFontSize" min="0.5" max="2.2" step="0.1" value="1">
@@ -100,14 +96,23 @@
 
     <div class="fp-tab-panel" data-step="escribir" hidden>
       <textarea id="lwText" class="fp-text-input fp-textarea" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás. Podés poner varios versos, se acomoda solo." rows="4"></textarea>
-      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. La letra y el tamaño ya quedaron fijos.</p>
+      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. El tamaño ya quedó fijo.</p>
 
-      <!-- Menú de ajuste en vivo: uno u otro, no los dos apilados — tocás el
+      <!-- Menú de ajuste en vivo: uno por vez, no los 3 apilados — tocás el
            botón y abajo aparece sólo esa sección. -->
       <div class="fp-tabs" id="lwLiveAdjustTabs" hidden>
+        <button type="button" class="fp-tab-btn" data-adjust="letra">🔤 Letra</button>
         <button type="button" class="fp-tab-btn" data-adjust="animacion">✨ Animación</button>
         <button type="button" class="fp-tab-btn" data-adjust="color">🎨 Color</button>
       </div>
+    </div>
+
+    <!-- "letra" va acá (no primero) para que, en el paso de escribir, el menú
+         de arriba la muestre justo debajo de las pestañas — el paso 1 del
+         asistente la sigue mostrando igual, la posición en el HTML no le
+         afecta a eso. -->
+    <div class="fp-tab-panel" data-step="letra" hidden>
+      <div class="fp-grid fp-grid-h" id="lwFontGrid"></div>
     </div>
 
     <div class="fp-tab-panel" data-step="animacion" hidden>
@@ -471,7 +476,11 @@
     { key: 'spin', label: '🌀 Giro continuo' },
     { key: 'bounce-loop', label: '⚡ Rebote continuo' },
     { key: 'wiggle', label: '🐍 Vaivén' },
-    { key: 'jelly', label: '🍮 Gelatina' }
+    { key: 'jelly', label: '🍮 Gelatina' },
+    { key: 'heartbeat', label: '❤️ Corazón' },
+    { key: 'rock', label: '🕰️ Tambaleo' },
+    { key: 'stretch', label: '🫧 Elástico' },
+    { key: 'neon', label: '💡 Neón' }
   ];
   const LW_STEPS = ['letra', 'tamano', 'animacion', 'color', 'escribir'];
   const LW_STEP_HINTS = {
@@ -479,7 +488,7 @@
     tamano: 'Paso 2 de 5 · Elegí el tamaño de letra.',
     animacion: 'Paso 3 de 5 · Elegí la animación.',
     color: 'Paso 4 de 5 · Elegí el color.',
-    escribir: 'Paso 5 de 5 · Escribí — aparece en tu pantalla al toque. Animación y color los podés seguir cambiando, letra y tamaño ya quedaron fijos.'
+    escribir: 'Paso 5 de 5 · Escribí — aparece en tu pantalla al toque. Letra, animación y color los podés seguir cambiando, el tamaño ya quedó fijo.'
   };
 
   const liveWriteBtn = document.getElementById('liveWriteBtn');
@@ -505,7 +514,7 @@
   let lwSizeChosen = false;
   let lwColorChosen = false;
   let lwActive = false; // true mientras algo se está mostrando de verdad en la pantalla
-  let lwLiveAdjustTab = 'animacion'; // cuál de los 2 (animación/color) se ve en el último paso
+  let lwLiveAdjustTab = 'letra'; // cuál de los 3 (letra/animación/color) se ve en el último paso
 
   // Igual que en "Frase final": cada botón de efecto trae su propia mini
   // pantalla negra que repite la animación en loop con un texto fijo ("Hola")
@@ -562,15 +571,15 @@
     return true;
   }
 
-  // En el último paso (escribir), animación y color no se apilan los dos
-  // juntos — hay un menú de 2 botones y sólo se ve el que está elegido, igual
+  // En el último paso (escribir), letra/animación/color no se apilan los 3
+  // juntos — hay un menú de 3 botones y sólo se ve el que está elegido, igual
   // que cualquier otro paso del asistente.
   function lwApplyPanels() {
     const step = LW_STEPS[lwStepIndex];
     const isLast = step === 'escribir';
     lwPanels.forEach((panel) => {
       const key = panel.dataset.step;
-      if (isLast && (key === 'animacion' || key === 'color')) {
+      if (isLast && (key === 'letra' || key === 'animacion' || key === 'color')) {
         panel.hidden = key !== lwLiveAdjustTab;
       } else {
         panel.hidden = key !== step;
@@ -672,9 +681,9 @@
     lwFontSize.value = 1;
     lwFontSizeValue.textContent = '100%';
     lwColor.value = '#ffffff';
-    lwLiveAdjustTab = 'animacion';
+    lwLiveAdjustTab = 'letra';
     document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.adjust === 'animacion');
+      btn.classList.toggle('active', btn.dataset.adjust === 'letra');
     });
     lwBuildGrid(lwFontGrid, LW_FONTS, null, lwSelectFont);
     lwBuildGrid(lwEffectGrid, LW_EFFECTS, null, lwSelectEffect);

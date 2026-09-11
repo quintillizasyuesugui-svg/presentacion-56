@@ -277,7 +277,7 @@ const FRASE_FONTS = [
 const FRASE_EFFECTS = [
   'fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave',
   'pulse', 'float', 'sway', 'shimmer', 'rainbow', 'shake', 'flicker', 'spin',
-  'bounce-loop', 'wiggle', 'jelly'
+  'bounce-loop', 'wiggle', 'jelly', 'heartbeat', 'rock', 'stretch', 'neon'
 ];
 const FRASE_POSITIONS = ['top', 'middle', 'bottom'];
 const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
