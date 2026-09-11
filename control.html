@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Control</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Los 10 tipos de letra de "Escribir en vivo" (mismos que "Frase final") —
+  <!-- Los 18 tipos de letra de "Escribir en vivo" (mismos que "Frase final") —
        hacen falta acá para que el selector y la vista previa se vean bien. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&display=swap" rel="stylesheet">
 </head>
 <body class="control">
 <div class="app">
@@ -100,16 +100,21 @@
 
     <div class="fp-tab-panel" data-step="escribir" hidden>
       <textarea id="lwText" class="fp-text-input fp-textarea" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás. Podés poner varios versos, se acomoda solo." rows="4"></textarea>
-      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. La letra y el tamaño ya quedaron fijos — animación y color los podés seguir cambiando acá abajo.</p>
+      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. La letra y el tamaño ya quedaron fijos.</p>
+
+      <!-- Menú de ajuste en vivo: uno u otro, no los dos apilados — tocás el
+           botón y abajo aparece sólo esa sección. -->
+      <div class="fp-tabs" id="lwLiveAdjustTabs" hidden>
+        <button type="button" class="fp-tab-btn" data-adjust="animacion">✨ Animación</button>
+        <button type="button" class="fp-tab-btn" data-adjust="color">🎨 Color</button>
+      </div>
     </div>
 
     <div class="fp-tab-panel" data-step="animacion" hidden>
-      <div class="fp-section-label" id="lwEffectLabel" hidden>Animación</div>
       <div class="fp-grid fp-grid-h" id="lwEffectGrid"></div>
     </div>
 
     <div class="fp-tab-panel" data-step="color" hidden>
-      <div class="fp-section-label" id="lwColorLabel" hidden>Color</div>
       <input type="color" id="lwColor" class="fp-color" value="#ffffff">
     </div>
 
@@ -438,7 +443,15 @@
     { key: 'bold-script', label: 'Retro', family: "'Lobster', cursive" },
     { key: 'poster', label: 'Póster', family: "'Oswald', sans-serif" },
     { key: 'calligraphy', label: 'Caligrafía', family: "'Great Vibes', cursive" },
-    { key: 'huge', label: 'Gigante', family: "'Anton', sans-serif" }
+    { key: 'huge', label: 'Gigante', family: "'Anton', sans-serif" },
+    { key: 'handwritten', label: 'A mano', family: "'Caveat', cursive" },
+    { key: 'marker', label: 'Marcador', family: "'Permanent Marker', cursive" },
+    { key: 'comic', label: 'Cómic', family: "'Bangers', cursive" },
+    { key: 'thin-hand', label: 'Fina a mano', family: "'Amatic SC', cursive" },
+    { key: 'rounded', label: 'Redondeada', family: "'Fredoka', sans-serif" },
+    { key: 'elegant-script', label: 'Fina elegante', family: "'Satisfy', cursive" },
+    { key: 'strong', label: 'Fuerte', family: "'Righteous', sans-serif" },
+    { key: 'notebook', label: 'Cuaderno', family: "'Kalam', cursive" }
   ];
   const LW_EFFECTS = [
     { key: 'fade', label: '✨ Fundido' },
@@ -482,6 +495,7 @@
   const lwBack = document.getElementById('lwBack');
   const lwNext = document.getElementById('lwNext');
   const lwFinish = document.getElementById('lwFinish');
+  const lwLiveAdjustTabs = document.getElementById('lwLiveAdjustTabs');
 
   let lwStepIndex = 0;
   let lwState = { font: null, fontSize: 1, effect: null, color: '#ffffff', text: '' };
@@ -491,6 +505,7 @@
   let lwSizeChosen = false;
   let lwColorChosen = false;
   let lwActive = false; // true mientras algo se está mostrando de verdad en la pantalla
+  let lwLiveAdjustTab = 'animacion'; // cuál de los 2 (animación/color) se ve en el último paso
 
   // Igual que en "Frase final": cada botón de efecto trae su propia mini
   // pantalla negra que repite la animación en loop con un texto fijo ("Hola")
@@ -547,27 +562,45 @@
     return true;
   }
 
+  // En el último paso (escribir), animación y color no se apilan los dos
+  // juntos — hay un menú de 2 botones y sólo se ve el que está elegido, igual
+  // que cualquier otro paso del asistente.
+  function lwApplyPanels() {
+    const step = LW_STEPS[lwStepIndex];
+    const isLast = step === 'escribir';
+    lwPanels.forEach((panel) => {
+      const key = panel.dataset.step;
+      if (isLast && (key === 'animacion' || key === 'color')) {
+        panel.hidden = key !== lwLiveAdjustTab;
+      } else {
+        panel.hidden = key !== step;
+      }
+    });
+    const efectoVisible = step === 'animacion' || (isLast && lwLiveAdjustTab === 'animacion');
+    if (efectoVisible) lwStartEffectMiniLoop(); else lwStopEffectMiniLoop();
+  }
+
+  function lwShowLiveAdjustTab(tab) {
+    lwLiveAdjustTab = tab;
+    document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.adjust === tab);
+    });
+    lwApplyPanels();
+  }
+  document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => lwShowLiveAdjustTab(btn.dataset.adjust));
+  });
+
   function lwShowStep(i) {
     lwStepIndex = i;
     const step = LW_STEPS[i];
     const isLast = i === LW_STEPS.length - 1;
-    // En el último paso, además de escribir se puede seguir tocando
-    // animación y color (nada más — letra y tamaño ya quedaron fijos), así
-    // que esos 2 paneles se muestran junto con el de escribir, no por separado.
-    lwPanels.forEach((panel) => {
-      const propio = panel.dataset.step === step;
-      const ajusteEnVivo = isLast && (panel.dataset.step === 'animacion' || panel.dataset.step === 'color');
-      panel.hidden = !(propio || ajusteEnVivo);
-    });
-    lwEffectLabel.hidden = !isLast;
-    lwColorLabel.hidden = !isLast;
+    lwApplyPanels();
+    lwLiveAdjustTabs.hidden = !isLast;
     lwStepHint.textContent = LW_STEP_HINTS[step];
     lwBack.hidden = i === 0;
     lwNext.hidden = isLast;
     lwFinish.hidden = !isLast;
-    // El grid de animación se ve en su propio paso Y en el paso de escribir
-    // (ajuste en vivo) — el loop de mini videos sólo corre mientras se ve.
-    if (step === 'animacion' || isLast) lwStartEffectMiniLoop(); else lwStopEffectMiniLoop();
     lwNext.disabled = !lwCanAdvance();
   }
 
@@ -639,6 +672,10 @@
     lwFontSize.value = 1;
     lwFontSizeValue.textContent = '100%';
     lwColor.value = '#ffffff';
+    lwLiveAdjustTab = 'animacion';
+    document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.adjust === 'animacion');
+    });
     lwBuildGrid(lwFontGrid, LW_FONTS, null, lwSelectFont);
     lwBuildGrid(lwEffectGrid, LW_EFFECTS, null, lwSelectEffect);
     lwShowStep(0);

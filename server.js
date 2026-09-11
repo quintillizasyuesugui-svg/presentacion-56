@@ -270,7 +270,10 @@ const CLOUD_FRASES_PUBLIC_ID = 'presentacion/frases-finales';
 // viven en el HTML (avanzado.html/pantalla.html), acá sólo importa la key.
 // Los primeros 10 entran una vez y quedan quietos; los últimos 8 (a partir
 // de "pulse") se mueven todo el tiempo que la frase está en pantalla.
-const FRASE_FONTS = ['sans', 'serif', 'script', 'display', 'casual', 'geometric', 'bold-script', 'poster', 'calligraphy', 'huge'];
+const FRASE_FONTS = [
+  'sans', 'serif', 'script', 'display', 'casual', 'geometric', 'bold-script', 'poster', 'calligraphy', 'huge',
+  'handwritten', 'marker', 'comic', 'thin-hand', 'rounded', 'elegant-script', 'strong', 'notebook'
+];
 const FRASE_EFFECTS = [
   'fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'typewriter', 'confetti', 'rotate', 'glow', 'wave',
   'pulse', 'float', 'sway', 'shimmer', 'rainbow', 'shake', 'flicker', 'spin',
