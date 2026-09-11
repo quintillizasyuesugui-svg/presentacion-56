@@ -173,13 +173,22 @@
   // Encoge el texto si no entra (varios versos largos) hasta que quepa, sin
   // pasar de un tamaño ilegible — se recalcula en cada letra que se escribe.
   function fitLiveWriteText() {
+    // El margen disponible es el padding real de #liveWrite (2rem de cada
+    // lado), leído del CSS en vez de un número fijo aparte — antes había un
+    // límite distinto acá y en el CSS (max-height), y cuando no coincidían
+    // el CSS cortaba el último verso aunque JS ya se hubiera dado por
+    // conforme con que entraba.
+    const estilo = getComputedStyle(liveWrite);
+    const margenAncho = parseFloat(estilo.paddingLeft) + parseFloat(estilo.paddingRight);
+    const margenAlto = parseFloat(estilo.paddingTop) + parseFloat(estilo.paddingBottom);
+
     let scale = liveWriteScale;
     liveWriteText.style.setProperty('--fp-size-scale', scale);
     let intentos = 0;
     while (
       intentos++ < 40 && scale > 0.2 &&
-      (liveWriteText.scrollHeight > liveWrite.clientHeight - 48 ||
-       liveWriteText.scrollWidth > liveWrite.clientWidth - 48)
+      (liveWriteText.scrollHeight > liveWrite.clientHeight - margenAlto ||
+       liveWriteText.scrollWidth > liveWrite.clientWidth - margenAncho)
     ) {
       scale -= 0.04;
       liveWriteText.style.setProperty('--fp-size-scale', scale);
