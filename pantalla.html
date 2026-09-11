@@ -49,6 +49,13 @@
   <div id="finalPhraseText" class="fp-anim-target"></div>
 </div>
 
+<!-- Escribir en vivo: lo que la persona dueña de esta pantalla tipea en su
+     celular (Control → Escribir en vivo) aparece acá al toque, letra por
+     letra — ver socket 'escribirVivoEstado' más abajo. -->
+<div id="liveWrite">
+  <div id="liveWriteText" class="fp-anim-target"></div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="auth.js"></script>
 <script>
@@ -73,6 +80,8 @@
   const fullscreenButton = document.getElementById('enterFullscreen');
   const finalPhrase = document.getElementById('finalPhrase');
   const finalPhraseText = document.getElementById('finalPhraseText');
+  const liveWrite = document.getElementById('liveWrite');
+  const liveWriteText = document.getElementById('liveWriteText');
 
   // ---- Frase final: mensaje propio de cada persona al terminar SU show ----
   // Mismas keys que FRASE_FONTS/FRASE_EFFECTS de server.js y de avanzado.html
@@ -143,6 +152,57 @@
     showingFinal = false;
     finalIsPreview = false;
     finalPhrase.classList.remove('show');
+  }
+
+  // ---- Escribir en vivo: texto propio, tipeado ahora mismo desde el celular ----
+  // Mismo mapa de fuentes que "Frase final" — server.js valida contra la misma
+  // lista cerrada, así las keys siempre coinciden acá y en control.html.
+  let liveWriteActive = false; // true mientras #liveWrite está en pantalla
+  let liveWriteEffect = null;  // efecto que se está reproduciendo ahora, para
+                                // no repetir la animación de entrada en cada letra
+  let liveWriteScale = 1;
+
+  // Encoge el texto si no entra (varios versos largos) hasta que quepa, sin
+  // pasar de un tamaño ilegible — se recalcula en cada letra que se escribe.
+  function fitLiveWriteText() {
+    let scale = liveWriteScale;
+    liveWriteText.style.setProperty('--fp-size-scale', scale);
+    let intentos = 0;
+    while (
+      intentos++ < 40 && scale > 0.2 &&
+      (liveWriteText.scrollHeight > liveWrite.clientHeight - 48 ||
+       liveWriteText.scrollWidth > liveWrite.clientWidth - 48)
+    ) {
+      scale -= 0.04;
+      liveWriteText.style.setProperty('--fp-size-scale', scale);
+    }
+  }
+
+  function aplicarEscribirVivo(estado) {
+    if (!estado) return;
+    if (!estado.active) {
+      liveWrite.classList.remove('show');
+      liveWriteActive = false;
+      liveWriteEffect = null;
+      return;
+    }
+
+    liveWriteText.style.fontFamily = FRASE_FONT_FAMILIES[estado.font] || FRASE_FONT_FAMILIES.sans;
+    liveWriteText.style.color = estado.color || '#ffffff';
+    liveWriteScale = estado.fontSize || 1;
+    liveWriteText.textContent = estado.text || '';
+
+    // La animación de entrada sólo se reproduce al prenderse o al cambiar de
+    // efecto — así no se reinicia con cada letra que se tipea, que se vería
+    // entrecortado en vez de fluido.
+    if (!liveWriteActive || estado.effect !== liveWriteEffect) {
+      liveWrite.className = '';
+      void liveWrite.offsetWidth; // fuerza reflow para poder repetir la animación
+      liveWrite.classList.add('show', 'fp-' + estado.effect);
+      liveWriteEffect = estado.effect;
+      liveWriteActive = true;
+    }
+    fitLiveWriteText();
   }
 
   // ---- Avance automático: opcional, 100% local a esta pantalla ----
@@ -428,6 +488,10 @@
       if (!frase || !frase.text) return;
       showFinalPhrase(frase, { preview: true });
     });
+
+    // "Escribir en vivo" desde el celular — mismo mecanismo de sala que la de
+    // arriba, así sólo le llega a esta pantalla y nunca a la de otra persona.
+    socket.on('escribirVivoEstado', aplicarEscribirVivo);
   });
 
   function updateHud() {
@@ -479,6 +543,13 @@
     // hacen nada en ESTA pantalla (el reloj es el que manda) — "Mostrar" y el
     // salto por número de voz siguen funcionando igual.
     if (!fromAuto && autoAdvance && autoAdvance.enabled && (accion === 'siguiente' || accion === 'anterior')) {
+      return;
+    }
+    // Mientras "Escribir en vivo" está mostrándose, ningún comando de
+    // navegación hace nada (ni por botón, ni por voz, ni desde otro
+    // dispositivo) hasta que se apague — Mostrar/Siguiente/Atrás quedan
+    // congelados abajo, tapados por el texto a pantalla completa.
+    if (liveWriteActive && (accion === 'mostrar' || accion === 'siguiente' || accion === 'anterior')) {
       return;
     }
 

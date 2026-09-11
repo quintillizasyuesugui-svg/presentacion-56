@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Control</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Los 10 tipos de letra de "Escribir en vivo" (mismos que "Frase final") —
+       hacen falta acá para que el selector y la vista previa se vean bien. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body class="control">
 <div class="app">
@@ -27,7 +32,11 @@
 
   <!-- Se usa una sola vez, al arrancar — no necesita ser el botón más grande -->
   <div class="btn-row">
-    <button class="btn ghost" onclick="enviar('mostrar')">▶️ Mostrar</button>
+    <button class="btn ghost" id="mostrarBtn" onclick="enviar('mostrar')">▶️ Mostrar</button>
+  </div>
+
+  <div class="btn-row">
+    <button type="button" class="btn ghost" id="liveWriteBtn">✍️ Escribir en vivo</button>
   </div>
 
   <div class="spacer"></div>
@@ -64,6 +73,53 @@
     <div class="btn-row">
       <button type="button" class="btn" id="fsPhoneBtn">📱 Mi celular</button>
       <button type="button" class="btn primary" id="fsPcBtn">🖥️ La PC</button>
+    </div>
+  </div>
+</div>
+
+<!-- Escribir en vivo: lo que vas tipeando aparece al toque en tu pantalla
+     (fondo negro). Antes de escribir obliga a elegir, en este orden, letra,
+     tamaño, animación y color — recién ahí se habilita escribir. Es 100%
+     independiente por persona: usa la misma sala 'owner:' de siempre, así
+     nunca aparece ni afecta la pantalla de otro usuario. -->
+<div class="modal-overlay" id="lwOverlay" hidden>
+  <div class="modal-card fp-card">
+    <h2>Escribir en vivo</h2>
+    <p id="lwStepHint"></p>
+
+    <div class="fp-tab-panel" data-step="letra">
+      <div class="fp-grid fp-grid-h" id="lwFontGrid"></div>
+    </div>
+
+    <div class="fp-tab-panel" data-step="tamano" hidden>
+      <div class="fp-range-row">
+        <input type="range" id="lwFontSize" min="0.5" max="2.2" step="0.1" value="1">
+        <span class="fp-range-value" id="lwFontSizeValue">100%</span>
+      </div>
+    </div>
+
+    <div class="fp-tab-panel" data-step="escribir" hidden>
+      <textarea id="lwText" class="fp-text-input fp-textarea" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás. Podés poner varios versos, se acomoda solo." rows="4"></textarea>
+      <div class="fp-preview-stage" id="lwPreviewStage">
+        <div id="lwPreviewText" class="fp-anim-target"></div>
+      </div>
+      <p class="editor-hint">Se ve en tu celular y en tu pantalla al mismo tiempo, en vivo. La letra y el tamaño ya quedaron fijos — animación y color los podés seguir cambiando acá abajo.</p>
+    </div>
+
+    <div class="fp-tab-panel" data-step="animacion" hidden>
+      <div class="fp-section-label" id="lwEffectLabel" hidden>Animación</div>
+      <div class="fp-grid fp-grid-h" id="lwEffectGrid"></div>
+    </div>
+
+    <div class="fp-tab-panel" data-step="color" hidden>
+      <div class="fp-section-label" id="lwColorLabel" hidden>Color</div>
+      <input type="color" id="lwColor" class="fp-color" value="#ffffff">
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn" id="lwBack" hidden>⬅️ Atrás</button>
+      <button type="button" class="btn primary" id="lwNext">Siguiente</button>
+      <button type="button" class="btn danger-solid" id="lwFinish" hidden>✅ Listo, ocultar y cerrar</button>
     </div>
   </div>
 </div>
@@ -111,20 +167,25 @@
   const autoCountdownInline = document.getElementById('autoCountdownInline');
   const anteriorBtn = document.getElementById('anteriorBtn');
   const siguienteBtn = document.getElementById('siguienteBtn');
+  const mostrarBtn = document.getElementById('mostrarBtn');
   let autoAdvanceEndAt = null;
+  let autoAdvanceOn = false;
 
-  // Mientras el avance automático está prendido, Siguiente/Atrás no hacen
-  // nada en pantalla.html (ver aplicarCambio ahí) — acá los apagamos también
-  // a la vista, para que no parezca que están rotos.
-  function setNavButtonsDisabled(disabled) {
-    anteriorBtn.disabled = disabled;
-    siguienteBtn.disabled = disabled;
+  // Mientras "Escribir en vivo" está mostrándose, NINGÚN botón de navegación
+  // hace nada en pantalla.html (ver aplicarCambio ahí) — ni Mostrar, ni
+  // Siguiente/Atrás — así que los 3 se apagan acá también, para que no
+  // parezcan rotos. El avance automático, en cambio, sólo frena
+  // Siguiente/Atrás, nunca Mostrar (así ya funcionaba antes).
+  function updateNavButtonsState() {
+    anteriorBtn.disabled = autoAdvanceOn || lwActive;
+    siguienteBtn.disabled = autoAdvanceOn || lwActive;
+    mostrarBtn.disabled = lwActive;
   }
 
   function refreshAutoAdvanceEnabled() {
     authFetch('/api/avance-automatico')
       .then(res => res.json())
-      .then(auto => setNavButtonsDisabled(!!(auto && auto.enabled)))
+      .then(auto => { autoAdvanceOn = !!(auto && auto.enabled); updateNavButtonsState(); })
       .catch(err => console.error('Error loading avance automático:', err));
   }
 
@@ -150,11 +211,13 @@
     if (payload.tipo === 'cuenta') {
       autoAdvanceEndAt = Date.now() + payload.segundos * 1000;
       updateAutoCountdownInline();
-      setNavButtonsDisabled(true);
+      autoAdvanceOn = true;
+      updateNavButtonsState();
     } else if (payload.tipo === 'terminamos') {
       autoAdvanceEndAt = null;
       updateAutoCountdownInline();
-      setNavButtonsDisabled(false);
+      autoAdvanceOn = false;
+      updateNavButtonsState();
       showToast('🏁 Terminamos — avance automático desactivado.');
     }
   });
@@ -361,6 +424,218 @@
   fsOverlay.addEventListener('click', (event) => {
     if (event.target === fsOverlay) closeFullscreenPicker();
   });
+
+  // ---- Escribir en vivo ----
+  // Las keys tienen que coincidir 1:1 con FRASE_FONTS/FRASE_EFFECTS de
+  // server.js (que valida contra esa misma lista) y con pantalla.html (que
+  // las usa para mostrar el texto de verdad, con la misma fuente/efecto).
+  // "Máquina de escribir" y "Ola" quedan afuera: tipean letra por letra, y acá
+  // ya estás tipeando en vivo — sería una animación encima de otra.
+  const LW_FONTS = [
+    { key: 'sans', label: 'Moderna', family: "'Poppins', sans-serif" },
+    { key: 'serif', label: 'Elegante', family: "'Playfair Display', serif" },
+    { key: 'script', label: 'Manuscrita', family: "'Dancing Script', cursive" },
+    { key: 'display', label: 'Impacto', family: "'Bebas Neue', sans-serif" },
+    { key: 'casual', label: 'Divertida', family: "'Pacifico', cursive" },
+    { key: 'geometric', label: 'Geométrica', family: "'Montserrat', sans-serif" },
+    { key: 'bold-script', label: 'Retro', family: "'Lobster', cursive" },
+    { key: 'poster', label: 'Póster', family: "'Oswald', sans-serif" },
+    { key: 'calligraphy', label: 'Caligrafía', family: "'Great Vibes', cursive" },
+    { key: 'huge', label: 'Gigante', family: "'Anton', sans-serif" }
+  ];
+  const LW_EFFECTS = [
+    { key: 'fade', label: '✨ Fundido' },
+    { key: 'slide-up', label: '⬆️ Deslizar arriba' },
+    { key: 'slide-down', label: '⬇️ Deslizar abajo' },
+    { key: 'zoom', label: '🔍 Zoom' },
+    { key: 'bounce', label: '🏀 Rebote' },
+    { key: 'rotate', label: '🔄 Girar' },
+    { key: 'glow', label: '💡 Destello' },
+    { key: 'pulse', label: '💓 Latido' },
+    { key: 'float', label: '🎈 Flotar' },
+    { key: 'sway', label: '🌴 Balanceo' },
+    { key: 'shimmer', label: '🌟 Brillo' },
+    { key: 'rainbow', label: '🌈 Arcoíris' },
+    { key: 'shake', label: '📳 Vibración' },
+    { key: 'flicker', label: '🕯️ Parpadeo' },
+    { key: 'spin', label: '🌀 Giro continuo' },
+    { key: 'bounce-loop', label: '⚡ Rebote continuo' },
+    { key: 'wiggle', label: '🐍 Vaivén' },
+    { key: 'jelly', label: '🍮 Gelatina' }
+  ];
+  const LW_STEPS = ['letra', 'tamano', 'animacion', 'color', 'escribir'];
+  const LW_STEP_HINTS = {
+    letra: 'Paso 1 de 5 · Elegí el tipo de letra.',
+    tamano: 'Paso 2 de 5 · Elegí el tamaño de letra.',
+    animacion: 'Paso 3 de 5 · Elegí la animación.',
+    color: 'Paso 4 de 5 · Elegí el color.',
+    escribir: 'Paso 5 de 5 · Escribí — aparece en tu pantalla al toque. Animación y color los podés seguir cambiando, letra y tamaño ya quedaron fijos.'
+  };
+
+  const liveWriteBtn = document.getElementById('liveWriteBtn');
+  const lwOverlay = document.getElementById('lwOverlay');
+  const lwStepHint = document.getElementById('lwStepHint');
+  const lwPanels = document.querySelectorAll('#lwOverlay .fp-tab-panel');
+  const lwFontGrid = document.getElementById('lwFontGrid');
+  const lwEffectGrid = document.getElementById('lwEffectGrid');
+  const lwFontSize = document.getElementById('lwFontSize');
+  const lwFontSizeValue = document.getElementById('lwFontSizeValue');
+  const lwColor = document.getElementById('lwColor');
+  const lwText = document.getElementById('lwText');
+  const lwPreviewText = document.getElementById('lwPreviewText');
+  const lwBack = document.getElementById('lwBack');
+  const lwNext = document.getElementById('lwNext');
+  const lwFinish = document.getElementById('lwFinish');
+
+  let lwStepIndex = 0;
+  let lwState = { font: null, fontSize: 1, effect: null, color: '#ffffff', text: '' };
+  // Las 4 son obligatorias: no alcanza con que tamaño/color ya tengan un
+  // valor por default, hay que tocarlos sí o sí para poder avanzar — igual
+  // que letra y efecto, que ya obligan por no tener nada seleccionado al abrir.
+  let lwSizeChosen = false;
+  let lwColorChosen = false;
+  let lwActive = false; // true mientras algo se está mostrando de verdad en la pantalla
+
+  function lwBuildGrid(container, items, selectedKey, onPick) {
+    container.innerHTML = '';
+    items.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.classList.add('fp-option-btn');
+      if (item.key === selectedKey) btn.classList.add('selected');
+      btn.textContent = item.label;
+      if (item.family) btn.style.fontFamily = item.family;
+      btn.addEventListener('click', () => onPick(item.key));
+      container.appendChild(btn);
+    });
+  }
+
+  function lwRenderPreview() {
+    const font = LW_FONTS.find((f) => f.key === lwState.font) || LW_FONTS[0];
+    lwPreviewText.style.fontFamily = font.family;
+    lwPreviewText.style.color = lwState.color;
+    lwPreviewText.style.setProperty('--fp-size-scale', lwState.fontSize);
+    lwPreviewText.textContent = lwState.text;
+  }
+
+  function lwCanAdvance() {
+    const step = LW_STEPS[lwStepIndex];
+    if (step === 'letra') return !!lwState.font;
+    if (step === 'tamano') return lwSizeChosen;
+    if (step === 'animacion') return !!lwState.effect;
+    if (step === 'color') return lwColorChosen;
+    return true;
+  }
+
+  function lwShowStep(i) {
+    lwStepIndex = i;
+    const step = LW_STEPS[i];
+    const isLast = i === LW_STEPS.length - 1;
+    // En el último paso, además de escribir se puede seguir tocando
+    // animación y color (nada más — letra y tamaño ya quedaron fijos), así
+    // que esos 2 paneles se muestran junto con el de escribir, no por separado.
+    lwPanels.forEach((panel) => {
+      const propio = panel.dataset.step === step;
+      const ajusteEnVivo = isLast && (panel.dataset.step === 'animacion' || panel.dataset.step === 'color');
+      panel.hidden = !(propio || ajusteEnVivo);
+    });
+    lwEffectLabel.hidden = !isLast;
+    lwColorLabel.hidden = !isLast;
+    lwStepHint.textContent = LW_STEP_HINTS[step];
+    lwBack.hidden = i === 0;
+    lwNext.hidden = isLast;
+    lwFinish.hidden = !isLast;
+    if (step === 'escribir') lwRenderPreview();
+    lwNext.disabled = !lwCanAdvance();
+  }
+
+  function lwSelectFont(key) {
+    lwState.font = key;
+    lwBuildGrid(lwFontGrid, LW_FONTS, key, lwSelectFont);
+    lwNext.disabled = !lwCanAdvance();
+    lwBroadcastIfActive();
+  }
+  function lwSelectEffect(key) {
+    lwState.effect = key;
+    lwBuildGrid(lwEffectGrid, LW_EFFECTS, key, lwSelectEffect);
+    lwNext.disabled = !lwCanAdvance();
+    lwBroadcastIfActive();
+  }
+
+  lwFontSize.addEventListener('input', () => {
+    lwState.fontSize = parseFloat(lwFontSize.value);
+    lwFontSizeValue.textContent = Math.round(lwState.fontSize * 100) + '%';
+    lwSizeChosen = true;
+    lwNext.disabled = !lwCanAdvance();
+    lwRenderPreview();
+    lwBroadcastIfActive();
+  });
+  lwColor.addEventListener('input', () => {
+    lwState.color = lwColor.value;
+    lwColorChosen = true;
+    lwNext.disabled = !lwCanAdvance();
+    lwRenderPreview();
+    lwBroadcastIfActive();
+  });
+  lwText.addEventListener('input', () => {
+    lwState.text = lwText.value;
+    lwRenderPreview();
+    lwBroadcast();
+  });
+
+  // Manda el estado completo a TU pantalla (sala 'owner:', ver identificarSocket
+  // más arriba) — nunca a la de otra persona. "active" se calcula del texto:
+  // en cuanto hay algo escrito se prende sola, y al borrarlo todo se apaga sola.
+  function lwBroadcast() {
+    const hasText = lwState.text.trim().length > 0;
+    lwActive = hasText;
+    updateNavButtonsState();
+    socket.emit('escribirVivoEstado', {
+      active: hasText,
+      text: lwState.text,
+      font: lwState.font,
+      fontSize: lwState.fontSize,
+      effect: lwState.effect,
+      color: lwState.color
+    });
+  }
+  // Reemite sólo si ya hay algo en pantalla — así, si volvés a "Animación" o
+  // "Color" a cambiar algo mientras estás escribiendo, se actualiza en el
+  // momento sin tener que retocar el texto.
+  function lwBroadcastIfActive() {
+    if (lwActive) lwBroadcast();
+  }
+  function lwStop() {
+    if (!lwActive) return;
+    lwActive = false;
+    updateNavButtonsState();
+    socket.emit('escribirVivoEstado', { active: false, text: '', font: lwState.font, fontSize: lwState.fontSize, effect: lwState.effect, color: lwState.color });
+  }
+
+  function openLiveWrite() {
+    lwState = { font: null, fontSize: 1, effect: null, color: '#ffffff', text: '' };
+    lwSizeChosen = false;
+    lwColorChosen = false;
+    lwText.value = '';
+    lwFontSize.value = 1;
+    lwFontSizeValue.textContent = '100%';
+    lwColor.value = '#ffffff';
+    lwBuildGrid(lwFontGrid, LW_FONTS, null, lwSelectFont);
+    lwBuildGrid(lwEffectGrid, LW_EFFECTS, null, lwSelectEffect);
+    lwShowStep(0);
+    lwOverlay.hidden = false;
+    requestAnimationFrame(() => lwOverlay.classList.add('show'));
+  }
+  function closeLiveWrite() {
+    lwStop();
+    lwOverlay.classList.remove('show');
+    setTimeout(() => { lwOverlay.hidden = true; }, 200);
+  }
+
+  liveWriteBtn.addEventListener('click', openLiveWrite);
+  lwNext.addEventListener('click', () => { if (lwCanAdvance()) lwShowStep(lwStepIndex + 1); });
+  lwBack.addEventListener('click', () => lwShowStep(lwStepIndex - 1));
+  lwFinish.addEventListener('click', closeLiveWrite);
 </script>
 
 </body>

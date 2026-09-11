@@ -338,6 +338,21 @@ function parseFraseBody(body) {
   return { text, font, color, effect, duration, fontSize, position };
 }
 
+// Nada de texto/HTML suelto sin revisar acá tampoco: mismas listas cerradas
+// de letra/efecto que "Frase final", color en hex y el texto acotado en
+// longitud. No se guarda en ningún lado — "Escribir en vivo" es 100% en el
+// momento, sólo se retransmite a la sala del propio dueño.
+function parseLiveWriteBody(body) {
+  const font = FRASE_FONTS.includes((body || {}).font) ? body.font : null;
+  const effect = FRASE_EFFECTS.includes((body || {}).effect) ? body.effect : null;
+  const color = typeof (body || {}).color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.color) ? body.color : null;
+  const rawFontSize = Number((body || {}).fontSize);
+  const fontSize = Number.isFinite(rawFontSize) ? Math.min(2.2, Math.max(0.5, rawFontSize)) : null;
+  if (!font || !effect || !color || fontSize === null) return null;
+  const text = String((body || {}).text || '').slice(0, 4000);
+  return { active: !!(body || {}).active && text.trim().length > 0, text, font, effect, color, fontSize };
+}
+
 // GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
 app.get('/api/frase-final', requirePerson, async (req, res) => {
   try {
@@ -775,6 +790,18 @@ io.on("connection", (socket) => {
   // los de otra persona.
   socket.on("avanceAutoAviso", (payload) => {
     if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('avanceAutoAviso', payload);
+  });
+
+  // "Escribir en vivo": retransmite el texto tipeado en el celular a la
+  // pantalla propia, letra por letra según se va escribiendo. Igual que
+  // "cambiar"/"cine"/"fraseFinalAhora", sólo va a la sala del propio dueño
+  // ('owner:' + nombre) — nunca a la de otra persona, aunque estén usando
+  // "Escribir en vivo" al mismo tiempo.
+  socket.on("escribirVivoEstado", (payload) => {
+    if (!socket.ownerName) return;
+    const parsed = parseLiveWriteBody(payload);
+    if (!parsed) return;
+    io.to('owner:' + socket.ownerName).emit('escribirVivoEstado', parsed);
   });
 });
 

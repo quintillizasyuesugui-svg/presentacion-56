@@ -320,6 +320,57 @@ body.pantalla {
 
 .fp-letter { display: inline-block; white-space: pre; }
 
+/* ==================================================
+   ESCRIBIR EN VIVO — mismo mecanismo de #finalPhrase (arriba): texto propio,
+   fondo negro, con las mismas 10 fuentes y las mismas clases fp-<efecto> —
+   la diferencia es que el texto se actualiza en vivo, letra por letra, en vez
+   de mostrarse una sola vez armado (ver control.html/pantalla.html).
+   ================================================== */
+
+#liveWrite {
+  position: fixed;
+  inset: 0;
+  z-index: 27;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background: #000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out), visibility var(--dur-base) var(--ease-out);
+}
+
+#liveWrite.show { opacity: 1; visibility: visible; }
+
+#liveWriteText {
+  /* --fp-size-scale lo pone JS: el tamaño elegido, y además se va encogiendo
+     solo si el texto tiene demasiados versos como para entrar en pantalla. */
+  font-size: calc(clamp(1.4rem, 6vw, 4.5rem) * var(--fp-size-scale, 1));
+  font-weight: 700;
+  line-height: 1.3;
+  max-width: 92vw;
+  max-height: 88vh;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+}
+
+/* Vista previa chica (celular, dentro de control.html) — mismo lienzo 16:9 de
+   siempre, pero con salto de línea real para poder previsualizar varios versos. */
+.fp-preview-stage #lwPreviewText {
+  font-size: calc(clamp(1rem, 5.5vw, 1.9rem) * var(--fp-size-scale, 1));
+  font-weight: 700;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
 /* --fp-duration lo pone JS (en #finalPhrase/.fp-preview-stage/cada miniatura,
    según el segundero elegido en el editor) — todos los efectos lo heredan de
    ahí, así una sola perilla de "Duración" controla la velocidad de cualquiera
@@ -500,6 +551,15 @@ body.pantalla {
 }
 
 .fp-text-input:focus { outline: none; border-color: var(--primary-500); }
+
+/* Igual que .fp-text-input, pero para el <textarea> de "Escribir en vivo"
+   (varios versos, no una sola línea) */
+.fp-textarea {
+  min-height: 110px;
+  line-height: 1.4;
+  font-family: inherit;
+  resize: vertical;
+}
 
 /* Pestañas Letra/Color/Efecto — sólo un panel a la vez, así no hay que
    scrollear las 3 secciones apiladas una atrás de la otra. */
@@ -1439,6 +1499,11 @@ body.dragging-active { user-select: none; }
    tengan la misma especificidad — sin esto, los 2 botones de elegir se
    quedaban visibles superpuestos con el formulario de nombre/PIN. */
 .auth-gate #authChoice[hidden] { display: none; }
+
+/* Mismo motivo que la nota de arriba: .btn (display:inline-flex) le gana al
+   [hidden] del navegador — sin esto, "Atrás" y "Listo, ocultar y cerrar" en
+   Escribir en vivo quedaban visibles siempre, amontonados con "Siguiente". */
+#lwBack[hidden], #lwNext[hidden], #lwFinish[hidden] { display: none; }
 
 .auth-gate .auth-back {
   display: block;
