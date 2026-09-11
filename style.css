@@ -680,6 +680,45 @@ input[type="color"].fp-color {
   margin-bottom: 18px;
 }
 
+/* ---- Combinar 2 colores (Frase final + Escribir en vivo) ---- */
+.color-combo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.color-swatch {
+  height: 48px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--gray-700);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--dur-fast) var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.color-swatch:active { transform: scale(0.96); }
+.color-swatch.selected { border-color: var(--primary-400); box-shadow: 0 0 0 2px rgba(52, 205, 250, 0.35); }
+
+.color-combo-custom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.color-combo-custom input[type="color"] {
+  flex: 1;
+  height: 44px;
+  padding: 4px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.color-combo-arrow { color: var(--text-muted); font-weight: 700; }
+
 .btn {
   display: inline-flex;
   align-items: center;

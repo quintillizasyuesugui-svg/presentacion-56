@@ -119,6 +119,26 @@
       .catch(err => console.error('Error loading frase final:', err));
   }
 
+  // Un color solo (color2 vacío) o degradado entre 2 (color2 con algo) — se
+  // usa acá y en "Escribir en vivo". El degradado se recorta con la forma del
+  // texto (background-clip: text) y el color de relleno normal se apaga
+  // (transparent) para que se vea el fondo en vez de un color plano encima.
+  function aplicarColorTexto(el, color, color2) {
+    if (color2) {
+      el.style.background = 'linear-gradient(90deg, ' + color + ', ' + color2 + ')';
+      el.style.webkitBackgroundClip = 'text';
+      el.style.backgroundClip = 'text';
+      el.style.webkitTextFillColor = 'transparent';
+      el.style.color = 'transparent';
+    } else {
+      el.style.background = 'none';
+      el.style.webkitBackgroundClip = '';
+      el.style.backgroundClip = '';
+      el.style.webkitTextFillColor = '';
+      el.style.color = color || '#ffffff';
+    }
+  }
+
   // Igual que en el editor: máquina de escribir/ola necesitan cada letra en
   // su propio <span> para animarse una por una; los demás efectos animan el
   // bloque de texto entero.
@@ -144,7 +164,7 @@
     showingFinal = true;
     const duration = frase.duration || 1;
     finalPhraseText.style.fontFamily = FRASE_FONT_FAMILIES[frase.font] || FRASE_FONT_FAMILIES.sans;
-    finalPhraseText.style.color = frase.color || '#ffffff';
+    aplicarColorTexto(finalPhraseText, frase.color, frase.color2);
     renderFinalText(frase.text, frase.effect, duration);
 
     finalPhrase.style.setProperty('--fp-duration', (duration * 1000) + 'ms');
@@ -205,7 +225,7 @@
     }
 
     liveWriteText.style.fontFamily = FRASE_FONT_FAMILIES[estado.font] || FRASE_FONT_FAMILIES.sans;
-    liveWriteText.style.color = estado.color || '#ffffff';
+    aplicarColorTexto(liveWriteText, estado.color, estado.color2);
     liveWriteScale = estado.fontSize || 1;
     liveWriteText.textContent = estado.text || '';
 

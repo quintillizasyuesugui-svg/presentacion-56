@@ -280,7 +280,15 @@ const FRASE_EFFECTS = [
   'bounce-loop', 'wiggle', 'jelly', 'heartbeat', 'rock', 'stretch', 'neon'
 ];
 const FRASE_POSITIONS = ['top', 'middle', 'bottom'];
-const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
+const FRASE_DEFAULT = { text: '', font: 'sans', color: '#ffffff', color2: '', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
+
+// color2 es opcional: '' (o nada) significa "un solo color", cualquier otra
+// cosa tiene que ser un hex válido — ahí se combinan los 2 en un degradado.
+// Devuelve null si vino algo raro (para poder distinguirlo de "vacío a propósito").
+function parseColor2(valor) {
+  if (valor === undefined || valor === null || valor === '') return '';
+  return typeof valor === 'string' && /^#[0-9a-fA-F]{6}$/.test(valor) ? valor : null;
+}
 
 async function readLocalFrases() {
   try {
@@ -332,13 +340,14 @@ function parseFraseBody(body) {
   const font = FRASE_FONTS.includes((body || {}).font) ? body.font : null;
   const effect = FRASE_EFFECTS.includes((body || {}).effect) ? body.effect : null;
   const color = typeof (body || {}).color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.color) ? body.color : null;
+  const color2 = parseColor2((body || {}).color2);
   const position = FRASE_POSITIONS.includes((body || {}).position) ? body.position : null;
   const rawDuration = Number((body || {}).duration);
   const duration = Number.isFinite(rawDuration) ? Math.min(3, Math.max(0.4, rawDuration)) : null;
   const rawFontSize = Number((body || {}).fontSize);
   const fontSize = Number.isFinite(rawFontSize) ? Math.min(1.8, Math.max(0.6, rawFontSize)) : null;
-  if (!text || !font || !effect || !color || !position || duration === null || fontSize === null) return null;
-  return { text, font, color, effect, duration, fontSize, position };
+  if (!text || !font || !effect || !color || color2 === null || !position || duration === null || fontSize === null) return null;
+  return { text, font, color, color2, effect, duration, fontSize, position };
 }
 
 // Nada de texto/HTML suelto sin revisar acá tampoco: mismas listas cerradas
@@ -349,11 +358,12 @@ function parseLiveWriteBody(body) {
   const font = FRASE_FONTS.includes((body || {}).font) ? body.font : null;
   const effect = FRASE_EFFECTS.includes((body || {}).effect) ? body.effect : null;
   const color = typeof (body || {}).color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.color) ? body.color : null;
+  const color2 = parseColor2((body || {}).color2);
   const rawFontSize = Number((body || {}).fontSize);
   const fontSize = Number.isFinite(rawFontSize) ? Math.min(2.2, Math.max(0.5, rawFontSize)) : null;
-  if (!font || !effect || !color || fontSize === null) return null;
+  if (!font || !effect || !color || color2 === null || fontSize === null) return null;
   const text = String((body || {}).text || '').slice(0, 4000);
-  return { active: !!(body || {}).active && text.trim().length > 0, text, font, effect, color, fontSize };
+  return { active: !!(body || {}).active && text.trim().length > 0, text, font, effect, color, color2, fontSize };
 }
 
 // GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
@@ -365,6 +375,7 @@ app.get('/api/frase-final', requirePerson, async (req, res) => {
       text: mine.text,
       font: mine.font,
       color: mine.color,
+      color2: mine.color2 || '',
       effect: mine.effect,
       duration: mine.duration || 1,
       fontSize: mine.fontSize || 1,

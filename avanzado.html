@@ -168,7 +168,25 @@
     </div>
 
     <div class="fp-tab-panel" data-tab="color" hidden>
-      <input type="color" id="fpColor" class="fp-color" value="#ffffff">
+      <div class="fp-tabs" id="fpColorModeTabs">
+        <button type="button" class="fp-tab-btn" data-color-mode="solido">🎨 Un color</button>
+        <button type="button" class="fp-tab-btn" data-color-mode="combinado">🌈 Combinar 2</button>
+      </div>
+
+      <div data-color-panel="solido">
+        <input type="color" id="fpColor" class="fp-color" value="#ffffff">
+      </div>
+
+      <div data-color-panel="combinado" hidden>
+        <div class="fp-section-label">Combinaciones</div>
+        <div class="color-combo-grid" id="fpComboGrid"></div>
+        <div class="fp-section-label">O armá la tuya</div>
+        <div class="color-combo-custom">
+          <input type="color" id="fpColor1" value="#38bdf8">
+          <span class="color-combo-arrow">→</span>
+          <input type="color" id="fpColor2" value="#a855f7">
+        </div>
+      </div>
     </div>
 
     <div class="fp-tab-panel" data-tab="efecto" hidden>
@@ -758,9 +776,25 @@
     { key: 'neon', label: '💡 Neón' }
   ];
 
+  // 6 combinaciones de 2 colores para elegir directo, más la opción de armar
+  // la propia con los 2 selectores de abajo — mismas combinaciones que en
+  // "Escribir en vivo", para que el menú se vea igual en las 2 funciones.
+  const COLOR_COMBOS = [
+    ['#fbbf24', '#ef4444'],
+    ['#38bdf8', '#6366f1'],
+    ['#fb923c', '#ec4899'],
+    ['#22c55e', '#eab308'],
+    ['#8b5cf6', '#ec4899'],
+    ['#2dd4bf', '#38bdf8']
+  ];
+
   const fpOverlay = document.getElementById('fpOverlay');
   const fpText = document.getElementById('fpText');
   const fpColor = document.getElementById('fpColor');
+  const fpColor1 = document.getElementById('fpColor1');
+  const fpColor2 = document.getElementById('fpColor2');
+  const fpComboGrid = document.getElementById('fpComboGrid');
+  const fpColorModeTabs = document.getElementById('fpColorModeTabs');
   const fpFontGrid = document.getElementById('fpFontGrid');
   const fpEffectGrid = document.getElementById('fpEffectGrid');
   const fpPreviewStage = document.getElementById('fpPreviewStage');
@@ -786,8 +820,80 @@
     btn.addEventListener('click', () => selectFpTab(btn.dataset.tab));
   });
 
-  let fpState = { font: 'sans', color: '#ffffff', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
+  let fpState = { font: 'sans', color: '#ffffff', color2: '', effect: 'fade', duration: 1, fontSize: 1, position: 'middle' };
   let effectMiniTimer = null;
+
+  // Un color solo (color2 vacío) o degradado entre 2 — mismo mecanismo que
+  // pantalla.html (ahí es donde se ve de verdad, esto es sólo la vista previa).
+  function aplicarColorTexto(el, color, color2) {
+    if (color2) {
+      el.style.background = 'linear-gradient(90deg, ' + color + ', ' + color2 + ')';
+      el.style.webkitBackgroundClip = 'text';
+      el.style.backgroundClip = 'text';
+      el.style.webkitTextFillColor = 'transparent';
+      el.style.color = 'transparent';
+    } else {
+      el.style.background = 'none';
+      el.style.webkitBackgroundClip = '';
+      el.style.backgroundClip = '';
+      el.style.webkitTextFillColor = '';
+      el.style.color = color || '#ffffff';
+    }
+  }
+
+  function buildComboGrid() {
+    fpComboGrid.innerHTML = '';
+    COLOR_COMBOS.forEach(([c1, c2]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'color-swatch';
+      btn.style.background = 'linear-gradient(90deg, ' + c1 + ', ' + c2 + ')';
+      if (fpState.color === c1 && fpState.color2 === c2) btn.classList.add('selected');
+      btn.addEventListener('click', () => selectCombo(c1, c2));
+      fpComboGrid.appendChild(btn);
+    });
+  }
+
+  function markSelectedCombo() {
+    fpComboGrid.querySelectorAll('.color-swatch').forEach((btn, i) => {
+      const [c1, c2] = COLOR_COMBOS[i];
+      btn.classList.toggle('selected', fpState.color === c1 && fpState.color2 === c2);
+    });
+  }
+
+  function selectCombo(c1, c2) {
+    fpState.color = c1;
+    fpState.color2 = c2;
+    fpColor1.value = c1;
+    fpColor2.value = c2;
+    markSelectedCombo();
+    renderPreview();
+  }
+
+  function selectColorMode(mode) {
+    fpColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.colorMode === mode);
+    });
+    document.querySelectorAll('#fpOverlay [data-color-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.colorPanel !== mode;
+    });
+    if (mode === 'solido') {
+      fpState.color2 = '';
+    } else if (!fpState.color2) {
+      // Primera vez que se entra a "Combinar 2": arranca con lo que ya
+      // tengan cargado los 2 selectores propios, no en blanco.
+      fpState.color = fpColor1.value;
+      fpState.color2 = fpColor2.value;
+      markSelectedCombo();
+    }
+    renderPreview();
+  }
+  fpColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectColorMode(btn.dataset.colorMode));
+  });
+
+  fpColor1.addEventListener('input', () => { fpState.color = fpColor1.value; markSelectedCombo(); renderPreview(); });
+  fpColor2.addEventListener('input', () => { fpState.color2 = fpColor2.value; markSelectedCombo(); renderPreview(); });
 
   function selectPosition(key) {
     fpState.position = key;
@@ -874,7 +980,7 @@
   function renderPreview() {
     const font = FRASE_FONTS.find(f => f.key === fpState.font) || FRASE_FONTS[0];
     fpPreviewText.style.fontFamily = font.family;
-    fpPreviewText.style.color = fpState.color;
+    aplicarColorTexto(fpPreviewText, fpState.color, fpState.color2);
     const text = fpText.value.trim() || 'Gracias';
     renderFpText(fpPreviewText, text, fpState.effect, fpState.duration);
 
@@ -921,18 +1027,28 @@
         fpState = {
           font: saved.font || 'sans',
           color: saved.color || '#ffffff',
+          color2: saved.color2 || '',
           effect: saved.effect || 'fade',
           duration: saved.duration || 1,
           fontSize: saved.fontSize || 1,
           position: saved.position || 'middle'
         };
-        fpColor.value = fpState.color;
+        fpColor.value = fpState.color2 ? '#ffffff' : fpState.color;
+        fpColor1.value = fpState.color2 ? fpState.color : '#38bdf8';
+        fpColor2.value = fpState.color2 || '#a855f7';
         fpDuration.value = fpState.duration;
         fpDurationValue.textContent = fpState.duration.toFixed(1) + 's';
         fpFontSize.value = fpState.fontSize;
         fpFontSizeValue.textContent = Math.round(fpState.fontSize * 100) + '%';
         buildFpGrid(fpFontGrid, FRASE_FONTS, fpState.font, selectFont);
         buildFpGrid(fpEffectGrid, FRASE_EFFECTS, fpState.effect, selectEffect);
+        buildComboGrid();
+        fpColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.colorMode === (fpState.color2 ? 'combinado' : 'solido'));
+        });
+        document.querySelectorAll('#fpOverlay [data-color-panel]').forEach((panel) => {
+          panel.hidden = panel.dataset.colorPanel !== (fpState.color2 ? 'combinado' : 'solido');
+        });
         fpPositionRow.querySelectorAll('.fp-option-btn').forEach((btn) => {
           btn.classList.toggle('selected', btn.dataset.key === fpState.position);
         });
@@ -956,6 +1072,7 @@
       text: fpText.value.trim(),
       font: fpState.font,
       color: fpState.color,
+      color2: fpState.color2,
       effect: fpState.effect,
       duration: fpState.duration,
       fontSize: fpState.fontSize,
