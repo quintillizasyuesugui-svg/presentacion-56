@@ -358,19 +358,6 @@ body.pantalla {
   overflow: hidden;
 }
 
-/* Vista previa chica (celular, dentro de control.html) — mismo lienzo 16:9 de
-   siempre, pero con salto de línea real para poder previsualizar varios versos. */
-.fp-preview-stage #lwPreviewText {
-  font-size: calc(clamp(1rem, 5.5vw, 1.9rem) * var(--fp-size-scale, 1));
-  font-weight: 700;
-  text-align: center;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-width: 100%;
-  max-height: 100%;
-  overflow: hidden;
-}
-
 /* --fp-duration lo pone JS (en #finalPhrase/.fp-preview-stage/cada miniatura,
    según el segundero elegido en el editor) — todos los efectos lo heredan de
    ahí, así una sola perilla de "Duración" controla la velocidad de cualquiera

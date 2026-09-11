@@ -100,10 +100,7 @@
 
     <div class="fp-tab-panel" data-step="escribir" hidden>
       <textarea id="lwText" class="fp-text-input fp-textarea" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás. Podés poner varios versos, se acomoda solo." rows="4"></textarea>
-      <div class="fp-preview-stage" id="lwPreviewStage">
-        <div id="lwPreviewText" class="fp-anim-target"></div>
-      </div>
-      <p class="editor-hint">Se ve en tu celular y en tu pantalla al mismo tiempo, en vivo. La letra y el tamaño ya quedaron fijos — animación y color los podés seguir cambiando acá abajo.</p>
+      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. La letra y el tamaño ya quedaron fijos — animación y color los podés seguir cambiando acá abajo.</p>
     </div>
 
     <div class="fp-tab-panel" data-step="animacion" hidden>
@@ -482,7 +479,6 @@
   const lwFontSizeValue = document.getElementById('lwFontSizeValue');
   const lwColor = document.getElementById('lwColor');
   const lwText = document.getElementById('lwText');
-  const lwPreviewText = document.getElementById('lwPreviewText');
   const lwBack = document.getElementById('lwBack');
   const lwNext = document.getElementById('lwNext');
   const lwFinish = document.getElementById('lwFinish');
@@ -496,26 +492,50 @@
   let lwColorChosen = false;
   let lwActive = false; // true mientras algo se está mostrando de verdad en la pantalla
 
+  // Igual que en "Frase final": cada botón de efecto trae su propia mini
+  // pantalla negra que repite la animación en loop con un texto fijo ("Hola")
+  // — así se ve de qué se trata cada uno sin tener que elegirlo primero.
   function lwBuildGrid(container, items, selectedKey, onPick) {
     container.innerHTML = '';
     items.forEach((item) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.classList.add('fp-option-btn');
+      btn.dataset.key = item.key;
       if (item.key === selectedKey) btn.classList.add('selected');
-      btn.textContent = item.label;
-      if (item.family) btn.style.fontFamily = item.family;
+      if (item.family) {
+        btn.textContent = item.label;
+        btn.style.fontFamily = item.family;
+      } else {
+        btn.classList.add('fp-effect-btn');
+        btn.innerHTML = '<span class="fp-mini-stage"><span class="fp-anim-target"></span></span>' +
+          '<span class="fp-mini-label">' + item.label + '</span>';
+      }
       btn.addEventListener('click', () => onPick(item.key));
       container.appendChild(btn);
     });
+    if (items === LW_EFFECTS) lwStartEffectMiniLoop();
   }
 
-  function lwRenderPreview() {
-    const font = LW_FONTS.find((f) => f.key === lwState.font) || LW_FONTS[0];
-    lwPreviewText.style.fontFamily = font.family;
-    lwPreviewText.style.color = lwState.color;
-    lwPreviewText.style.setProperty('--fp-size-scale', lwState.fontSize);
-    lwPreviewText.textContent = lwState.text;
+  let lwEffectMiniTimer = null;
+  function lwPlayEffectMinis() {
+    document.querySelectorAll('#lwEffectGrid .fp-effect-btn').forEach((btn) => {
+      const stage = btn.querySelector('.fp-mini-stage');
+      const target = btn.querySelector('.fp-anim-target');
+      target.textContent = 'Hola';
+      stage.style.setProperty('--fp-duration', '900ms');
+      stage.className = 'fp-mini-stage';
+      void stage.offsetWidth; // fuerza reflow para poder repetir la animación
+      stage.classList.add('fp-' + btn.dataset.key);
+    });
+  }
+  function lwStartEffectMiniLoop() {
+    lwPlayEffectMinis();
+    if (lwEffectMiniTimer) clearInterval(lwEffectMiniTimer);
+    lwEffectMiniTimer = setInterval(lwPlayEffectMinis, 2200);
+  }
+  function lwStopEffectMiniLoop() {
+    if (lwEffectMiniTimer) { clearInterval(lwEffectMiniTimer); lwEffectMiniTimer = null; }
   }
 
   function lwCanAdvance() {
@@ -545,7 +565,9 @@
     lwBack.hidden = i === 0;
     lwNext.hidden = isLast;
     lwFinish.hidden = !isLast;
-    if (step === 'escribir') lwRenderPreview();
+    // El grid de animación se ve en su propio paso Y en el paso de escribir
+    // (ajuste en vivo) — el loop de mini videos sólo corre mientras se ve.
+    if (step === 'animacion' || isLast) lwStartEffectMiniLoop(); else lwStopEffectMiniLoop();
     lwNext.disabled = !lwCanAdvance();
   }
 
@@ -567,19 +589,16 @@
     lwFontSizeValue.textContent = Math.round(lwState.fontSize * 100) + '%';
     lwSizeChosen = true;
     lwNext.disabled = !lwCanAdvance();
-    lwRenderPreview();
     lwBroadcastIfActive();
   });
   lwColor.addEventListener('input', () => {
     lwState.color = lwColor.value;
     lwColorChosen = true;
     lwNext.disabled = !lwCanAdvance();
-    lwRenderPreview();
     lwBroadcastIfActive();
   });
   lwText.addEventListener('input', () => {
     lwState.text = lwText.value;
-    lwRenderPreview();
     lwBroadcast();
   });
 
@@ -628,6 +647,7 @@
   }
   function closeLiveWrite() {
     lwStop();
+    lwStopEffectMiniLoop();
     lwOverlay.classList.remove('show');
     setTimeout(() => { lwOverlay.hidden = true; }, 200);
   }
