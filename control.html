@@ -168,6 +168,17 @@
   });
 
   function enviar(accion) {
+    // "Atrás"/"Siguiente" antes de "Mostrar" no tienen nada que recorrer
+    // (pantalla.html los ignora igual, ver aplicarCambio ahí) — en vez de que
+    // no pase nada en silencio, avisa por qué.
+    if (!showStarted && (accion === 'anterior' || accion === 'siguiente')) {
+      showToast('Apretá "Mostrar" para encender');
+      return;
+    }
+    if (accion === 'mostrar') {
+      showStarted = true;
+      updateNavButtonsState();
+    }
     socket.emit('cambiar', accion);
   }
 
@@ -195,17 +206,31 @@
   const mostrarBtn = document.getElementById('mostrarBtn');
   let autoAdvanceEndAt = null;
   let autoAdvanceOn = false;
+  let showStarted = false; // recién true al apretar "Mostrar" — antes, pantalla.html no tiene nada que recorrer
 
   // Mientras "Escribir en vivo" está mostrándose, NINGÚN botón de navegación
   // hace nada en pantalla.html (ver aplicarCambio ahí) — ni Mostrar, ni
   // Siguiente/Atrás — así que los 3 se apagan acá también, para que no
   // parezcan rotos. El avance automático, en cambio, sólo frena
   // Siguiente/Atrás, nunca Mostrar (así ya funcionaba antes).
+  //
+  // Antes de arrancar con "Mostrar", Atrás/Siguiente también se ven apagados
+  // — pero con una clase aparte ("is-off", sin pointer-events:none) en vez de
+  // "disabled", para que el click siga entrando y avise con un mensaje en vez
+  // de no hacer nada en silencio (ver enviar()).
   function updateNavButtonsState() {
     anteriorBtn.disabled = autoAdvanceOn || lwActive;
     siguienteBtn.disabled = autoAdvanceOn || lwActive;
     mostrarBtn.disabled = lwActive;
+    anteriorBtn.classList.toggle('is-off', !showStarted);
+    siguienteBtn.classList.toggle('is-off', !showStarted);
   }
+  // Estado inicial: "is-off" nomás (autoAdvanceOn/lwActive todavía no existen
+  // acá arriba en el archivo — se declaran más abajo — así que no se puede
+  // llamar a updateNavButtonsState() todavía; da lo mismo, al arrancar
+  // siempre están en false).
+  anteriorBtn.classList.add('is-off');
+  siguienteBtn.classList.add('is-off');
 
   function refreshAutoAdvanceEnabled() {
     authFetch('/api/avance-automatico')

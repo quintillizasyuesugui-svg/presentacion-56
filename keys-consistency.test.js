@@ -137,6 +137,24 @@ test('pantalla.html: "Atrás"/"Siguiente" no hacen nada si el show todavía no a
   );
 });
 
+test('control.html: "Atrás"/"Siguiente" avisan con un mensaje si se tocan antes de "Mostrar", en vez de no hacer nada', () => {
+  const source = readFile('control.html');
+  assert.match(source, /let showStarted = false;/, 'debería haber un "showStarted" que arranca en false');
+  assert.match(
+    source,
+    /if \(!showStarted && \(accion === 'anterior' \|\| accion === 'siguiente'\)\) \{\s*\n\s*showToast\(/,
+    'enviar() debería avisar con showToast en vez de emitir "anterior"/"siguiente" mientras showStarted sea false'
+  );
+  assert.match(source, /if \(accion === 'mostrar'\) \{\s*\n\s*showStarted = true;/, 'enviar() debería poner showStarted en true al mandar "mostrar"');
+});
+
+test('style.css: .is-off se ve igual que .btn:disabled pero sin bloquear el click (para poder avisar por qué)', () => {
+  const source = readFile('style.css');
+  const match = source.match(/\.btn\.is-off \{([^}]*)\}/);
+  assert.ok(match, 'no se encontró ".btn.is-off { ... }" en style.css');
+  assert.ok(!/pointer-events\s*:\s*none/.test(match[1]), '.btn.is-off no debería tener pointer-events:none (si no, no se podría avisar al tocarlo)');
+});
+
 test('avanzado.html y control.html: PARTICLE_RAIN_ICONS tiene un ícono para cada lluvia de partículas', () => {
   const esperado = ['confetti', 'stars', 'hearts'].sort();
   for (const file of ['avanzado.html', 'control.html']) {

@@ -778,6 +778,12 @@ input[type="color"].fp-color {
 .btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; box-shadow: none; }
 
+/* Mismo look que ".btn:disabled" pero SIN pointer-events:none — se usa en
+   "Atrás"/"Siguiente" antes de apretar "Mostrar" (control.html), para que el
+   botón se vea apagado pero el click siga entrando y avise con un mensaje en
+   vez de no hacer nada en silencio. */
+.btn.is-off { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
 .btn.primary {
   background: linear-gradient(180deg, var(--primary-400), var(--primary-600));
   border-color: var(--primary-200);
