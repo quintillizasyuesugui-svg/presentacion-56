@@ -85,26 +85,34 @@ test('pantalla.html: PARTICLE_RAIN_EFFECTS son justo las 3 lluvias de partícula
   assert.deepEqual(keys.sort(), ['confetti', 'hearts', 'stars'].sort());
 });
 
-test('pantalla.html: cada golpe de lluvia de partículas dura 3 minutos', () => {
+test('pantalla.html: "Frase final" dura 5s (un solo golpe) y "Escribir en vivo" 3 minutos por golpe (encadenado)', () => {
   const source = readFile('pantalla.html');
-  const match = source.match(/const PARTICLE_RAIN_DURATION_MS = (\d+)/);
-  assert.ok(match, 'no se encontró "const PARTICLE_RAIN_DURATION_MS = ..." en pantalla.html');
-  assert.equal(Number(match[1]), 180000, 'PARTICLE_RAIN_DURATION_MS debería ser 180000ms (3 minutos)');
+  const final = source.match(/const FINAL_PHRASE_RAIN_DURATION_MS = (\d+)/);
+  assert.ok(final, 'no se encontró "const FINAL_PHRASE_RAIN_DURATION_MS = ..." en pantalla.html');
+  assert.equal(Number(final[1]), 5000, 'FINAL_PHRASE_RAIN_DURATION_MS debería ser 5000ms (5s)');
+
+  const vivo = source.match(/const LIVE_WRITE_RAIN_DURATION_MS = (\d+)/);
+  assert.ok(vivo, 'no se encontró "const LIVE_WRITE_RAIN_DURATION_MS = ..." en pantalla.html');
+  assert.equal(Number(vivo[1]), 180000, 'LIVE_WRITE_RAIN_DURATION_MS debería ser 180000ms (3 minutos)');
 });
 
-test('pantalla.html: la lluvia se repite en bucle sin tope de tiempo (sólo se corta al apagar el texto o cambiar de efecto)', () => {
+test('pantalla.html: "Frase final" es un solo golpe (no se repite) y "Escribir en vivo" se repite en bucle sin tope de tiempo', () => {
   const source = readFile('pantalla.html');
   assert.ok(!/PARTICLE_RAIN_LOOP_MAX_MS/.test(source), 'no debería haber ningún tope de tiempo para el bucle de partículas');
-  const match = source.match(/function crearCarrilDeLluvia\(\) \{[\s\S]*?\n  \}/);
-  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia() {...}" en pantalla.html');
-  assert.ok(/setInterval\([\s\S]*?particleRain\(kind\)[\s\S]*?, PARTICLE_RAIN_DURATION_MS\)/.test(match[0]), 'el carril debería encadenar particleRain sin condición de corte');
+
+  assert.match(source, /const finalPhraseRain = crearCarrilDeLluvia\(FINAL_PHRASE_RAIN_DURATION_MS, \{ loop: false \}\)/, 'finalPhraseRain debería crearse con loop: false (un solo golpe)');
+  assert.match(source, /const liveWriteRain = crearCarrilDeLluvia\(LIVE_WRITE_RAIN_DURATION_MS, \{ loop: true \}\)/, 'liveWriteRain debería crearse con loop: true (bucle sin cortarse solo)');
+
+  const match = source.match(/function crearCarrilDeLluvia\(duracionMs, \{ loop \}\) \{[\s\S]*?\n  \}/);
+  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia(duracionMs, { loop }) {...}" en pantalla.html');
+  assert.ok(/if \(loop\) \{[\s\S]*?setInterval\([\s\S]*?particleRain\(kind, duracionMs\)[\s\S]*?, duracionMs\)/.test(match[0]), 'el carril sólo debería encadenar golpes cuando loop es true');
 });
 
 test('pantalla.html: particleRain se puede cortar antes de tiempo, y el carril corta el golpe actual (no sólo la cadena) al detenerse', () => {
   const source = readFile('pantalla.html');
-  assert.match(source, /function particleRain\(kind\) \{[\s\S]*?return \{ detener: limpiar \};\n  \}/, 'particleRain debería devolver { detener } para poder cortarse antes de tiempo');
-  const match = source.match(/function crearCarrilDeLluvia\(\) \{[\s\S]*?\n  \}/);
-  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia() {...}" en pantalla.html');
+  assert.match(source, /function particleRain\(kind, durationMs\) \{[\s\S]*?return \{ detener: limpiar \};\n  \}/, 'particleRain debería devolver { detener } para poder cortarse antes de tiempo');
+  const match = source.match(/function crearCarrilDeLluvia\(duracionMs, \{ loop \}\) \{[\s\S]*?\n  \}/);
+  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia(duracionMs, { loop }) {...}" en pantalla.html');
   assert.match(match[0], /detener\(\) \{[\s\S]*?golpeActual\.detener\(\)/, 'detener() del carril debería cortar también el golpe que está cayendo ahora mismo, no sólo la cadena de golpes futuros');
 });
 

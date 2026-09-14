@@ -123,28 +123,34 @@
 
   // Estos 3 efectos son ráfagas de partículas (ver particleRain más abajo) en
   // vez de una animación de texto — tanto "Frase final" como "Escribir en
-  // vivo" los usan. Cada golpe dura PARTICLE_RAIN_DURATION_MS y se encadena
-  // uno detrás de otro sin parar (como un bucle) mientras el texto siga en
-  // pantalla con ese efecto — no hay tope de tiempo, sigue así de constante
-  // todo lo que dure el texto prendido con ese efecto. Se corta sola cuando
+  // vivo" los usan, pero con duraciones distintas: "Frase final" es un flash
+  // corto de FINAL_PHRASE_RAIN_DURATION_MS (un solo golpe, no se repite);
+  // "Escribir en vivo" encadena golpes de LIVE_WRITE_RAIN_DURATION_MS uno
+  // detrás de otro sin parar (como un bucle) mientras el texto siga en
+  // pantalla con ese efecto — sin tope de tiempo, se corta sola sólo cuando
   // se apaga el texto o se cambia a otro efecto (ver "detener" más abajo).
   const PARTICLE_RAIN_EFFECTS = ['confetti', 'stars', 'hearts'];
-  const PARTICLE_RAIN_DURATION_MS = 180000; // 3 minutos — cuánto dura cada golpe (particleRain se autolimpia sola a este tiempo)
+  const FINAL_PHRASE_RAIN_DURATION_MS = 5000;   // 5s — "Frase final": un solo golpe, no se repite
+  const LIVE_WRITE_RAIN_DURATION_MS = 180000;   // 3 minutos — "Escribir en vivo": dura cada golpe de la cadena
 
   // Cada lugar que puede mostrar una lluvia de partículas (Frase final,
   // Escribir en vivo) tiene su propio "carril" independiente, para poder
   // prenderlo/cortarlo sin pisar al del otro si llegaran a mostrarse juntos.
-  function crearCarrilDeLluvia() {
+  // "loop: true" encadena golpes sin parar (Escribir en vivo); "loop: false"
+  // es un solo golpe que se autolimpia sola (Frase final).
+  function crearCarrilDeLluvia(duracionMs, { loop }) {
     let timer = null;
-    let golpeActual = null; // el particleRain() que está cayendo ahora mismo, para poder cortarlo antes de sus 3 minutos
+    let golpeActual = null; // el particleRain() que está cayendo ahora mismo, para poder cortarlo antes de tiempo
     return {
       iniciar(kind) {
         this.detener();
-        golpeActual = particleRain(kind);
-        timer = setInterval(() => {
-          golpeActual.detener();
-          golpeActual = particleRain(kind);
-        }, PARTICLE_RAIN_DURATION_MS);
+        golpeActual = particleRain(kind, duracionMs);
+        if (loop) {
+          timer = setInterval(() => {
+            golpeActual.detener();
+            golpeActual = particleRain(kind, duracionMs);
+          }, duracionMs);
+        }
       },
       detener() {
         if (timer) { clearInterval(timer); timer = null; }
@@ -152,8 +158,8 @@
       }
     };
   }
-  const finalPhraseRain = crearCarrilDeLluvia();
-  const liveWriteRain = crearCarrilDeLluvia();
+  const finalPhraseRain = crearCarrilDeLluvia(FINAL_PHRASE_RAIN_DURATION_MS, { loop: false });
+  const liveWriteRain = crearCarrilDeLluvia(LIVE_WRITE_RAIN_DURATION_MS, { loop: true });
 
   function refreshFraseFinal() {
     authFetch('/api/frase-final')
@@ -753,14 +759,14 @@
     ctx.fill();
   }
 
-  // Lluvia de partículas que cae sobre toda la pantalla durante
-  // PARTICLE_RAIN_DURATION_MS (o hasta que se llame a "detener" antes de
-  // tiempo) — la usan los efectos "confetti" (cuadraditos), "stars" (⭐) y
-  // "hearts" (💖) de "Frase final", y también el cierre automático de cada
-  // show (última diapositiva). "kind" elige la forma y la paleta de color de
-  // cada pieza. Devuelve { detener } para poder cortarla antes de sus 3
-  // minutos si el efecto se apaga o se cambia mientras tanto.
-  function particleRain(kind) {
+  // Lluvia de partículas que cae sobre toda la pantalla durante durationMs
+  // (o hasta que se llame a "detener" antes de tiempo) — la usan los efectos
+  // "confetti" (cuadraditos), "stars" (⭐) y "hearts" (💖) de "Frase final" y
+  // "Escribir en vivo", y también el cierre automático de cada show (última
+  // diapositiva). "kind" elige la forma y la paleta de color de cada pieza.
+  // Devuelve { detener } para poder cortarla antes de tiempo si el efecto se
+  // apaga o se cambia mientras tanto.
+  function particleRain(kind, durationMs) {
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
     canvas.style.top = '0';
@@ -817,12 +823,12 @@
       cancelAnimationFrame(animationId);
       if (canvas.isConnected) document.body.removeChild(canvas);
     }
-    const cleanupTimer = setTimeout(limpiar, PARTICLE_RAIN_DURATION_MS);
+    const cleanupTimer = setTimeout(limpiar, durationMs);
     return { detener: limpiar };
   }
 
   function confetti() {
-    particleRain('confetti');
+    particleRain('confetti', FINAL_PHRASE_RAIN_DURATION_MS);
   }
 
   window.addEventListener('keydown', (event) => {
