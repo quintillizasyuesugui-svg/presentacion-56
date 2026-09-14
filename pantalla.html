@@ -136,14 +136,19 @@
   // prenderlo/cortarlo sin pisar al del otro si llegaran a mostrarse juntos.
   function crearCarrilDeLluvia() {
     let timer = null;
+    let golpeActual = null; // el particleRain() que está cayendo ahora mismo, para poder cortarlo antes de sus 3 minutos
     return {
       iniciar(kind) {
         this.detener();
-        particleRain(kind);
-        timer = setInterval(() => particleRain(kind), PARTICLE_RAIN_DURATION_MS);
+        golpeActual = particleRain(kind);
+        timer = setInterval(() => {
+          golpeActual.detener();
+          golpeActual = particleRain(kind);
+        }, PARTICLE_RAIN_DURATION_MS);
       },
       detener() {
         if (timer) { clearInterval(timer); timer = null; }
+        if (golpeActual) { golpeActual.detener(); golpeActual = null; }
       }
     };
   }
@@ -749,10 +754,12 @@
   }
 
   // Lluvia de partículas que cae sobre toda la pantalla durante
-  // PARTICLE_RAIN_DURATION_MS — la usan los efectos "confetti" (cuadraditos),
-  // "stars" (⭐) y "hearts" (💖) de "Frase final", y también el cierre
-  // automático de cada show (última diapositiva). "kind" elige la forma y la
-  // paleta de color de cada pieza.
+  // PARTICLE_RAIN_DURATION_MS (o hasta que se llame a "detener" antes de
+  // tiempo) — la usan los efectos "confetti" (cuadraditos), "stars" (⭐) y
+  // "hearts" (💖) de "Frase final", y también el cierre automático de cada
+  // show (última diapositiva). "kind" elige la forma y la paleta de color de
+  // cada pieza. Devuelve { detener } para poder cortarla antes de sus 3
+  // minutos si el efecto se apaga o se cambia mientras tanto.
   function particleRain(kind) {
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
@@ -805,10 +812,13 @@
       animationId = requestAnimationFrame(animate);
     }
     animate();
-    setTimeout(() => {
+    function limpiar() {
+      clearTimeout(cleanupTimer);
       cancelAnimationFrame(animationId);
-      document.body.removeChild(canvas);
-    }, PARTICLE_RAIN_DURATION_MS);
+      if (canvas.isConnected) document.body.removeChild(canvas);
+    }
+    const cleanupTimer = setTimeout(limpiar, PARTICLE_RAIN_DURATION_MS);
+    return { detener: limpiar };
   }
 
   function confetti() {

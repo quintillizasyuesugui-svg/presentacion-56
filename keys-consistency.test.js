@@ -97,7 +97,15 @@ test('pantalla.html: la lluvia se repite en bucle sin tope de tiempo (sólo se c
   assert.ok(!/PARTICLE_RAIN_LOOP_MAX_MS/.test(source), 'no debería haber ningún tope de tiempo para el bucle de partículas');
   const match = source.match(/function crearCarrilDeLluvia\(\) \{[\s\S]*?\n  \}/);
   assert.ok(match, 'no se encontró "function crearCarrilDeLluvia() {...}" en pantalla.html');
-  assert.ok(/setInterval\(\(\) => particleRain\(kind\), PARTICLE_RAIN_DURATION_MS\)/.test(match[0]), 'el carril debería encadenar particleRain sin condición de corte');
+  assert.ok(/setInterval\([\s\S]*?particleRain\(kind\)[\s\S]*?, PARTICLE_RAIN_DURATION_MS\)/.test(match[0]), 'el carril debería encadenar particleRain sin condición de corte');
+});
+
+test('pantalla.html: particleRain se puede cortar antes de tiempo, y el carril corta el golpe actual (no sólo la cadena) al detenerse', () => {
+  const source = readFile('pantalla.html');
+  assert.match(source, /function particleRain\(kind\) \{[\s\S]*?return \{ detener: limpiar \};\n  \}/, 'particleRain debería devolver { detener } para poder cortarse antes de tiempo');
+  const match = source.match(/function crearCarrilDeLluvia\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia() {...}" en pantalla.html');
+  assert.match(match[0], /detener\(\) \{[\s\S]*?golpeActual\.detener\(\)/, 'detener() del carril debería cortar también el golpe que está cayendo ahora mismo, no sólo la cadena de golpes futuros');
 });
 
 // Saca, en orden, las keys de un objeto plano de una sola línea por entrada
