@@ -121,6 +121,35 @@
   let showingFinal = false;   // true mientras #finalPhrase está en pantalla
   let finalIsPreview = false; // true si se está mostrando por "Enviar a PC" (no por llegar al final de verdad)
 
+  // Estos 3 efectos son ráfagas de partículas (ver particleRain más abajo) en
+  // vez de una animación de texto — tanto "Frase final" como "Escribir en
+  // vivo" los usan. Cada golpe dura PARTICLE_RAIN_DURATION_MS y se encadena
+  // uno detrás de otro sin parar (como un bucle) mientras el texto siga en
+  // pantalla con ese efecto — no hay tope de tiempo, sigue así de constante
+  // todo lo que dure el texto prendido con ese efecto. Se corta sola cuando
+  // se apaga el texto o se cambia a otro efecto (ver "detener" más abajo).
+  const PARTICLE_RAIN_EFFECTS = ['confetti', 'stars', 'hearts'];
+  const PARTICLE_RAIN_DURATION_MS = 5000; // cuánto dura cada golpe (particleRain se autolimpia sola a este tiempo)
+
+  // Cada lugar que puede mostrar una lluvia de partículas (Frase final,
+  // Escribir en vivo) tiene su propio "carril" independiente, para poder
+  // prenderlo/cortarlo sin pisar al del otro si llegaran a mostrarse juntos.
+  function crearCarrilDeLluvia() {
+    let timer = null;
+    return {
+      iniciar(kind) {
+        this.detener();
+        particleRain(kind);
+        timer = setInterval(() => particleRain(kind), PARTICLE_RAIN_DURATION_MS);
+      },
+      detener() {
+        if (timer) { clearInterval(timer); timer = null; }
+      }
+    };
+  }
+  const finalPhraseRain = crearCarrilDeLluvia();
+  const liveWriteRain = crearCarrilDeLluvia();
+
   function refreshFraseFinal() {
     authFetch('/api/frase-final')
       .then(res => res.json())
@@ -182,13 +211,15 @@
     void finalPhrase.offsetWidth; // fuerza reflow para poder repetir la animación
     finalPhrase.classList.add('show', 'fp-' + frase.effect);
 
-    if (PARTICLE_RAIN_EFFECTS.includes(frase.effect)) particleRain(frase.effect);
+    if (PARTICLE_RAIN_EFFECTS.includes(frase.effect)) finalPhraseRain.iniciar(frase.effect);
+    else finalPhraseRain.detener();
   }
 
   function hideFinalPhrase() {
     showingFinal = false;
     finalIsPreview = false;
     finalPhrase.classList.remove('show');
+    finalPhraseRain.detener();
   }
 
   // ---- Escribir en vivo: texto propio, tipeado ahora mismo desde el celular ----
@@ -198,28 +229,6 @@
   let liveWriteEffect = null;  // efecto que se está reproduciendo ahora, para
                                 // no repetir la animación de entrada en cada letra
   let liveWriteScale = 1;
-  let liveWriteRainTimer = null; // repite la lluvia de partículas mientras el
-                                  // efecto siga siendo confetti/estrellas/corazones
-
-  // Estos 3 efectos son ráfagas de partículas (ver particleRain) en vez de una
-  // animación de texto — se repiten en cadena mientras "Escribir en vivo" siga
-  // prendido con ese efecto, para que se vea una lluvia constante y no un solo
-  // golpe que se corta mientras la persona sigue escribiendo.
-  const PARTICLE_RAIN_EFFECTS = ['confetti', 'stars', 'hearts'];
-  const PARTICLE_RAIN_DURATION_MS = 5000; // cuánto dura cada golpe de partículas (particleRain se autolimpia sola a este tiempo)
-
-  function startLiveWriteRain(kind) {
-    stopLiveWriteRain();
-    particleRain(kind);
-    liveWriteRainTimer = setInterval(() => particleRain(kind), PARTICLE_RAIN_DURATION_MS);
-  }
-
-  function stopLiveWriteRain() {
-    if (liveWriteRainTimer) {
-      clearInterval(liveWriteRainTimer);
-      liveWriteRainTimer = null;
-    }
-  }
 
   // Encoge el texto si no entra (varios versos largos) hasta que quepa, sin
   // pasar de un tamaño ilegible — se recalcula en cada letra que se escribe.
@@ -252,7 +261,7 @@
       liveWrite.classList.remove('show');
       liveWriteActive = false;
       liveWriteEffect = null;
-      stopLiveWriteRain();
+      liveWriteRain.detener();
       return;
     }
 
@@ -270,8 +279,8 @@
       liveWrite.classList.add('show', 'fp-' + estado.effect);
       liveWriteEffect = estado.effect;
       liveWriteActive = true;
-      if (PARTICLE_RAIN_EFFECTS.includes(estado.effect)) startLiveWriteRain(estado.effect);
-      else stopLiveWriteRain();
+      if (PARTICLE_RAIN_EFFECTS.includes(estado.effect)) liveWriteRain.iniciar(estado.effect);
+      else liveWriteRain.detener();
     }
     fitLiveWriteText();
   }

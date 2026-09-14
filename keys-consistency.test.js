@@ -92,6 +92,14 @@ test('pantalla.html: la lluvia de partículas dura al menos 4s (más que la ráf
   assert.ok(Number(match[1]) >= 4000, `PARTICLE_RAIN_DURATION_MS es ${match[1]}ms, debería ser >= 4000ms`);
 });
 
+test('pantalla.html: la lluvia se repite en bucle sin tope de tiempo (sólo se corta al apagar el texto o cambiar de efecto)', () => {
+  const source = readFile('pantalla.html');
+  assert.ok(!/PARTICLE_RAIN_LOOP_MAX_MS/.test(source), 'no debería haber ningún tope de tiempo para el bucle de partículas');
+  const match = source.match(/function crearCarrilDeLluvia\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(match, 'no se encontró "function crearCarrilDeLluvia() {...}" en pantalla.html');
+  assert.ok(/setInterval\(\(\) => particleRain\(kind\), PARTICLE_RAIN_DURATION_MS\)/.test(match[0]), 'el carril debería encadenar particleRain sin condición de corte');
+});
+
 // Saca, en orden, las keys de un objeto plano de una sola línea por entrada
 // tipo PARTICLE_RAIN_ICONS = { confetti: '🎉', stars: '⭐', hearts: '💖' };
 function extractInlineObjectKeys(source, varName) {
