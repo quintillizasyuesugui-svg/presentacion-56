@@ -521,6 +521,7 @@ body.pantalla {
 }
 
 .fp-mini-stage {
+  position: relative;
   height: 40px;
   background: #000;
   border-radius: 8px;
@@ -539,8 +540,28 @@ body.pantalla {
 
 .fp-mini-label { font-size: 0.8rem; }
 
+/* Mini lluvia de partículas dentro de la vista previa de "confetti"/"stars"/
+   "hearts" — no es el canvas real (ver particleRain en pantalla.html), sólo
+   un puñado de emoji cayendo en loop para que se note de qué se trata cada
+   efecto antes de elegirlo (si no, sólo se veía el texto "Hola" rebotando). */
+.fp-mini-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.fp-mini-rain span {
+  position: absolute;
+  top: -1.4em;
+  font-size: 0.85rem;
+  animation: fpMiniRainFall 1.6s linear infinite;
+}
+@keyframes fpMiniRainFall {
+  to { transform: translateY(60px) rotate(20deg); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fp-anim-target, .fp-letter { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .fp-mini-rain span { animation: none !important; opacity: 0 !important; }
 }
 
 /* ---- Editor de frase final (Modo avanzado) ---- */

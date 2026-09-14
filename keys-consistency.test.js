@@ -84,3 +84,26 @@ test('pantalla.html: PARTICLE_RAIN_EFFECTS son justo las 3 lluvias de partícula
   const keys = [...match[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
   assert.deepEqual(keys.sort(), ['confetti', 'hearts', 'stars'].sort());
 });
+
+test('pantalla.html: la lluvia de partículas dura al menos 4s (más que la ráfaga original de 3s)', () => {
+  const source = readFile('pantalla.html');
+  const match = source.match(/const PARTICLE_RAIN_DURATION_MS = (\d+)/);
+  assert.ok(match, 'no se encontró "const PARTICLE_RAIN_DURATION_MS = ..." en pantalla.html');
+  assert.ok(Number(match[1]) >= 4000, `PARTICLE_RAIN_DURATION_MS es ${match[1]}ms, debería ser >= 4000ms`);
+});
+
+// Saca, en orden, las keys de un objeto plano de una sola línea por entrada
+// tipo PARTICLE_RAIN_ICONS = { confetti: '🎉', stars: '⭐', hearts: '💖' };
+function extractInlineObjectKeys(source, varName) {
+  const match = source.match(new RegExp(`const ${varName} = \\{([^}]*)\\}`));
+  assert.ok(match, `no se encontró "const ${varName} = {...}"`);
+  return [...match[1].matchAll(/([\w-]+):/g)].map(m => m[1]);
+}
+
+test('avanzado.html y control.html: PARTICLE_RAIN_ICONS tiene un ícono para cada lluvia de partículas', () => {
+  const esperado = ['confetti', 'stars', 'hearts'].sort();
+  for (const file of ['avanzado.html', 'control.html']) {
+    const keys = extractInlineObjectKeys(readFile(file), 'PARTICLE_RAIN_ICONS').sort();
+    assert.deepEqual(keys, esperado, `${file}: PARTICLE_RAIN_ICONS no tiene exactamente confetti/stars/hearts`);
+  }
+});

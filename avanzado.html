@@ -942,6 +942,18 @@
     effectMiniTimer = setInterval(playEffectMinis, 2200);
   }
 
+  // Mismos 3 keys que PARTICLE_RAIN_EFFECTS de pantalla.html — el emoji de
+  // cada uno es el mismo que ya se usa en su label del menú de efectos.
+  const PARTICLE_RAIN_ICONS = { confetti: '🎉', stars: '⭐', hearts: '💖' };
+  function buildMiniRainHtml(key) {
+    const icon = PARTICLE_RAIN_ICONS[key];
+    if (!icon) return '';
+    const posiciones = [8, 28, 50, 72, 90];
+    return '<span class="fp-mini-rain">' + posiciones.map((left, i) =>
+      '<span style="left:' + left + '%; animation-delay:' + (i * 0.3) + 's;">' + icon + '</span>'
+    ).join('') + '</span>';
+  }
+
   function buildFpGrid(container, items, selectedKey, onPick) {
     container.innerHTML = '';
     items.forEach((item) => {
@@ -958,8 +970,12 @@
         btn.style.fontFamily = item.family;
       } else {
         // Efecto: mini pantalla que juega la animación en loop + el nombre debajo.
+        // "confetti"/"stars"/"hearts" son una lluvia de partículas de verdad
+        // (ver particleRain en pantalla.html), no una animación de texto — acá
+        // se les agrega un puñado de emoji cayendo para que se note.
         btn.classList.add('fp-option-btn', 'fp-effect-btn');
-        btn.innerHTML = '<span class="fp-mini-stage"><span class="fp-anim-target"></span></span>' +
+        btn.innerHTML = '<span class="fp-mini-stage">' + buildMiniRainHtml(item.key) +
+          '<span class="fp-anim-target"></span></span>' +
           '<span class="fp-mini-label">' + item.label + '</span>';
       }
 

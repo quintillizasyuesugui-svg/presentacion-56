@@ -204,13 +204,14 @@
   // Estos 3 efectos son ráfagas de partículas (ver particleRain) en vez de una
   // animación de texto — se repiten en cadena mientras "Escribir en vivo" siga
   // prendido con ese efecto, para que se vea una lluvia constante y no un solo
-  // golpe de 3s que se corta mientras la persona sigue escribiendo.
+  // golpe que se corta mientras la persona sigue escribiendo.
   const PARTICLE_RAIN_EFFECTS = ['confetti', 'stars', 'hearts'];
+  const PARTICLE_RAIN_DURATION_MS = 5000; // cuánto dura cada golpe de partículas (particleRain se autolimpia sola a este tiempo)
 
   function startLiveWriteRain(kind) {
     stopLiveWriteRain();
     particleRain(kind);
-    liveWriteRainTimer = setInterval(() => particleRain(kind), 3000);
+    liveWriteRainTimer = setInterval(() => particleRain(kind), PARTICLE_RAIN_DURATION_MS);
   }
 
   function stopLiveWriteRain() {
@@ -738,10 +739,11 @@
     ctx.fill();
   }
 
-  // Lluvia de partículas que cae sobre toda la pantalla durante 3s — la usan
-  // los efectos "confetti" (cuadraditos), "stars" (⭐) y "hearts" (💖) de
-  // "Frase final", y también el cierre automático de cada show (última
-  // diapositiva). "kind" elige la forma y la paleta de color de cada pieza.
+  // Lluvia de partículas que cae sobre toda la pantalla durante
+  // PARTICLE_RAIN_DURATION_MS — la usan los efectos "confetti" (cuadraditos),
+  // "stars" (⭐) y "hearts" (💖) de "Frase final", y también el cierre
+  // automático de cada show (última diapositiva). "kind" elige la forma y la
+  // paleta de color de cada pieza.
   function particleRain(kind) {
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
@@ -797,7 +799,7 @@
     setTimeout(() => {
       cancelAnimationFrame(animationId);
       document.body.removeChild(canvas);
-    }, 3000);
+    }, PARTICLE_RAIN_DURATION_MS);
   }
 
   function confetti() {
