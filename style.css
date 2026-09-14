@@ -386,7 +386,7 @@ body.pantalla {
   70% { transform: scale(0.92); }
   100% { opacity: 1; transform: scale(1); }
 }
-.fp-bounce .fp-anim-target, .fp-confetti .fp-anim-target { animation: fpBounce var(--fp-duration, 800ms) var(--ease-out) both; }
+.fp-bounce .fp-anim-target, .fp-confetti .fp-anim-target, .fp-stars .fp-anim-target, .fp-hearts .fp-anim-target { animation: fpBounce var(--fp-duration, 800ms) var(--ease-out) both; }
 
 @keyframes fpTypewriterLetter { from { opacity: 0; } to { opacity: 1; } }
 .fp-typewriter .fp-letter { opacity: 0; animation: fpTypewriterLetter 10ms linear forwards; }

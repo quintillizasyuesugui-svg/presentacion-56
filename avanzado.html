@@ -8,11 +8,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <title>Modo avanzado</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Los 18 tipos de letra de "Frase final" — se cargan acá y en pantalla.html,
+  <!-- Los 27 tipos de letra de "Frase final" — se cargan acá y en pantalla.html,
        que es donde realmente se ven en las dos vistas previas. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&family=Cinzel+Decorative:wght@700&family=Bungee+Shade&family=Monoton&family=Luckiest+Guy&family=Shrikhand&family=Chewy&family=Titan+One&family=Faster+One&family=Bungee+Inline&display=swap" rel="stylesheet">
 </head>
 <body class="control">
 <div class="app">
@@ -744,10 +744,21 @@
     { key: 'rounded', label: 'Redondeada', family: "'Fredoka', sans-serif" },
     { key: 'elegant-script', label: 'Fina elegante', family: "'Satisfy', cursive" },
     { key: 'strong', label: 'Fuerte', family: "'Righteous', sans-serif" },
-    { key: 'notebook', label: 'Cuaderno', family: "'Kalam', cursive" }
+    { key: 'notebook', label: 'Cuaderno', family: "'Kalam', cursive" },
+    { key: 'royal', label: 'Imperial', family: "'Cinzel Decorative', serif" },
+    { key: 'shadow-3d', label: 'Sombra 3D', family: "'Bungee Shade', sans-serif" },
+    { key: 'neon-tube', label: 'Tubo neón', family: "'Monoton', sans-serif" },
+    { key: 'graffiti', label: 'Grafiti', family: "'Luckiest Guy', cursive" },
+    { key: 'curvy-bold', label: 'Curva fuerte', family: "'Shrikhand', cursive" },
+    { key: 'bubble', label: 'Burbuja', family: "'Chewy', cursive" },
+    { key: 'comic-3d', label: 'Cómic 3D', family: "'Titan One', sans-serif" },
+    { key: 'urban', label: 'Urbana', family: "'Faster One', sans-serif" },
+    { key: 'outline', label: 'Contorno', family: "'Bungee Inline', sans-serif" }
   ];
-  // Los primeros 10 entran una vez y quedan quietos; los últimos 8 (a partir
-  // de "Latido") se mueven todo el tiempo que la frase está en pantalla.
+  // Los primeros 10 entran una vez y quedan quietos; del 11° al 18° (a partir
+  // de "Latido") se mueven todo el tiempo que la frase está en pantalla; los
+  // últimos 2 ("Lluvia de estrellas"/"Corazones de colores") vuelven a ser de
+  // una sola vez, con una lluvia de partículas encima igual que "Confeti".
   const FRASE_EFFECTS = [
     { key: 'fade', label: '✨ Fundido' },
     { key: 'slide-up', label: '⬆️ Deslizar arriba' },
@@ -773,7 +784,9 @@
     { key: 'heartbeat', label: '❤️ Corazón' },
     { key: 'rock', label: '🕰️ Tambaleo' },
     { key: 'stretch', label: '🫧 Elástico' },
-    { key: 'neon', label: '💡 Neón' }
+    { key: 'neon', label: '💡 Neón' },
+    { key: 'stars', label: '⭐ Lluvia de estrellas' },
+    { key: 'hearts', label: '💖 Corazones de colores' }
   ];
 
   // 6 combinaciones de 2 colores para elegir directo, más la opción de armar
