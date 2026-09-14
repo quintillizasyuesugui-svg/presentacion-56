@@ -85,11 +85,11 @@ test('pantalla.html: PARTICLE_RAIN_EFFECTS son justo las 3 lluvias de partícula
   assert.deepEqual(keys.sort(), ['confetti', 'hearts', 'stars'].sort());
 });
 
-test('pantalla.html: la lluvia de partículas dura al menos 4s (más que la ráfaga original de 3s)', () => {
+test('pantalla.html: cada golpe de lluvia de partículas dura 3 minutos', () => {
   const source = readFile('pantalla.html');
   const match = source.match(/const PARTICLE_RAIN_DURATION_MS = (\d+)/);
   assert.ok(match, 'no se encontró "const PARTICLE_RAIN_DURATION_MS = ..." en pantalla.html');
-  assert.ok(Number(match[1]) >= 4000, `PARTICLE_RAIN_DURATION_MS es ${match[1]}ms, debería ser >= 4000ms`);
+  assert.equal(Number(match[1]), 180000, 'PARTICLE_RAIN_DURATION_MS debería ser 180000ms (3 minutos)');
 });
 
 test('pantalla.html: la lluvia se repite en bucle sin tope de tiempo (sólo se corta al apagar el texto o cambiar de efecto)', () => {
