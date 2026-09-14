@@ -643,6 +643,14 @@
     if (liveWriteActive && (accion === 'mostrar' || accion === 'siguiente' || accion === 'anterior')) {
       return;
     }
+    // Antes de apretar "Mostrar" (o el salto directo por número de voz), el
+    // show todavía no arrancó — no hay nada que recorrer. Sin este chequeo,
+    // "Atrás" restaba 1 al índice sin arrancado, se iba a negativo y
+    // "envolvía" a la última diapositiva, disparando el confetti de cierre
+    // aunque las fotos siguieran tapadas por la pantalla de espera.
+    if (!started && (accion === 'siguiente' || accion === 'anterior')) {
+      return;
+    }
 
     if (accion === 'mostrar') {
       if (showingFinal) hideFinalPhrase();

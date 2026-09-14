@@ -124,6 +124,19 @@ function extractInlineObjectKeys(source, varName) {
   return [...match[1].matchAll(/([\w-]+):/g)].map(m => m[1]);
 }
 
+test('pantalla.html: "Atrás"/"Siguiente" no hacen nada si el show todavía no arrancó con "Mostrar"', () => {
+  // Regresión: sin este chequeo, "Atrás" antes de "Mostrar" restaba 1 al
+  // índice sin arrancar, se iba a negativo y "envolvía" a la última
+  // diapositiva, disparando el confetti de cierre aunque las fotos siguieran
+  // tapadas por la pantalla de espera.
+  const source = readFile('pantalla.html');
+  assert.match(
+    source,
+    /if \(!started && \(accion === 'siguiente' \|\| accion === 'anterior'\)\) \{\s*\n\s*return;\s*\n\s*\}/,
+    'aplicarCambio debería ignorar "siguiente"/"anterior" mientras "started" sea false'
+  );
+});
+
 test('avanzado.html y control.html: PARTICLE_RAIN_ICONS tiene un ícono para cada lluvia de partículas', () => {
   const esperado = ['confetti', 'stars', 'hearts'].sort();
   for (const file of ['avanzado.html', 'control.html']) {
