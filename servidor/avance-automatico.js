@@ -2,22 +2,24 @@
 // Opcional: si está prendido, pantalla.html pasa sola a la siguiente diapositiva
 // cada tantos segundos, sin que nadie tenga que tocar "Siguiente" — sólo afecta
 // a la pantalla de esa persona (es 100% local ahí, no manda nada por socket).
-const { crearAlmacenJson } = require('./almacen');
+const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona } = require('./personas');
 
 const AVANCE_POR_DEFECTO = { enabled: false, seconds: 120 };
 
-const almacenAvance = crearAlmacenJson({
+const almacenAvance = crearAlmacen({
   archivo: 'avance-automatico.json',
   archivoViejo: 'avance-automatico.json',
   idNube: 'presentacion/avance-automatico',
-  que: 'avance automático',
-  elQue: 'el avance automático'
+  elQue: 'el avance automático',
+  tabla: {
+    nombre: 'avance_automatico',
+    clave: 'dueno',
+    columnas: { dueno: 'TEXT PRIMARY KEY', activo: 'BOOLEAN NOT NULL', segundos: 'INTEGER NOT NULL' },
+    aFila: r => ({ dueno: r.owner, activo: Boolean(r.enabled), segundos: r.seconds }),
+    deFila: f => ({ owner: f.dueno, enabled: f.activo, seconds: f.segundos })
+  }
 });
-
-async function leerAvances() {
-  return (await almacenAvance.leer()) || [];
-}
 
 // Entre 3 segundos y 1 hora — evita un valor absurdo (0s en loop infinito, o
 // tan largo que en la práctica nunca avanza).
@@ -32,16 +34,16 @@ function interpretarAvance(cuerpo) {
 // Para cuando el admin borra una o varias cuentas.
 async function borrarAvanceDe(nombres) {
   const quitar = new Set(nombres);
-  const lista = await leerAvances();
-  const quedan = lista.filter(r => !quitar.has(r.owner));
-  if (quedan.length !== lista.length) await almacenAvance.escribir(quedan);
+  await almacenAvance.modificar((lista) => {
+    const quedan = lista.filter(r => !quitar.has(r.owner));
+    return quedan.length === lista.length ? SIN_CAMBIOS : quedan;
+  });
 }
 
 function registrarRutasAvanceAutomatico(app) {
-  app.get('/api/avance-automatico', requierePersona, async (req, res) => {
+  app.get('/api/avance-automatico', requierePersona, (req, res) => {
     try {
-      const lista = await leerAvances();
-      const propio = lista.find(r => r.owner === req.person.name);
+      const propio = almacenAvance.actual().find(r => r.owner === req.person.name);
       res.json(propio ? { enabled: propio.enabled, seconds: propio.seconds } : AVANCE_POR_DEFECTO);
     } catch (err) {
       console.error(err);
@@ -54,11 +56,11 @@ function registrarRutasAvanceAutomatico(app) {
       const datos = interpretarAvance(req.body);
       if (!datos) return res.status(400).json({ error: 'Duración inválida.' });
 
-      const lista = await leerAvances();
-      const posicion = lista.findIndex(r => r.owner === req.person.name);
-      const registro = { owner: req.person.name, ...datos };
-      if (posicion === -1) lista.push(registro); else lista[posicion] = registro;
-      await almacenAvance.escribir(lista);
+      await almacenAvance.modificar((lista) => {
+        const posicion = lista.findIndex(r => r.owner === req.person.name);
+        const registro = { owner: req.person.name, ...datos };
+        if (posicion === -1) lista.push(registro); else lista[posicion] = registro;
+      });
       res.json(datos);
     } catch (err) {
       console.error(err);

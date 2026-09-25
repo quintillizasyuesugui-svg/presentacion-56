@@ -7,7 +7,8 @@ const { registrarRutasPersonas } = require('./personas');
 const { registrarRutasFraseFinal } = require('./frase-final');
 const { registrarRutasAvanceAutomatico } = require('./avance-automatico');
 const { registrarRutasDiapositivas } = require('./diapositivas');
-const { registrarRutasDocumentos } = require('./documentos');
+const { registrarRutasDocumentos, retomarTrabajos, vaciarTrabajos } = require('./documentos');
+const { iniciarAlmacenes, vaciarRespaldos } = require('./almacen');
 const { registrarRutasAdministracion } = require('./administracion');
 const { registrarSockets } = require('./sockets');
 
@@ -37,4 +38,31 @@ registrarRutasDocumentos(app, io);
 registrarRutasAdministracion(app);
 registrarSockets(io);
 
-servidor.listen(PUERTO, '0.0.0.0', () => console.log(`🚀 Cinema en http://0.0.0.0:${PUERTO}`));
+// Primero se cargan los datos (base de datos o archivos) y se retoman los documentos que
+// quedaron a mitad; recién ahí se atienden pedidos. Si no se pueden cargar, el servidor no
+// arranca (Render lo reintenta) en vez de arrancar vacío y pisar los datos buenos.
+async function arrancar() {
+  await iniciarAlmacenes();
+  await retomarTrabajos();
+  servidor.listen(PUERTO, '0.0.0.0', () => console.log(`🚀 Cinema en http://0.0.0.0:${PUERTO}`));
+}
+
+// Render avisa con SIGTERM antes de apagar (redeploy o reinicio): se sube el respaldo pendiente
+// y se termina de guardar el estado de los documentos.
+let apagando = false;
+async function apagar() {
+  if (apagando) return;
+  apagando = true;
+  try {
+    await Promise.all([vaciarRespaldos(), vaciarTrabajos()]);
+  } finally {
+    process.exit(0);
+  }
+}
+process.on('SIGTERM', apagar);
+process.on('SIGINT', apagar);
+
+arrancar().catch((err) => {
+  console.error('❌ No se pudo arrancar:', err.message);
+  process.exit(1);
+});

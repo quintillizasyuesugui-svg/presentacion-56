@@ -27,7 +27,9 @@ Subí un **PDF, Word, Excel o PowerPoint** y cada página se convierte en una di
 - Los PDF funcionan en cualquier servidor. **Word, Excel y PowerPoint necesitan LibreOffice**:
   en Render hay que usar el servicio con **Docker** (el `Dockerfile` ya lo instala, con fuentes
   compatibles con las de Office). Sin LibreOffice, la app avisa «Guardalo como PDF y subilo».
-- Si Render reinicia el servidor mientras procesa, ese trabajo se pierde (hay que subirlo de nuevo).
+- Si Render reinicia el servidor mientras procesa, **el trabajo no se pierde**: al volver a arrancar
+  sigue desde la página donde iba (las ya subidas no se repiten). Para eso, en Render hace falta la
+  base de datos (`DATABASE_URL`); sin ella el estado queda en el disco, que Render borra al reiniciar.
 
 ## 📁 Estructura
 
@@ -35,8 +37,10 @@ Subí un **PDF, Word, Excel o PowerPoint** y cada página se convierte en una di
 servidor/                 Todo lo que corre en el servidor (Node)
   index.js                Arranque: sirve publico/ y conecta cada parte
   configuracion.js        Puerto, carpetas y Cloudinary
-  almacen.js              Guardar JSON en datos/ con respaldo en Cloudinary
-  personas.js             PIN por persona (registro, entrar, permisos)
+  base-datos.js           Conexión a Postgres (si hay DATABASE_URL)
+  almacen.js              Guardar los datos (Postgres o datos/*.json) con respaldo privado en Cloudinary
+  personas.js             PIN por persona (registro, entrar, permisos; el PIN se guarda cifrado)
+  limite-intentos.js      Bloqueo por PIN equivocados
   diapositivas.js         Orden, subir, borrar, ajustar, unir y reordenar imágenes
   documentos.js           «Subir documento»: trabajos en segundo plano con progreso en vivo
   conversion-office.js    Word/Excel/PowerPoint → PDF con LibreOffice
@@ -54,7 +58,7 @@ publico/                  Lo único que ve el navegador
   diapositivas/           Imágenes opcionales que viajan con el código
 datos/                    Lo que genera la app (no va a git): orden-imagenes.json, personas.json,
                           frases-finales.json, avance-automatico.json
-pruebas/                  Pruebas automáticas (npm test)
+pruebas/                  Pruebas automáticas (npm test) y prueba de carga (npm run carga)
 Dockerfile                Imagen para Render con LibreOffice (Word/Excel/PowerPoint)
 server.js                 Sólo compatibilidad: si Render arranca con «node server.js», llama a servidor/
 ```
@@ -104,6 +108,32 @@ perderse — por eso ese servidor usa [Cloudinary](https://cloudinary.com)
 Sin estas variables, la pantalla y el control funcionan igual, pero el botón
 de subir imágenes en `/gestionar.html` no va a andar (avisa con un error claro).
 
+## 🗄️ Base de datos (recomendada)
+
+Con la variable `DATABASE_URL` la app guarda todo en **Postgres** en vez de archivos JSON. Sirve el
+plan gratis de [Neon](https://neon.tech) o [Supabase](https://supabase.com) (el Postgres gratis de
+Render se borra a los 30 días).
+
+1. En Neon: creá un proyecto (misma región que Render, por ejemplo US West / Oregon) y en
+   **Connect** copiá la dirección que empieza con `postgresql://`.
+2. En Render → tu servicio → **Environment**: agregá `DATABASE_URL` con esa dirección.
+3. Al arrancar, la app crea sus tablas y **copia sola los datos de siempre** (cuentas, orden de las
+   diapositivas, frases, avance). Los respaldos de Cloudinary no se borran.
+
+Qué cambia:
+- Cada cambio escribe sólo lo que cambió (antes se reescribía el archivo entero).
+- Los datos se leen una vez al arrancar y quedan en memoria: la pantalla responde sin tocar el disco.
+- Los cambios van de a uno: antes, si muchas personas se registraban o guardaban a la vez, se
+  pisaban (en la prueba de carga con 400 personas el archivo de cuentas quedó roto).
+- Los documentos en proceso sobreviven a un reinicio (ver «Subir documento»).
+
+Sin `DATABASE_URL` todo sigue funcionando como antes, con `datos/*.json`. Las dos formas dejan
+además un respaldo **privado** en Cloudinary (sólo se baja con la firma del servidor; antes era
+público y se podía bajar la lista de personas).
+
+Es para **un solo servidor** (como Render hoy): si algún día hubiera varios a la vez, cada uno
+tendría su propia copia en memoria.
+
 ## 🔒 PIN por persona
 
 `/gestionar.html` y `/avanzado.html` piden identificarse antes de dejar subir,
@@ -119,9 +149,16 @@ usuarios a mano:
 - Cada persona sólo ve y puede tocar **sus propias** imágenes — las de los
   demás ni aparecen en su lista. La pantalla proyectada (`pantalla.html`)
   sigue mostrando el show combinado de todos, sin cambios ahí.
-- Los PIN se guardan en `datos/personas.json`, respaldado en Cloudinary igual que
-  `datos/orden-imagenes.json` — sobrevive a los redeploys de Render sin base de datos.
-  (Los respaldos en Cloudinary conservan sus nombres de siempre, así no se pierde nada.)
+- **El PIN no se guarda escrito**: sólo su huella (HMAC-SHA256). Para que ni con los datos se pueda
+  averiguar, agregá en Render → Environment la variable **`PIN_SECRETO`** (botón «Generate»).
+  **No la cambies nunca después**: las huellas dejarían de coincidir y nadie podría entrar. Las
+  cuentas de antes se pasan solas a huella; todos siguen entrando con su mismo PIN.
+- **Límite de intentos** (lo lleva el servidor, no se saltea borrando el navegador): después de
+  5 PIN equivocados distintos desde la misma conexión, espera 1 minuto; si sigue fallando, 2, 4, 8
+  y como mucho 15 minutos. Tras una hora sin errores vuelve a empezar. El mismo PIN viejo guardado
+  en un celular cuenta una sola vez, así un aula entera con la misma conexión no queda afuera.
+- Como el PIN ya no se puede leer, el admin tampoco puede ver el PIN de nadie: si alguien lo
+  olvida, se borra su cuenta y se registra de nuevo.
 - Opcional: `ADMIN_PIN` en las variables de entorno da un PIN que ve y
   controla las imágenes de todos (para vos, como organizador).
 - **Borrar cuentas (sólo admin):** en Modo avanzado, con el PIN de admin aparece
@@ -142,6 +179,9 @@ npm start
 - http://localhost:3000/control.html
 - http://localhost:3000/gestionar.html
 - `npm test` corre las pruebas de `pruebas/`
+- `npm run carga -- http://localhost:3000 400 20` simula 400 personas y 20 documentos a la vez
+  (crea cuentas de prueba: no usarlo contra Render sin borrarlas después)
+- Para probar con Postgres sin instalar nada: `DATABASE_URL=pglite:./datos/pg` (sólo en la PC)
 
 ## 📱 Features
 - Socket.IO real-time

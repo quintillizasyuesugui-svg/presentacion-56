@@ -1,39 +1,41 @@
 // ---- Frase final (por persona) ----
 // Cada persona configura su propio mensaje de cierre — aparece en pantalla.html
 // cuando SU show (sus propias diapositivas) llega al final. Se guarda igual que el
-// resto: datos/frases-finales.json con respaldo crudo en Cloudinary.
-const { crearAlmacenJson } = require('./almacen');
+// resto (ver almacen.js): tabla frases_finales o datos/frases-finales.json.
+const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona } = require('./personas');
 // Listas de letras/efectos y validación viven en validadores-frase.js — separado
 // para poder probarlas sin levantar el servidor (ver pruebas/validadores-frase.test.js).
 const { FRASE_DEFAULT, parseFraseBody } = require('./validadores-frase');
 
-const almacenFrases = crearAlmacenJson({
+const almacenFrases = crearAlmacen({
   archivo: 'frases-finales.json',
   archivoViejo: 'frases-finales.json',
   idNube: 'presentacion/frases-finales',
-  que: 'frases finales',
-  elQue: 'las frases finales'
+  elQue: 'las frases finales',
+  tabla: {
+    nombre: 'frases_finales',
+    clave: 'dueno',
+    columnas: { dueno: 'TEXT PRIMARY KEY', datos: 'JSONB NOT NULL' },
+    aFila: ({ owner, ...datos }) => ({ dueno: owner, datos }),
+    deFila: f => ({ owner: f.dueno, ...f.datos })
+  }
 });
-
-async function leerFrases() {
-  return (await almacenFrases.leer()) || [];
-}
 
 // Para cuando el admin borra una o varias cuentas.
 async function borrarFraseDe(nombres) {
   const quitar = new Set(nombres);
-  const frases = await leerFrases();
-  const quedan = frases.filter(f => !quitar.has(f.owner));
-  if (quedan.length !== frases.length) await almacenFrases.escribir(quedan);
+  await almacenFrases.modificar((frases) => {
+    const quedan = frases.filter(f => !quitar.has(f.owner));
+    return quedan.length === frases.length ? SIN_CAMBIOS : quedan;
+  });
 }
 
 function registrarRutasFraseFinal(app, io) {
   // GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
-  app.get('/api/frase-final', requierePersona, async (req, res) => {
+  app.get('/api/frase-final', requierePersona, (req, res) => {
     try {
-      const frases = await leerFrases();
-      const propia = frases.find(f => f.owner === req.person.name);
+      const propia = almacenFrases.actual().find(f => f.owner === req.person.name);
       res.json(propia ? {
         text: propia.text,
         font: propia.font,
@@ -56,11 +58,11 @@ function registrarRutasFraseFinal(app, io) {
       const datos = parseFraseBody(req.body);
       if (!datos) return res.status(400).json({ error: 'Revisá el texto, la letra, el color o el efecto.' });
 
-      const frases = await leerFrases();
-      const posicion = frases.findIndex(f => f.owner === req.person.name);
-      const registro = { owner: req.person.name, ...datos };
-      if (posicion === -1) frases.push(registro); else frases[posicion] = registro;
-      await almacenFrases.escribir(frases);
+      await almacenFrases.modificar((frases) => {
+        const posicion = frases.findIndex(f => f.owner === req.person.name);
+        const registro = { owner: req.person.name, ...datos };
+        if (posicion === -1) frases.push(registro); else frases[posicion] = registro;
+      });
       res.json(datos);
     } catch (err) {
       console.error(err);

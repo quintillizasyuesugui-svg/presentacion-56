@@ -14,7 +14,8 @@ const CARPETA_PUBLICA = path.join(RAIZ, 'publico');
 // Imágenes que viajan con el código (opcionales); se sirven en la raíz de la web, como antes.
 const CARPETA_DIAPOSITIVAS = path.join(CARPETA_PUBLICA, 'diapositivas');
 // Datos que genera la app (orden de imágenes, personas, frases, avance automático).
-const CARPETA_DATOS = path.join(RAIZ, 'datos');
+// CARPETA_DATOS en el entorno la cambia (lo usan las pruebas, para no tocar los datos reales).
+const CARPETA_DATOS = process.env.CARPETA_DATOS || path.join(RAIZ, 'datos');
 
 const EXTENSIONES_IMAGEN = ['.jpg', '.jpeg', '.png', '.webp'];
 const ADMIN_PIN = process.env.ADMIN_PIN || null;

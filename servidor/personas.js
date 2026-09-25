@@ -1,33 +1,68 @@
 // ---- Personas y PIN (para /gestionar.html y /avanzado.html) ----
 // El sistema se encarga solo: cada persona se registra una vez con su nombre,
-// el servidor le da un PIN de 4 dígitos único (nadie lo elige a mano), y desde
-// ahí ese PIN identifica sus imágenes. Se guarda en datos/personas.json con
-// respaldo en Cloudinary como JSON crudo para que sobreviva a los reinicios de
-// Render aunque no haya una base de datos real.
+// el servidor le da un PIN único de 4 dígitos (nadie lo elige a mano), y desde
+// ahí ese PIN identifica sus imágenes.
+// El PIN no se guarda escrito: sólo su huella (HMAC-SHA256 con PIN_SECRETO), así
+// quien llegara a ver los datos guardados no ve el PIN de nadie.
 // ADMIN_PIN (opcional, variable de entorno) ve y controla las imágenes de todos.
+const crypto = require('crypto');
 const { ADMIN_PIN } = require('./configuracion');
-const { crearAlmacenJson } = require('./almacen');
+const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
+const { ipDe, esperaDe, anotarFallo, mensajeDeEspera } = require('./limite-intentos');
 
-const almacenPersonas = crearAlmacenJson({
+const NOMBRE_ADMIN = 'admin';
+const DIGITOS_PIN = 4;
+// Con PIN_SECRETO (en Render: Environment), ni teniendo los datos se puede averiguar un PIN.
+// Nunca cambiarlo después: las huellas guardadas dejarían de coincidir y nadie podría entrar.
+const SECRETO = process.env.PIN_SECRETO || null;
+const CLAVE_SIN_SECRETO = 'conexiones-pin';
+if (!SECRETO) console.warn('⚠️  PIN_SECRETO no está definido: los PIN se guardan con una clave fija. Ver README, «PIN por persona».');
+
+function huella(pin, conSecreto) {
+  return crypto.createHmac('sha256', conSecreto ? SECRETO : CLAVE_SIN_SECRETO).update(String(pin)).digest('hex');
+}
+
+// Las cuentas de antes tenían el PIN escrito ({ pin, name }): al cargar se pasa a su huella.
+function cifrarPinesViejos(personas) {
+  return personas.map(p => (p.pin === undefined ? p : { name: p.name, pinHash: huella(p.pin, Boolean(SECRETO)), conSecreto: Boolean(SECRETO) }));
+}
+
+const almacenPersonas = crearAlmacen({
   archivo: 'personas.json',
   archivoViejo: 'people.json',
   idNube: 'presentacion/people',
-  que: 'personas',
-  elQue: 'las personas'
+  elQue: 'las personas',
+  tabla: {
+    nombre: 'personas',
+    clave: 'nombre',
+    columnas: { nombre: 'TEXT PRIMARY KEY', pin_hash: 'TEXT NOT NULL UNIQUE', con_secreto: 'BOOLEAN NOT NULL DEFAULT false' },
+    aFila: p => ({ nombre: p.name, pin_hash: p.pinHash, con_secreto: Boolean(p.conSecreto) }),
+    deFila: f => ({ name: f.nombre, pinHash: f.pin_hash, conSecreto: f.con_secreto })
+  },
+  normalizar: cifrarPinesViejos
 });
 
-async function leerPersonas() {
-  return (await almacenPersonas.leer()) || [];
+// Índice huella → persona, rehecho sólo cuando cambia la lista.
+let indice = { personas: null, porHuella: new Map() };
+function buscarPorHuella(h) {
+  const personas = almacenPersonas.actual();
+  if (indice.personas !== personas) indice = { personas, porHuella: new Map(personas.map(p => [p.pinHash, p])) };
+  return indice.porHuella.get(h);
 }
 
-// PIN de 4 dígitos (1000-9999) que no choque con uno ya asignado.
-function generarPin(personas) {
-  const usados = new Set(personas.map(p => p.pin));
-  let pin;
-  do {
-    pin = String(Math.floor(1000 + Math.random() * 9000));
-  } while (usados.has(pin));
-  return pin;
+function pinEnUso(pin) {
+  return (ADMIN_PIN && pin === ADMIN_PIN) || Boolean(SECRETO && buscarPorHuella(huella(pin, true))) || Boolean(buscarPorHuella(huella(pin, false)));
+}
+
+// PIN al azar (criptográfico) de 4 dígitos que no choque con otro ni con el ADMIN_PIN
+// (antes podía tocar el mismo que el admin, y esa persona entraba como admin).
+// Hay 9.000 PIN posibles: si casi todos están usados, se corta en vez de probar para siempre.
+function generarPin() {
+  for (let intento = 0; intento < 50000; intento++) {
+    const pin = String(crypto.randomInt(10 ** (DIGITOS_PIN - 1), 10 ** DIGITOS_PIN));
+    if (!pinEnUso(pin)) return pin;
+  }
+  throw new Error('No quedan PIN libres.');
 }
 
 // Si el nombre ya está tomado, no le presta el PIN ajeno (sería dejar entrar a
@@ -41,21 +76,57 @@ function nombreUnico(base, personas) {
   return `${base} (${n})`;
 }
 
-const NOMBRE_ADMIN = 'admin';
+function igualSeguro(a, b) {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+// Una cuenta guardada con la clave fija (de antes de definir PIN_SECRETO) pasa a la secreta
+// la primera vez que entra, porque recién ahí se conoce su PIN.
+function pasarASecreto(nombre, pin) {
+  almacenPersonas.modificar((personas) => {
+    const p = personas.find(x => x.name === nombre && !x.conSecreto);
+    if (!p) return SIN_CAMBIOS;
+    p.pinHash = huella(pin, true);
+    p.conSecreto = true;
+  }).catch(err => console.error('No se pudo actualizar el PIN de', nombre, err.message));
+}
 
 async function identificar(pin) {
   if (!pin) return null;
-  if (ADMIN_PIN && pin === ADMIN_PIN) return { name: NOMBRE_ADMIN, isAdmin: true };
-  const persona = (await leerPersonas()).find(p => p.pin === pin);
-  return persona ? { name: persona.name, isAdmin: false } : null;
+  pin = String(pin);
+  if (ADMIN_PIN && igualSeguro(pin, ADMIN_PIN)) return { name: NOMBRE_ADMIN, isAdmin: true };
+  if (SECRETO) {
+    const p = buscarPorHuella(huella(pin, true));
+    if (p && p.conSecreto) return { name: p.name, isAdmin: false };
+  }
+  const p = buscarPorHuella(huella(pin, false));
+  if (!p || p.conSecreto) return null;
+  if (SECRETO) pasarASecreto(p.name, pin);
+  return { name: p.name, isAdmin: false };
+}
+
+// Identifica respetando el límite de intentos. Devuelve { persona } o { estado, error }.
+async function identificarDesde(ip, pin) {
+  const espera = esperaDe(ip);
+  if (espera) return { estado: 429, error: mensajeDeEspera(espera) };
+  const persona = await identificar(pin);
+  if (persona) return { persona };
+  if (pin) anotarFallo(ip, pin);
+  return { estado: 401 };
+}
+
+function ipDelPedido(req) {
+  return ipDe(req.headers, req.socket.remoteAddress);
 }
 
 // Middleware: exige el PIN en la cabecera "x-pin" y deja a la persona en req.person.
 async function requierePersona(req, res, next) {
   try {
-    const persona = await identificar(req.get('x-pin'));
-    if (!persona) return res.status(401).json({ error: 'PIN inválido o faltante.' });
-    req.person = persona;
+    const r = await identificarDesde(ipDelPedido(req), req.get('x-pin'));
+    if (!r.persona) return res.status(r.estado).json({ error: r.error || 'PIN inválido o faltante.' });
+    req.person = r.persona;
     next();
   } catch (err) {
     console.error(err);
@@ -72,18 +143,20 @@ function requiereAdmin(req, res, next) {
 }
 
 // Lista de personas registradas (sin sus PIN), para la sección de admin.
-async function nombresDePersonas() {
-  return (await leerPersonas()).map(p => p.name);
+function nombresDePersonas() {
+  return almacenPersonas.actual().map(p => p.name);
 }
 
 // Borra una o varias cuentas: su PIN deja de servir. Devuelve cuántas borró.
 async function borrarPersonas(nombres) {
   const quitar = new Set(nombres);
-  const personas = await leerPersonas();
-  const quedan = personas.filter(p => !quitar.has(p.name));
-  if (quedan.length === personas.length) return 0;
-  await almacenPersonas.escribir(quedan);
-  return personas.length - quedan.length;
+  let borradas = 0;
+  await almacenPersonas.modificar((personas) => {
+    const quedan = personas.filter(p => !quitar.has(p.name));
+    borradas = personas.length - quedan.length;
+    return borradas ? quedan : SIN_CAMBIOS;
+  });
+  return borradas;
 }
 
 // Qué ve cada uno: admin ve todo, cualquier otra persona sólo lo que subió ella.
@@ -98,12 +171,14 @@ function registrarRutasPersonas(app) {
       const crudo = String((req.body || {}).name || '').trim().slice(0, 40);
       if (!crudo) return res.status(400).json({ error: 'Escribí tu nombre.' });
 
-      const personas = await leerPersonas();
-      const name = nombreUnico(crudo, personas);
-      const pin = generarPin(personas);
-      personas.push({ pin, name });
-      await almacenPersonas.escribir(personas);
-      res.json({ name, pin, isAdmin: false });
+      let alta;
+      await almacenPersonas.modificar((personas) => {
+        const name = nombreUnico(crudo, personas);
+        const pin = generarPin();
+        personas.push({ name, pinHash: huella(pin, Boolean(SECRETO)), conSecreto: Boolean(SECRETO) });
+        alta = { name, pin, isAdmin: false };
+      });
+      res.json(alta);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'No se pudo registrar.' });
@@ -112,10 +187,15 @@ function registrarRutasPersonas(app) {
 
   // POST /api/auth/login — volver a entrar con un PIN ya asignado (ej. otro celular).
   app.post('/api/auth/login', async (req, res) => {
-    const persona = await identificar((req.body || {}).pin);
-    if (!persona) return res.status(401).json({ error: 'PIN incorrecto.' });
-    res.json(persona);
+    try {
+      const r = await identificarDesde(ipDelPedido(req), (req.body || {}).pin);
+      if (!r.persona) return res.status(r.estado).json({ error: r.error || 'PIN incorrecto.' });
+      res.json(r.persona);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error en servidor' });
+    }
   });
 }
 
-module.exports = { identificar, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersonas, NOMBRE_ADMIN };
+module.exports = { identificar, identificarDesde, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersonas, NOMBRE_ADMIN };

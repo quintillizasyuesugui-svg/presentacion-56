@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node servidor/index.js",
     "dev": "nodemon servidor/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "carga": "node pruebas/carga.js"
   },
   "keywords": [
     "presentation",
@@ -27,6 +28,11 @@
     "express": "^5.2.1",
     "multer": "^2.3.0",
     "pdfjs-dist": "^5.7.284",
+    "pg": "^8.23.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "socket.io-client": "^4.8.4"
   }
 }

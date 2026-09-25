@@ -4,10 +4,17 @@
 // agregarla al show). Cada paso se avisa por Socket.IO a la sala del dueño
 // ('owner:' + nombre) con el evento «documentoProgreso». Si el celular recarga
 // la página o se va y vuelve, pide GET /api/documentos y sigue mostrando el avance.
-// Los trabajos viven en memoria: si el servidor se reinicia, se pierden.
+//
+// Cada trabajo queda guardado (su estado y el documento) para que un reinicio del servidor
+// no lo pierda: al volver a arrancar, retomarTrabajos() los sigue desde donde iban (las
+// páginas ya subidas no se vuelven a hacer). Con base de datos se guardan en Postgres; sin
+// ella en datos/documentos/, que sirve en la PC pero en Render se borra en cada reinicio.
 const crypto = require('crypto');
+const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
+const { CARPETA_DATOS } = require('./configuracion');
+const { baseDeDatos } = require('./almacen');
 const { requierePersona } = require('./personas');
 const { convertirAPdf, EXTENSIONES_OFFICE } = require('./conversion-office');
 const { CALIDADES, abrirPdf, imagenDePagina, miniaturaDePagina, vistaDePagina } = require('./paginas-pdf');
@@ -22,6 +29,112 @@ const FASES_TERMINADAS = ['listo', 'error', 'cancelado'];
 
 const trabajos = new Map();
 let io = null;
+
+// ---- Guardado de los trabajos ----
+const CARPETA_TRABAJOS = path.join(CARPETA_DATOS, 'documentos');
+const ID_VALIDO = /^[A-Za-z0-9_-]+$/;
+
+// Lo que se guarda de cada trabajo (sin los bytes, que van aparte).
+const CAMPOS_GUARDADOS = ['id', 'owner', 'nombre', 'esOffice', 'archivoEsPdf', 'pesoOriginal', 'fase', 'paso', 'porcentaje',
+  'hechas', 'total', 'paginasTotales', 'error', 'resultado', 'creado', 'actualizado', 'paginas', 'calidad', 'recortar',
+  'subidas', 'peso', 'agregadas', 'cancelado'];
+
+const guardado = {
+  async preparar() {
+    const db = baseDeDatos();
+    if (db) {
+      await db.consulta('CREATE TABLE IF NOT EXISTS documentos (id TEXT PRIMARY KEY, dueno TEXT NOT NULL, estado JSONB NOT NULL)');
+      await db.consulta('CREATE TABLE IF NOT EXISTS documentos_archivos (id TEXT PRIMARY KEY, contenido BYTEA NOT NULL)');
+    } else {
+      await fs.mkdir(CARPETA_TRABAJOS, { recursive: true });
+    }
+  },
+  async estado(t) {
+    const estado = Object.fromEntries(CAMPOS_GUARDADOS.map(c => [c, t[c] ?? null]));
+    const db = baseDeDatos();
+    if (db) {
+      await db.consulta(`INSERT INTO documentos (id, dueno, estado) VALUES ($1, $2, $3::jsonb)
+        ON CONFLICT (id) DO UPDATE SET estado = EXCLUDED.estado`, [t.id, t.owner, JSON.stringify(estado)]);
+    } else {
+      await fs.writeFile(path.join(CARPETA_TRABAJOS, t.id + '.json'), JSON.stringify(estado));
+    }
+  },
+  async archivo(id, bytes) {
+    const db = baseDeDatos();
+    if (db) {
+      await db.consulta(`INSERT INTO documentos_archivos (id, contenido) VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE SET contenido = EXCLUDED.contenido`, [id, bytes]);
+    } else {
+      await fs.writeFile(path.join(CARPETA_TRABAJOS, id + '.bin'), bytes);
+    }
+  },
+  async leerArchivo(id) {
+    const db = baseDeDatos();
+    if (db) {
+      const [fila] = await db.consulta('SELECT contenido FROM documentos_archivos WHERE id = $1', [id]);
+      return fila ? Buffer.from(fila.contenido) : null;
+    }
+    return fs.readFile(path.join(CARPETA_TRABAJOS, id + '.bin')).catch(() => null);
+  },
+  async borrarArchivo(id) {
+    const db = baseDeDatos();
+    if (db) await db.consulta('DELETE FROM documentos_archivos WHERE id = $1', [id]);
+    else await fs.unlink(path.join(CARPETA_TRABAJOS, id + '.bin')).catch(() => {});
+  },
+  async borrar(id) {
+    await guardado.borrarArchivo(id);
+    const db = baseDeDatos();
+    if (db) await db.consulta('DELETE FROM documentos WHERE id = $1', [id]);
+    else await fs.unlink(path.join(CARPETA_TRABAJOS, id + '.json')).catch(() => {});
+  },
+  async todos() {
+    const db = baseDeDatos();
+    if (db) {
+      return (await db.consulta('SELECT estado FROM documentos')).map(f => (typeof f.estado === 'string' ? JSON.parse(f.estado) : f.estado));
+    }
+    const estados = [];
+    for (const archivo of await fs.readdir(CARPETA_TRABAJOS)) {
+      if (!archivo.endsWith('.json')) continue;
+      try { estados.push(JSON.parse(await fs.readFile(path.join(CARPETA_TRABAJOS, archivo), 'utf8'))); } catch { /* dañado */ }
+    }
+    return estados.filter(e => e && typeof e.id === 'string' && ID_VALIDO.test(e.id));
+  }
+};
+
+// Guarda el estado sin frenar el trabajo; si hay varios cambios seguidos, se guarda el último.
+function persistir(t) {
+  if (t.borrado) return Promise.resolve();
+  t.sucio = true;
+  if (!t.guardando) {
+    t.guardando = (async () => {
+      while (t.sucio && !t.borrado) {
+        t.sucio = false;
+        await guardado.estado(t).catch(err => console.error('No se pudo guardar el estado del documento', t.nombre, err.message));
+      }
+      t.guardando = null;
+    })();
+  }
+  return t.guardando;
+}
+
+// Si guardar el documento falla (por ejemplo, la base de datos está llena), el trabajo sigue
+// igual; sólo que no se podría retomar tras un reinicio.
+async function guardarArchivo(t, bytes, esPdf) {
+  try {
+    await guardado.archivo(t.id, bytes);
+    t.archivoEsPdf = esPdf;
+    await persistir(t);
+  } catch (err) {
+    console.error('No se pudo guardar el documento', t.nombre, err.message);
+  }
+}
+
+function quitarTrabajo(t) {
+  trabajos.delete(t.id);
+  t.borrado = true;
+  Promise.resolve(t.guardando).then(() => guardado.borrar(t.id))
+    .catch(err => console.error('No se pudo borrar el documento guardado', t.nombre, err.message));
+}
 
 // De a un trabajo pesado a la vez (convertir, dibujar): en Render gratis la memoria es poca.
 let fila = Promise.resolve();
@@ -55,12 +168,21 @@ function resumen(t) {
 function avanzar(t, cambios) {
   Object.assign(t, cambios, { actualizado: Date.now() });
   if (io) io.to('owner:' + t.owner).to('admins').emit('documentoProgreso', resumen(t));
+  persistir(t);
 }
 
+// Ya no hace falta el documento (terminó, falló o se canceló): se suelta de la memoria y del guardado.
 function liberar(t) {
   t.archivo = null;
   t.pdfBytes = null;
   t.miniaturas = null;
+  guardado.borrarArchivo(t.id).catch(() => {});
+}
+
+function errorConEstado(mensaje) {
+  const error = new Error(mensaje);
+  error.estado = 500;
+  return error;
 }
 
 function fallo(t, err, subidas = 0) {
@@ -79,7 +201,7 @@ function cancelado(t) {
   liberar(t);
   avanzar(t, { fase: 'cancelado', porcentaje: null, paso: 'Cancelado.' });
   // Cuenta borrada por el admin: el trabajo desaparece del todo, como si nunca hubiera existido.
-  if (t.borrarAlTerminar) trabajos.delete(t.id);
+  if (t.borrarAlTerminar) quitarTrabajo(t);
 }
 
 function textoPaginas(n) {
@@ -87,18 +209,22 @@ function textoPaginas(n) {
 }
 
 // Paso 1: pasar a PDF (si hace falta) y preparar las miniaturas para elegir páginas.
+// Si se retoma tras un reinicio y el PDF ya estaba convertido, no se vuelve a convertir.
 async function preparar(t) {
   try {
     if (ocupados > 0) avanzar(t, { paso: 'Esperando turno (hay otro documento en proceso)…', porcentaje: 0 });
     await enFila(async () => {
       if (t.cancelado) return;
-      if (t.esOffice) {
-        avanzar(t, { paso: 'Convirtiendo a PDF… (puede tardar unos segundos)', porcentaje: null });
-        t.pdfBytes = await convertirAPdf(t.archivo, t.nombre);
-      } else {
-        t.pdfBytes = t.archivo;
+      if (!t.pdfBytes) {
+        if (t.esOffice) {
+          avanzar(t, { paso: 'Convirtiendo a PDF… (puede tardar unos segundos)', porcentaje: null });
+          t.pdfBytes = await convertirAPdf(t.archivo, t.nombre);
+          await guardarArchivo(t, t.pdfBytes, true);
+        } else {
+          t.pdfBytes = t.archivo;
+        }
+        t.archivo = null;
       }
-      t.archivo = null;
       const pdf = await abrirPdf(t.pdfBytes);
       try {
         const total = Math.min(pdf.numPages, MAXIMO_PAGINAS);
@@ -120,25 +246,37 @@ async function preparar(t) {
   }
 }
 
+function terminar(t) {
+  liberar(t);
+  const n = t.subidas.length;
+  avanzar(t, {
+    fase: 'listo', porcentaje: 100, paso: `Listo: ${n} ${n === 1 ? 'diapositiva agregada' : 'diapositivas agregadas'}.`,
+    resultado: { subidas: n, pesoFinal: t.peso, pesoOriginal: t.pesoOriginal }
+  });
+}
+
 // Paso 2: dibujar, comprimir y subir cada página elegida; al final se agregan al show, en orden.
-async function procesar(t, paginas, calidad, recortar) {
-  const subidas = [];
-  let peso = 0;
+// Las ya subidas quedan en t.subidas (guardado): al retomar se sigue desde la siguiente.
+async function procesar(t) {
+  const { paginas, calidad, recortar } = t;
+  const subidas = t.subidas;
   try {
-    avanzar(t, { fase: 'procesando', hechas: 0, total: paginas.length, porcentaje: 0,
-      paso: ocupados > 0 ? 'Esperando turno (hay otro documento en proceso)…' : 'Empezando…' });
+    const retomado = subidas.length > 0;
+    avanzar(t, { fase: 'procesando', hechas: subidas.length, total: paginas.length, porcentaje: Math.round((subidas.length / paginas.length) * 100),
+      paso: ocupados > 0 ? 'Esperando turno (hay otro documento en proceso)…' : (retomado ? 'Retomando…' : 'Empezando…') });
     await enFila(async () => {
       const pdf = await abrirPdf(t.pdfBytes);
       try {
-        for (const [i, numero] of paginas.entries()) {
+        for (let i = subidas.length; i < paginas.length; i++) {
           if (t.cancelado) break;
+          const numero = paginas[i];
           const de = `página ${numero} (${i + 1} de ${paginas.length})`;
           avanzar(t, { paso: `Comprimiendo ${de}…`, porcentaje: Math.round(((i + 0.2) / paginas.length) * 100) });
           const imagen = await imagenDePagina(pdf, numero, calidad, recortar);
-          peso += imagen.length;
           if (t.cancelado) break;
           avanzar(t, { paso: `Subiendo ${de}…`, porcentaje: Math.round(((i + 0.6) / paginas.length) * 100) });
           subidas.push(await subirImagen(imagen, 'image/webp', t.owner, `doc-${t.id}-p${numero}.webp`));
+          t.peso += imagen.length;
           avanzar(t, { hechas: i + 1, porcentaje: Math.round(((i + 1) / paginas.length) * 100) });
         }
       } finally {
@@ -150,37 +288,73 @@ async function procesar(t, paginas, calidad, recortar) {
       return cancelado(t);
     }
     await agregarDiapositivas(subidas);
-    liberar(t);
-    avanzar(t, {
-      fase: 'listo', porcentaje: 100, paso: `Listo: ${subidas.length} ${subidas.length === 1 ? 'diapositiva agregada' : 'diapositivas agregadas'}.`,
-      resultado: { subidas: subidas.length, pesoFinal: peso, pesoOriginal: t.pesoOriginal }
-    });
+    t.agregadas = true;
+    terminar(t);
   } catch (err) {
     // Lo que ya se subió no se pierde: se agrega al show igual.
-    if (subidas.length) await agregarDiapositivas(subidas).catch(() => {});
+    if (subidas.length && !t.agregadas) {
+      await agregarDiapositivas(subidas).then(() => { t.agregadas = true; }).catch(() => {});
+    }
     fallo(t, err, subidas.length);
   }
+}
+
+// Al arrancar: vuelve a poner en marcha los trabajos que quedaron a mitad por un reinicio.
+async function retomarTrabajos() {
+  await guardado.preparar();
+  const estados = (await guardado.todos()).sort((a, b) => a.creado - b.creado);
+  let retomados = 0;
+  for (const estado of estados) {
+    const t = { ...estado, archivo: null, pdfBytes: null, miniaturas: null, guardando: null, sucio: false };
+    trabajos.set(t.id, t);
+    if (FASES_TERMINADAS.includes(t.fase)) continue;
+    retomados++;
+    if (t.agregadas) { terminar(t); continue; }
+    if (t.cancelado) {
+      await Promise.all((t.subidas || []).map(borrarImagenSubida));
+      cancelado(t);
+      continue;
+    }
+    const bytes = await guardado.leerArchivo(t.id).catch(() => null);
+    if (!bytes || (t.fase === 'procesando' && !t.archivoEsPdf)) {
+      fallo(t, errorConEstado('El servidor se reinició y no se pudo recuperar el documento. Subilo de nuevo.'));
+      continue;
+    }
+    if (t.archivoEsPdf) t.pdfBytes = bytes; else t.archivo = bytes;
+    if (t.fase === 'procesando') {
+      procesar(t);
+    } else {
+      avanzar(t, { fase: 'preparando', porcentaje: 0, paso: 'Retomando después de un reinicio del servidor…' });
+      preparar(t);
+    }
+  }
+  if (retomados) console.log(`📄 ${retomados} documentos retomados después del reinicio.`);
+}
+
+// Al apagar: espera que termine de guardarse el estado de cada trabajo.
+async function vaciarTrabajos() {
+  await Promise.all([...trabajos.values()].map(t => t.guardando));
 }
 
 // Para cuando el admin borra una cuenta: corta sus documentos en proceso (lo que ya se había
 // subido de ellos se borra solo al cancelar) y los quita de la lista, también los terminados.
 function cancelarTrabajosDe(nombres) {
   const quitar = new Set(nombres);
-  for (const [id, t] of trabajos) {
+  for (const t of [...trabajos.values()]) {
     if (!quitar.has(t.owner)) continue;
-    if (FASES_TERMINADAS.includes(t.fase)) { trabajos.delete(id); continue; }
+    if (FASES_TERMINADAS.includes(t.fase)) { quitarTrabajo(t); continue; }
     t.cancelado = true;
     t.borrarAlTerminar = true;
-    if (t.fase === 'eligiendo') cancelado(t);
+    if (t.fase === 'eligiendo') cancelado(t); else persistir(t);
   }
 }
 
 function limpiarViejos() {
   const ahora = Date.now();
-  for (const [id, t] of trabajos) {
+  for (const t of [...trabajos.values()]) {
     const terminado = FASES_TERMINADAS.includes(t.fase);
     if ((terminado && ahora - t.actualizado > GUARDAR_TERMINADOS_MS) || (t.fase === 'eligiendo' && ahora - t.actualizado > GUARDAR_SIN_ELEGIR_MS)) {
-      trabajos.delete(id);
+      quitarTrabajo(t);
     }
   }
 }
@@ -195,7 +369,7 @@ function puedeVer(persona, t) {
 function propio(req, res) {
   const t = trabajos.get(req.params.id);
   if (!t || !puedeVer(req.person, t)) {
-    res.status(404).json({ error: 'Ese documento ya no está (pasó mucho tiempo o el servidor se reinició).' });
+    res.status(404).json({ error: 'Ese documento ya no está (pasó mucho tiempo desde que se subió).' });
     return null;
   }
   return t;
@@ -208,7 +382,7 @@ function registrarRutasDocumentos(app, ioServidor) {
 
   // POST /api/documentos — recibe un PDF/Word/Excel/PowerPoint y arranca el trabajo.
   app.post('/api/documentos', requierePersona, (req, res) => {
-    subida.single('documento')(req, res, (errorSubida) => {
+    subida.single('documento')(req, res, async (errorSubida) => {
       if (errorSubida) {
         const grande = errorSubida.code === 'LIMIT_FILE_SIZE';
         return res.status(grande ? 413 : 400).json({
@@ -232,6 +406,7 @@ function registrarRutasDocumentos(app, ioServidor) {
         owner: req.person.name,
         nombre,
         esOffice: !esPdf,
+        archivoEsPdf: false,
         archivo: req.file.buffer,
         pesoOriginal: req.file.size,
         fase: 'preparando',
@@ -240,12 +415,19 @@ function registrarRutasDocumentos(app, ioServidor) {
         hechas: 0,
         total: 0,
         paginasTotales: 0,
+        paginas: null,
+        calidad: null,
+        recortar: true,
+        subidas: [],
+        peso: 0,
+        agregadas: false,
         creado: Date.now(),
         actualizado: Date.now(),
         cancelado: false
       };
       trabajos.set(t.id, t);
       res.status(202).json(resumen(t));
+      await guardarArchivo(t, t.archivo, esPdf);
       preparar(t);
     });
   });
@@ -299,7 +481,8 @@ function registrarRutasDocumentos(app, ioServidor) {
     if (!Object.prototype.hasOwnProperty.call(CALIDADES, calidad)) return res.status(400).json({ error: 'Calidad inválida.' });
     if (!nubeDisponible()) return res.status(500).json({ error: ERROR_SIN_NUBE });
     t.miniaturas = null;
-    procesar(t, [...paginas].sort((a, b) => a - b), calidad, recortar !== false);
+    Object.assign(t, { paginas: [...paginas].sort((a, b) => a - b), calidad, recortar: recortar !== false, subidas: [], peso: 0 });
+    procesar(t);
     res.json(resumen(t));
   });
 
@@ -309,7 +492,7 @@ function registrarRutasDocumentos(app, ioServidor) {
     if (!t) return;
     if (FASES_TERMINADAS.includes(t.fase)) return res.json(resumen(t));
     t.cancelado = true;
-    if (t.fase === 'eligiendo') cancelado(t);
+    if (t.fase === 'eligiendo') cancelado(t); else persistir(t);
     res.json(resumen(t));
   });
 
@@ -318,9 +501,9 @@ function registrarRutasDocumentos(app, ioServidor) {
     const t = propio(req, res);
     if (!t) return;
     if (!FASES_TERMINADAS.includes(t.fase)) return res.status(409).json({ error: 'Todavía se está procesando.' });
-    trabajos.delete(t.id);
+    quitarTrabajo(t);
     res.json({ ok: true });
   });
 }
 
-module.exports = { registrarRutasDocumentos, cancelarTrabajosDe, MAXIMO_MB, MAXIMO_PAGINAS };
+module.exports = { registrarRutasDocumentos, retomarTrabajos, vaciarTrabajos, cancelarTrabajosDe, MAXIMO_MB, MAXIMO_PAGINAS };

@@ -20,8 +20,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error de autenticación.');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const error = new Error(data.error || 'Error de autenticación.');
+      error.estado = res.status; // 401 = PIN incorrecto; 429 = el servidor bloqueó por muchos intentos
+      throw error;
+    }
     return data;
   }
 
@@ -264,6 +268,13 @@
         }
 
         pinInput.value = '';
+        if (error.estado === 429) {
+          // El servidor ya bloqueó esta conexión: se muestra su mensaje (dice cuánto esperar).
+          errorEl.textContent = error.message;
+          pinInput.disabled = false;
+          loginBtn.disabled = false;
+          return;
+        }
         const lock = getLock();
         lock.attempts = (lock.attempts || 0) + 1;
         if (lock.attempts >= MAX_ATTEMPTS) {
@@ -300,8 +311,11 @@
           const auth = Object.assign({}, fresh, { pin: stored.pin });
           setStored(auth);
           return auth;
-        } catch {
-          clearStored(); // el PIN ya no sirve (ej. people.json se reinició)
+        } catch (err) {
+          // Sólo se olvida el PIN si el servidor dice que ya no sirve (cuenta borrada). Si es
+          // un bloqueo por intentos o se cortó internet, se conserva y se vuelve a probar después.
+          if (err.estado === 401) clearStored();
+          else return Object.assign({}, stored);
         }
       }
       return showGate(lastGateOpts);

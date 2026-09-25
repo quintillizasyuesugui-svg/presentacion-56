@@ -1,5 +1,6 @@
 // ---- Tiempo real (Socket.IO) entre el control (celular) y la pantalla ----
-const { identificar } = require('./personas');
+const { identificarDesde } = require('./personas');
+const { ipDe } = require('./limite-intentos');
 const { parseLiveWriteBody } = require('./validadores-frase');
 
 function registrarSockets(io) {
@@ -23,9 +24,10 @@ function registrarSockets(io) {
     // puede mandar algo sólo a él/ella, como probar la frase final en su propia
     // pantalla sin que le aparezca a nadie más. Se repite en cada reconexión
     // porque las salas son por socket (conexión), no por dispositivo.
+    // Un PIN equivocado cuenta para el límite de intentos igual que en un pedido.
     socket.on('identificar', async (pin) => {
       try {
-        const persona = await identificar(pin);
+        const { persona } = await identificarDesde(ipDe(socket.handshake.headers, socket.handshake.address), pin);
         if (persona) {
           socket.join('owner:' + persona.name);
           // Sala sólo para el ADMIN_PIN de verdad: recibe el progreso de los documentos de todos.
