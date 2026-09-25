@@ -544,6 +544,37 @@
     else if (el.msRequestFullscreen) el.msRequestFullscreen();
   }
 
+  // ---- QR: abre el control en el celular sin escribir la dirección ----
+  const qrBtn = document.getElementById('qrBtn');
+  const qrOverlay = document.getElementById('qrOverlay');
+  const qrCodigo = document.getElementById('qrCodigo');
+  const qrDireccion = document.getElementById('qrDireccion');
+  const qrCerrar = document.getElementById('qrCerrar');
+
+  function cerrarQr() {
+    qrOverlay.hidden = true;
+    qrBtn.focus();
+  }
+
+  qrBtn.addEventListener('click', async () => {
+    qrOverlay.hidden = false;
+    qrCerrar.focus();
+    if (qrCodigo.childElementCount) return; // ya se armó antes
+    qrDireccion.textContent = 'Preparando el código…';
+    try {
+      const res = await fetch('/api/qr-control');
+      const datos = await res.json();
+      if (!res.ok) throw new Error(datos.error);
+      qrCodigo.innerHTML = datos.svg; // SVG armado por el servidor (librería qrcode), no texto del usuario
+      qrDireccion.textContent = datos.direccion.replace(/^https?:\/\//, '');
+    } catch (err) {
+      qrDireccion.textContent = 'No se pudo armar el código. Abrí en el celular: ' + location.origin + '/control.html';
+    }
+  });
+  qrCerrar.addEventListener('click', cerrarQr);
+  qrOverlay.addEventListener('click', (e) => { if (e.target === qrOverlay) cerrarQr(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !qrOverlay.hidden) cerrarQr(); });
+
   fullscreenButton.addEventListener('click', () => {
     requestFullscreenNow();
     waitingHint.textContent = 'Pantalla completa activada';

@@ -35,7 +35,23 @@
   <canvas class="brain-sphere" id="brainSphere" aria-hidden="true"></canvas>
   <h1>Presentación lista</h1>
   <p id="waitingHint">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
-  <button id="enterFullscreen" class="btn primary">📺 Ir a pantalla completa</button>
+  <div class="waiting-botones">
+    <button id="enterFullscreen" class="btn primary">📺 Ir a pantalla completa</button>
+    <button type="button" id="qrBtn" class="btn">📱 QR</button>
+  </div>
+</div>
+
+<!-- QR: se escanea con la cámara del celular y abre el control, sin escribir la dirección. -->
+<div class="qr-overlay" id="qrOverlay" hidden>
+  <div class="qr-tarjeta" role="dialog" aria-modal="true" aria-labelledby="qrTitulo">
+    <h2 id="qrTitulo">📱 Escaneá para controlar</h2>
+    <div class="qr-codigo" id="qrCodigo" aria-label="Código QR para abrir el control en el celular"></div>
+    <div class="qr-textos">
+      <p class="qr-ayuda">Abrí la cámara del celular y apuntá al código. Entrá con el <strong>mismo PIN</strong> de esta pantalla para manejarla.</p>
+      <p class="qr-direccion" id="qrDireccion"></p>
+      <button type="button" class="btn primary" id="qrCerrar">Cerrar</button>
+    </div>
+  </div>
 </div>
 
 <div id="fs-indicator" class="fullscreen-indicator">

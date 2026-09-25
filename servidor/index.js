@@ -10,6 +10,7 @@ const { registrarRutasDiapositivas } = require('./diapositivas');
 const { registrarRutasDocumentos, retomarTrabajos, vaciarTrabajos } = require('./documentos');
 const { iniciarAlmacenes, vaciarRespaldos } = require('./almacen');
 const { registrarRutasAdministracion } = require('./administracion');
+const { registrarRutasCodigoQr } = require('./codigo-qr');
 const { registrarSockets } = require('./sockets');
 
 const app = express();
@@ -36,6 +37,7 @@ registrarRutasAvanceAutomatico(app);
 registrarRutasDiapositivas(app, io);
 registrarRutasDocumentos(app, io);
 registrarRutasAdministracion(app);
+registrarRutasCodigoQr(app);
 registrarSockets(io);
 
 // Primero se cargan los datos (base de datos o archivos) y se retoman los documentos que

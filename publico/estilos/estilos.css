@@ -255,6 +255,92 @@ body.pantalla {
   max-width: 34ch;
 }
 
+.waiting-botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ---- QR para abrir el control desde el celular (pantalla.html) ----
+   El código va sobre blanco y grande: se escanea desde el fondo del aula. */
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(10, 14, 20, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.qr-overlay[hidden] { display: none; }
+
+.qr-tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 560px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: clamp(18px, 3vw, 32px);
+  text-align: center;
+  background: var(--gray-900);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+}
+.qr-tarjeta h2 {
+  font-size: clamp(1.2rem, 3.2vw, 1.9rem);
+  font-weight: 800;
+}
+.qr-codigo {
+  /* Lo más grande que entre, sin pasar el alto de la pantalla (TV acostada). */
+  width: min(100%, 62vh, 420px);
+  aspect-ratio: 1;
+  padding: 12px;
+  background: #fff;
+  border-radius: var(--radius-md);
+}
+.qr-codigo svg { display: block; width: 100%; height: 100%; }
+.qr-ayuda {
+  max-width: 40ch;
+  color: var(--text-muted);
+  font-size: clamp(0.9rem, 2vw, 1.05rem);
+}
+.qr-ayuda strong { color: var(--text); }
+.qr-direccion {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--primary-300);
+  font-weight: 700;
+  font-size: clamp(0.85rem, 1.8vw, 1rem);
+}
+.qr-textos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Pantalla baja y ancha (celular acostado): el código a la izquierda y el texto a la derecha,
+   así el QR entra entero sin tener que desplazarse. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .qr-tarjeta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
+    column-gap: 20px;
+    width: min(100%, 720px);
+    text-align: left;
+  }
+  .qr-tarjeta h2 { grid-column: 2; grid-row: 1; align-self: end; }
+  .qr-codigo { grid-column: 1; grid-row: 1 / span 2; width: min(78vh, 300px); }
+  .qr-textos { grid-column: 2; grid-row: 2; align-items: flex-start; align-self: start; }
+}
+
 /* ==================================================
    FRASE FINAL — mensaje de cierre (pantalla.html), y su vista previa
    compartida en el editor de Modo avanzado (avanzado.html).
