@@ -20,8 +20,9 @@ const ARCHIVOS = {
   'style.css': 'publico/estilos/estilos.css'
 };
 
+// Los saltos de línea se normalizan: en Windows git puede dejar los archivos con \r\n.
 function readFile(name) {
-  return fs.readFileSync(path.join(__dirname, '..', ARCHIVOS[name]), 'utf8');
+  return fs.readFileSync(path.join(__dirname, '..', ARCHIVOS[name]), 'utf8').replace(/\r\n/g, '\n');
 }
 
 // Saca, en orden, las keys de un array de objetos tipo:

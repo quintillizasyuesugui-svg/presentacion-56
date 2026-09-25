@@ -1,9 +1,15 @@
 // ---- Páginas de un PDF → imágenes (en el servidor) ----
-// PDF.js dibuja cada página sobre un lienzo de @napi-rs/canvas (funciona igual en
-// Windows y en Linux, sin instalar nada más). Se dibuja de a una página, así la
-// memoria no crece con documentos largos.
+// Para dibujar cada página se usa Poppler (pdftoppm) si está instalado, como en el Docker de
+// Render: maneja bien las fuentes que incrusta LibreOffice (con PDF.js a algunas páginas de Word o
+// PowerPoint les faltaban letras). Si Poppler no está (por ejemplo en Windows) o falla con una
+// página, se dibuja con PDF.js. Se dibuja de a una página, así la memoria no crece con documentos
+// largos. Funciona igual con páginas de texto, de imágenes o mezcladas.
+const { execFile } = require('child_process');
+const fs = require('fs').promises;
+const os = require('os');
+const path = require('path');
 const { pathToFileURL } = require('url');
-const { createCanvas } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 // Lado mayor de cada imagen y calidad de compresión WebP (0-100).
 const CALIDADES = {
@@ -12,27 +18,80 @@ const CALIDADES = {
   alta: { lado: 1920, calidad: 90 }
 };
 
+const PDFTOPPM = process.env.PDFTOPPM_RUTA || 'pdftoppm';
+const TIEMPO_POR_PAGINA_MS = 60 * 1000;
+
 let pdfjs = null;
 async function cargarPdfjs() {
   if (!pdfjs) pdfjs = await import(pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.mjs')).href);
   return pdfjs;
 }
 
+let hayPoppler = null;
+function popplerDisponible() {
+  if (hayPoppler === null) {
+    hayPoppler = new Promise((resolver) => {
+      execFile(PDFTOPPM, ['-v'], { timeout: 15000, windowsHide: true }, (error) => resolver(!error || error.code !== 'ENOENT'));
+    });
+  }
+  return hayPoppler;
+}
+
+// Abre el PDF: cuenta las páginas (y detecta contraseña o archivo dañado) con PDF.js y,
+// si hay Poppler, deja una copia en una carpeta temporal para que pdftoppm la lea.
+// Devuelve { numPages, destroy() }; destroy() borra lo temporal. Siempre llamarlo al terminar.
 async function abrirPdf(bytes) {
   const lib = await cargarPdfjs();
+  let pdf;
   try {
-    return await lib.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false }).promise;
+    pdf = await lib.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false }).promise;
   } catch (err) {
     const conClave = err && err.name === 'PasswordException';
     const error = new Error(conClave ? 'El PDF tiene contraseña. Quitásela y volvé a subirlo.' : 'El archivo no es un PDF válido o está dañado.');
     error.estado = 422;
     throw error;
   }
+  const documento = { numPages: pdf.numPages, pdf, carpeta: null, ruta: null };
+  if (await popplerDisponible()) {
+    documento.carpeta = await fs.mkdtemp(path.join(os.tmpdir(), 'conexiones-pdf-'));
+    documento.ruta = path.join(documento.carpeta, 'documento.pdf');
+    await fs.writeFile(documento.ruta, bytes);
+  }
+  documento.destroy = async () => {
+    await pdf.destroy().catch(() => {});
+    if (documento.carpeta) await fs.rm(documento.carpeta, { recursive: true, force: true }).catch(() => {});
+  };
+  return documento;
 }
 
-// Dibuja una página con su lado mayor en `lado` píxeles, sobre fondo blanco.
-async function dibujarPagina(pdf, numero, lado) {
-  const pagina = await pdf.getPage(numero);
+function ejecutar(comando, args) {
+  return new Promise((resolver, rechazar) => {
+    execFile(comando, args, { timeout: TIEMPO_POR_PAGINA_MS, killSignal: 'SIGKILL', windowsHide: true },
+      (error, salida, errores) => (error ? rechazar(Object.assign(error, { detalle: String(errores || '') })) : resolver(salida)));
+  });
+}
+
+// Con Poppler: una página → PNG con su lado mayor en `lado` píxeles → lienzo.
+async function dibujarConPoppler(documento, numero, lado) {
+  const base = path.join(documento.carpeta, `pagina-${numero}-${lado}`);
+  await ejecutar(PDFTOPPM, ['-f', String(numero), '-l', String(numero), '-scale-to', String(lado), '-png', '-singlefile', documento.ruta, base]);
+  const archivo = base + '.png';
+  try {
+    const imagen = await loadImage(await fs.readFile(archivo));
+    const lienzo = createCanvas(imagen.width, imagen.height);
+    const ctx = lienzo.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+    ctx.drawImage(imagen, 0, 0);
+    return lienzo;
+  } finally {
+    await fs.rm(archivo, { force: true }).catch(() => {});
+  }
+}
+
+// Con PDF.js (respaldo): una página sobre fondo blanco con su lado mayor en `lado` píxeles.
+async function dibujarConPdfjs(documento, numero, lado) {
+  const pagina = await documento.pdf.getPage(numero);
   const base = pagina.getViewport({ scale: 1 });
   const vista = pagina.getViewport({ scale: lado / Math.max(base.width, base.height) });
   const lienzo = createCanvas(Math.max(1, Math.round(vista.width)), Math.max(1, Math.round(vista.height)));
@@ -42,6 +101,17 @@ async function dibujarPagina(pdf, numero, lado) {
   await pagina.render({ canvas: lienzo, canvasContext: ctx, viewport: vista }).promise;
   pagina.cleanup();
   return lienzo;
+}
+
+async function dibujarPagina(documento, numero, lado) {
+  if (documento.ruta) {
+    try {
+      return await dibujarConPoppler(documento, numero, lado);
+    } catch (err) {
+      console.error(`Poppler no pudo dibujar la página ${numero}; se usa PDF.js:`, err.message, err.detalle || '');
+    }
+  }
+  return dibujarConPdfjs(documento, numero, lado);
 }
 
 // Recorta los márgenes blancos (deja un pequeño borde), así el contenido llena la pantalla.
@@ -77,23 +147,23 @@ function recortarMargenes(lienzo) {
 }
 
 // Imagen final de una página: tamaño según la calidad, sin márgenes si se pide, en WebP.
-async function imagenDePagina(pdf, numero, calidad, recortar) {
+async function imagenDePagina(documento, numero, calidad, recortar) {
   const { lado, calidad: q } = CALIDADES[calidad] || CALIDADES.normal;
-  let lienzo = await dibujarPagina(pdf, numero, lado);
+  let lienzo = await dibujarPagina(documento, numero, lado);
   if (recortar) lienzo = recortarMargenes(lienzo);
   return lienzo.encode('webp', q);
 }
 
 // Miniatura chica (JPG en data URI) para elegir páginas en el celular.
-async function miniaturaDePagina(pdf, numero) {
-  const lienzo = await dibujarPagina(pdf, numero, 240);
+async function miniaturaDePagina(documento, numero) {
+  const lienzo = await dibujarPagina(documento, numero, 240);
   return 'data:image/jpeg;base64,' + (await lienzo.encode('jpeg', 70)).toString('base64');
 }
 
 // Página en grande para verla en el celular antes de elegir (WebP nítido, no tan pesado).
-async function vistaDePagina(pdf, numero) {
-  const lienzo = await dibujarPagina(pdf, numero, 1400);
+async function vistaDePagina(documento, numero) {
+  const lienzo = await dibujarPagina(documento, numero, 1400);
   return lienzo.encode('webp', 80);
 }
 
-module.exports = { CALIDADES, abrirPdf, imagenDePagina, miniaturaDePagina, vistaDePagina, recortarMargenes };
+module.exports = { CALIDADES, abrirPdf, imagenDePagina, miniaturaDePagina, vistaDePagina, recortarMargenes, popplerDisponible };
