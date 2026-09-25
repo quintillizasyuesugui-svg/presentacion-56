@@ -9,7 +9,8 @@ const { borrarFraseDe } = require('./frase-final');
 const { borrarAvanceDe } = require('./avance-automatico');
 const { cancelarTrabajosDe } = require('./documentos');
 
-const MAXIMO_POR_VEZ = 100;
+// Alcanza para borrar de una vez todas las cuentas de una prueba de carga (400) o de un curso entero.
+const MAXIMO_POR_VEZ = 2000;
 
 // Los borrados van de a uno: dos pedidos al mismo tiempo no se pisan al escribir los datos.
 let fila = Promise.resolve();
