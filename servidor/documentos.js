@@ -78,6 +78,8 @@ function fallo(t, err, subidas = 0) {
 function cancelado(t) {
   liberar(t);
   avanzar(t, { fase: 'cancelado', porcentaje: null, paso: 'Cancelado.' });
+  // Cuenta borrada por el admin: el trabajo desaparece del todo, como si nunca hubiera existido.
+  if (t.borrarAlTerminar) trabajos.delete(t.id);
 }
 
 function textoPaginas(n) {
@@ -157,6 +159,18 @@ async function procesar(t, paginas, calidad, recortar) {
     // Lo que ya se subió no se pierde: se agrega al show igual.
     if (subidas.length) await agregarDiapositivas(subidas).catch(() => {});
     fallo(t, err, subidas.length);
+  }
+}
+
+// Para cuando el admin borra una cuenta: corta sus documentos en proceso (lo que ya se había
+// subido de ellos se borra solo al cancelar) y los quita de la lista, también los terminados.
+function cancelarTrabajosDe(nombre) {
+  for (const [id, t] of trabajos) {
+    if (t.owner !== nombre) continue;
+    if (FASES_TERMINADAS.includes(t.fase)) { trabajos.delete(id); continue; }
+    t.cancelado = true;
+    t.borrarAlTerminar = true;
+    if (t.fase === 'eligiendo') cancelado(t);
   }
 }
 
@@ -308,4 +322,4 @@ function registrarRutasDocumentos(app, ioServidor) {
   });
 }
 
-module.exports = { registrarRutasDocumentos, MAXIMO_MB, MAXIMO_PAGINAS };
+module.exports = { registrarRutasDocumentos, cancelarTrabajosDe, MAXIMO_MB, MAXIMO_PAGINAS };

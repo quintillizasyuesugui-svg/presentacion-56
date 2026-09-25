@@ -29,6 +29,13 @@ function interpretarAvance(cuerpo) {
   return { enabled, seconds };
 }
 
+// Para cuando el admin borra una cuenta.
+async function borrarAvanceDe(nombre) {
+  const lista = await leerAvances();
+  const quedan = lista.filter(r => r.owner !== nombre);
+  if (quedan.length !== lista.length) await almacenAvance.escribir(quedan);
+}
+
 function registrarRutasAvanceAutomatico(app) {
   app.get('/api/avance-automatico', requierePersona, async (req, res) => {
     try {
@@ -59,4 +66,4 @@ function registrarRutasAvanceAutomatico(app) {
   });
 }
 
-module.exports = { registrarRutasAvanceAutomatico, interpretarAvance };
+module.exports = { registrarRutasAvanceAutomatico, interpretarAvance, borrarAvanceDe };

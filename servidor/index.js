@@ -8,6 +8,7 @@ const { registrarRutasFraseFinal } = require('./frase-final');
 const { registrarRutasAvanceAutomatico } = require('./avance-automatico');
 const { registrarRutasDiapositivas } = require('./diapositivas');
 const { registrarRutasDocumentos } = require('./documentos');
+const { registrarRutasAdministracion } = require('./administracion');
 const { registrarSockets } = require('./sockets');
 
 const app = express();
@@ -33,6 +34,7 @@ registrarRutasFraseFinal(app, io);
 registrarRutasAvanceAutomatico(app);
 registrarRutasDiapositivas(app, io);
 registrarRutasDocumentos(app, io);
+registrarRutasAdministracion(app);
 registrarSockets(io);
 
 servidor.listen(PUERTO, '0.0.0.0', () => console.log(`🚀 Cinema en http://0.0.0.0:${PUERTO}`));

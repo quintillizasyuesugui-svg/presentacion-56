@@ -20,6 +20,13 @@ async function leerFrases() {
   return (await almacenFrases.leer()) || [];
 }
 
+// Para cuando el admin borra una cuenta.
+async function borrarFraseDe(nombre) {
+  const frases = await leerFrases();
+  const quedan = frases.filter(f => f.owner !== nombre);
+  if (quedan.length !== frases.length) await almacenFrases.escribir(quedan);
+}
+
 function registrarRutasFraseFinal(app, io) {
   // GET /api/frase-final — la frase de cierre propia (valores por default si nunca la configuró)
   app.get('/api/frase-final', requierePersona, async (req, res) => {
@@ -71,4 +78,4 @@ function registrarRutasFraseFinal(app, io) {
   });
 }
 
-module.exports = { registrarRutasFraseFinal };
+module.exports = { registrarRutasFraseFinal, borrarFraseDe };

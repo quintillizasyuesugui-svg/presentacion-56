@@ -63,6 +63,28 @@ async function requierePersona(req, res, next) {
   }
 }
 
+// Middleware: además del PIN, exige que sea el admin (ADMIN_PIN).
+function requiereAdmin(req, res, next) {
+  requierePersona(req, res, () => {
+    if (!req.person.isAdmin) return res.status(403).json({ error: 'Sólo el admin puede hacer esto.' });
+    next();
+  });
+}
+
+// Lista de personas registradas (sin sus PIN), para la sección de admin.
+async function nombresDePersonas() {
+  return (await leerPersonas()).map(p => p.name);
+}
+
+// Borra la cuenta: su PIN deja de servir. Devuelve false si no existía.
+async function borrarPersona(nombre) {
+  const personas = await leerPersonas();
+  const quedan = personas.filter(p => p.name !== nombre);
+  if (quedan.length === personas.length) return false;
+  await almacenPersonas.escribir(quedan);
+  return true;
+}
+
 // Qué ve cada uno: admin ve todo, cualquier otra persona sólo lo que subió ella.
 function visiblePara(persona, orden) {
   return persona.isAdmin ? orden : orden.filter(r => r.owner === persona.name);
@@ -95,4 +117,4 @@ function registrarRutasPersonas(app) {
   });
 }
 
-module.exports = { identificar, requierePersona, visiblePara, registrarRutasPersonas, NOMBRE_ADMIN };
+module.exports = { identificar, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersona, NOMBRE_ADMIN };

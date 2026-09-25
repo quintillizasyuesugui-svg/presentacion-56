@@ -99,6 +99,26 @@ async function agregarDiapositivas(registros) {
   avisarCambioDeImagenes();
 }
 
+// Cuántas diapositivas tiene cada persona: { nombre: cantidad }.
+async function contarPorDueno() {
+  const conteo = {};
+  for (const r of await leerOrden()) if (r.owner) conteo[r.owner] = (conteo[r.owner] || 0) + 1;
+  return conteo;
+}
+
+// Quita del show todas las diapositivas de una persona y borra sus imágenes (también
+// las originales guardadas dentro de una unión). Devuelve cuántas diapositivas quitó.
+async function quitarDiapositivasDe(nombre) {
+  const orden = await leerOrden();
+  const suyas = orden.filter(r => r.owner === nombre);
+  if (!suyas.length) return 0;
+  const imagenes = suyas.flatMap(r => [r, ...(r.originals || [])]);
+  await Promise.all(imagenes.map(borrarImagenSubida));
+  await almacenOrden.escribir(orden.filter(r => r.owner !== nombre));
+  avisarCambioDeImagenes();
+  return suyas.length;
+}
+
 function nubeDisponible() {
   return nubeLista || process.env.DOCUMENTOS_SIN_NUBE_LOCAL === '1';
 }
@@ -359,4 +379,4 @@ function registrarRutasDiapositivas(app, io) {
   });
 }
 
-module.exports = { registrarRutasDiapositivas, subirImagen, borrarImagenSubida, agregarDiapositivas, nubeDisponible, ERROR_SIN_NUBE };
+module.exports = { registrarRutasDiapositivas, subirImagen, borrarImagenSubida, agregarDiapositivas, nubeDisponible, contarPorDueno, quitarDiapositivasDe, ERROR_SIN_NUBE };

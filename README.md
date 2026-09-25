@@ -41,6 +41,7 @@ servidor/                 Todo lo que corre en el servidor (Node)
   documentos.js           «Subir documento»: trabajos en segundo plano con progreso en vivo
   conversion-office.js    Word/Excel/PowerPoint → PDF con LibreOffice
   paginas-pdf.js          Cada página del PDF → imagen WebP (recorte de márgenes y calidad)
+  administracion.js       Sólo admin: lista de personas y borrar cuentas con todo lo suyo
   frase-final.js          Frase de cierre de cada persona
   avance-automatico.js    Avance automático de cada persona
   sockets.js              Tiempo real entre el control y la pantalla
@@ -123,6 +124,12 @@ usuarios a mano:
   (Los respaldos en Cloudinary conservan sus nombres de siempre, así no se pierde nada.)
 - Opcional: `ADMIN_PIN` en las variables de entorno da un PIN que ve y
   controla las imágenes de todos (para vos, como organizador).
+- **Borrar cuentas (sólo admin):** en Modo avanzado, con el PIN de admin aparece
+  «👥 Personas»: la lista de cuentas con cuántas diapositivas tiene cada una y un 🗑️.
+  Al borrar (pide confirmar) se va todo lo de esa persona, como si nunca hubiera existido:
+  la cuenta y su PIN, sus diapositivas (también en Cloudinary), su frase final, su avance
+  automático y sus documentos en proceso. Su nombre queda libre. Nadie más ve esta sección,
+  y el servidor rechaza a cualquiera que no sea admin. El nombre «admin» está reservado.
 
 ## 🧪 Local
 ```bash

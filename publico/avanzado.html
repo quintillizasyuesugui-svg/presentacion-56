@@ -76,6 +76,17 @@
       </span>
       <span class="action-chevron">›</span>
     </button>
+
+    <!-- Sólo aparece si entraste con el PIN de admin (scripts/administracion.js) -->
+    <div class="section-label" id="adminSeccion" hidden>Administración</div>
+    <button type="button" class="action-card" id="personasBtn" hidden>
+      <span class="action-icon">👥</span>
+      <span class="action-text">
+        <span class="action-title">Personas</span>
+        <span class="action-desc">Ver las cuentas y borrar las que sobran 🗑️</span>
+      </span>
+      <span class="action-chevron">›</span>
+    </button>
   </div>
 
   <div class="spacer"></div>
@@ -97,6 +108,21 @@
     </div>
     <!-- Cada documento es una tarjeta con su progreso en vivo (lo arma scripts/documentos.js) -->
     <div class="doc-lista" id="documentoLista" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- Personas (sólo admin): lista de cuentas con 🗑️ para borrar una y todo lo suyo -->
+<div class="modal-overlay doc-overlay" id="personasOverlay" hidden>
+  <div class="modal-card doc-card" role="dialog" aria-modal="true" aria-labelledby="personasTitulo">
+    <div class="doc-encabezado">
+      <h2 id="personasTitulo">Personas</h2>
+      <button type="button" class="doc-cerrar" id="personasCerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="doc-lista" id="personasLista" aria-live="polite">
+      <input type="search" class="personas-buscar" id="personasBuscar" placeholder="Buscar por nombre" aria-label="Buscar por nombre">
+      <p class="personas-resumen" id="personasResumen">Cargando…</p>
+      <div class="personas-filas" id="personasFilas"></div>
+    </div>
   </div>
 </div>
 
@@ -294,6 +320,7 @@
 <script src="scripts/avanzado.js"></script>
 <script src="scripts/trabajos-documentos.js"></script>
 <script src="scripts/documentos.js"></script>
+<script src="scripts/administracion.js"></script>
 
 </body>
 </html>

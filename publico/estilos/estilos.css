@@ -2208,3 +2208,55 @@ body.dragging-active { user-select: none; }
   .doc-progreso.indeterminado span,
   .doc-aviso-barra.indeterminado span { animation: none; width: 100% !important; opacity: 0.5; }
 }
+
+/* ---- Personas (sólo admin, scripts/administracion.js) ---- */
+
+/* Las tarjetas del menú usan display:flex: sin esto, «hidden» no las ocultaría. */
+.action-card[hidden], .section-label[hidden] { display: none; }
+
+.personas-buscar {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--gray-700);
+  background: var(--gray-900);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.personas-buscar:focus { outline: 2px solid var(--primary-400); outline-offset: 1px; }
+.modal-card .personas-resumen { margin: 0; font-size: 0.85rem; }
+.personas-filas { display: flex; flex-direction: column; gap: 10px; }
+
+.persona-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 14px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-md);
+}
+.persona-fila.confirmando { flex-direction: column; align-items: stretch; border-color: var(--red-400); }
+.persona-datos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.persona-nombre { font-weight: 700; overflow-wrap: anywhere; }
+.persona-detalle { font-size: 0.8rem; color: var(--text-muted); }
+
+.persona-basura {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--red-400);
+  background: rgba(248, 113, 113, 0.1);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.persona-basura:active { transform: scale(0.95); }
+.persona-basura:disabled { opacity: 0.4; cursor: default; }
+
+.modal-card .persona-pregunta { margin: 0; color: var(--text); font-size: 0.92rem; overflow-wrap: anywhere; }
+.persona-advertencia { display: block; margin-top: 4px; color: var(--red-300); font-size: 0.82rem; }
+.persona-acciones { display: flex; gap: 10px; }
+.persona-acciones .btn { flex: 1; white-space: nowrap; }
