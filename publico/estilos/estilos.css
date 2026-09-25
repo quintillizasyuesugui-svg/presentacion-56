@@ -2226,37 +2226,75 @@ body.dragging-active { user-select: none; }
   font-size: 0.95rem;
 }
 .personas-buscar:focus { outline: 2px solid var(--primary-400); outline-offset: 1px; }
-.modal-card .personas-resumen { margin: 0; font-size: 0.85rem; }
+.personas-herramientas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.modal-card .personas-resumen { flex: 1; min-width: 9em; margin: 0; font-size: 0.85rem; }
 .personas-filas { display: flex; flex-direction: column; gap: 10px; }
 
+/* Cada persona es una fila que se marca con un toque (casilla a la izquierda). */
 .persona-fila {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 10px 10px 14px;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px;
   background: var(--gray-850);
   border: 1.5px solid var(--gray-700);
   border-radius: var(--radius-md);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.persona-fila.confirmando { flex-direction: column; align-items: stretch; border-color: var(--red-400); }
+.persona-fila:active { transform: scale(0.99); }
+.persona-fila.marcada { border-color: var(--red-400); background: rgba(248, 113, 113, 0.08); }
+.persona-fila:disabled { opacity: 0.6; cursor: default; }
+.persona-casilla {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 2px solid var(--gray-500);
+  color: transparent;
+  font-weight: 800;
+}
+.persona-casilla::after { content: '✓'; }
+.persona-fila.marcada .persona-casilla { background: var(--red-400); border-color: var(--red-400); color: #fff; }
 .persona-datos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .persona-nombre { font-weight: 700; overflow-wrap: anywhere; }
 .persona-detalle { font-size: 0.8rem; color: var(--text-muted); }
 
-.persona-basura {
-  flex: none;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--red-400);
-  background: rgba(248, 113, 113, 0.1);
-  font-size: 1.3rem;
-  cursor: pointer;
+/* Barra fija abajo: «Borrar N cuentas» y, al tocarla, la confirmación. */
+.personas-barra {
+  position: sticky;
+  bottom: calc(-16px - env(safe-area-inset-bottom));
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 2px -16px 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--gray-900);
+  border-top: 1.5px solid var(--red-400);
 }
-.persona-basura:active { transform: scale(0.95); }
-.persona-basura:disabled { opacity: 0.4; cursor: default; }
-
-.modal-card .persona-pregunta { margin: 0; color: var(--text); font-size: 0.92rem; overflow-wrap: anywhere; }
-.persona-advertencia { display: block; margin-top: 4px; color: var(--red-300); font-size: 0.82rem; }
-.persona-acciones { display: flex; gap: 10px; }
-.persona-acciones .btn { flex: 1; white-space: nowrap; }
+.personas-barra[hidden] { display: none; }
+.personas-barra > .btn { width: 100%; white-space: nowrap; }
+.modal-card .persona-pregunta { margin: 0; color: var(--text); font-size: 0.95rem; font-weight: 700; overflow-wrap: anywhere; }
+.persona-lista-nombres {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  margin-top: 4px;
+  font-weight: 400;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.persona-advertencia { display: block; margin-top: 4px; color: var(--red-300); font-size: 0.82rem; font-weight: 400; }
+/* Si en pantallas muy angostas no entran juntos, «Borrar» baja a otra fila en vez de cortarse. */
+.persona-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.persona-acciones .btn { flex: 1 1 120px; min-width: 0; white-space: nowrap; }

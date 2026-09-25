@@ -20,10 +20,11 @@ async function leerFrases() {
   return (await almacenFrases.leer()) || [];
 }
 
-// Para cuando el admin borra una cuenta.
-async function borrarFraseDe(nombre) {
+// Para cuando el admin borra una o varias cuentas.
+async function borrarFraseDe(nombres) {
+  const quitar = new Set(nombres);
   const frases = await leerFrases();
-  const quedan = frases.filter(f => f.owner !== nombre);
+  const quedan = frases.filter(f => !quitar.has(f.owner));
   if (quedan.length !== frases.length) await almacenFrases.escribir(quedan);
 }
 

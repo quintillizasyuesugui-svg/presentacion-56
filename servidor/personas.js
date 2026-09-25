@@ -76,13 +76,14 @@ async function nombresDePersonas() {
   return (await leerPersonas()).map(p => p.name);
 }
 
-// Borra la cuenta: su PIN deja de servir. Devuelve false si no existía.
-async function borrarPersona(nombre) {
+// Borra una o varias cuentas: su PIN deja de servir. Devuelve cuántas borró.
+async function borrarPersonas(nombres) {
+  const quitar = new Set(nombres);
   const personas = await leerPersonas();
-  const quedan = personas.filter(p => p.name !== nombre);
-  if (quedan.length === personas.length) return false;
+  const quedan = personas.filter(p => !quitar.has(p.name));
+  if (quedan.length === personas.length) return 0;
   await almacenPersonas.escribir(quedan);
-  return true;
+  return personas.length - quedan.length;
 }
 
 // Qué ve cada uno: admin ve todo, cualquier otra persona sólo lo que subió ella.
@@ -117,4 +118,4 @@ function registrarRutasPersonas(app) {
   });
 }
 
-module.exports = { identificar, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersona, NOMBRE_ADMIN };
+module.exports = { identificar, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersonas, NOMBRE_ADMIN };

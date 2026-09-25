@@ -106,17 +106,20 @@ async function contarPorDueno() {
   return conteo;
 }
 
-// Quita del show todas las diapositivas de una persona y borra sus imágenes (también
-// las originales guardadas dentro de una unión). Devuelve cuántas diapositivas quitó.
-async function quitarDiapositivasDe(nombre) {
+// Quita del show todas las diapositivas de una o varias personas y borra sus imágenes
+// (también las originales guardadas dentro de una unión). Devuelve { nombre: cantidad }.
+async function quitarDiapositivasDe(nombres) {
+  const quitar = new Set(nombres);
   const orden = await leerOrden();
-  const suyas = orden.filter(r => r.owner === nombre);
-  if (!suyas.length) return 0;
+  const suyas = orden.filter(r => quitar.has(r.owner));
+  const cantidades = {};
+  for (const r of suyas) cantidades[r.owner] = (cantidades[r.owner] || 0) + 1;
+  if (!suyas.length) return cantidades;
   const imagenes = suyas.flatMap(r => [r, ...(r.originals || [])]);
   await Promise.all(imagenes.map(borrarImagenSubida));
-  await almacenOrden.escribir(orden.filter(r => r.owner !== nombre));
+  await almacenOrden.escribir(orden.filter(r => !quitar.has(r.owner)));
   avisarCambioDeImagenes();
-  return suyas.length;
+  return cantidades;
 }
 
 function nubeDisponible() {

@@ -164,9 +164,10 @@ async function procesar(t, paginas, calidad, recortar) {
 
 // Para cuando el admin borra una cuenta: corta sus documentos en proceso (lo que ya se había
 // subido de ellos se borra solo al cancelar) y los quita de la lista, también los terminados.
-function cancelarTrabajosDe(nombre) {
+function cancelarTrabajosDe(nombres) {
+  const quitar = new Set(nombres);
   for (const [id, t] of trabajos) {
-    if (t.owner !== nombre) continue;
+    if (!quitar.has(t.owner)) continue;
     if (FASES_TERMINADAS.includes(t.fase)) { trabajos.delete(id); continue; }
     t.cancelado = true;
     t.borrarAlTerminar = true;

@@ -120,8 +120,14 @@
     </div>
     <div class="doc-lista" id="personasLista" aria-live="polite">
       <input type="search" class="personas-buscar" id="personasBuscar" placeholder="Buscar por nombre" aria-label="Buscar por nombre">
-      <p class="personas-resumen" id="personasResumen">Cargando…</p>
+      <div class="personas-herramientas">
+        <p class="personas-resumen" id="personasResumen">Cargando…</p>
+        <button type="button" class="chip-btn" id="personasTodas">Seleccionar todas</button>
+        <button type="button" class="chip-btn" id="personasNinguna">Ninguna</button>
+      </div>
       <div class="personas-filas" id="personasFilas"></div>
+      <!-- Aparece al marcar personas: borrar todas las marcadas juntas (pide confirmar) -->
+      <div class="personas-barra" id="personasBarra" hidden></div>
     </div>
   </div>
 </div>

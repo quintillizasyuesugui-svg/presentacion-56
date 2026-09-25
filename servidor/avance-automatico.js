@@ -29,10 +29,11 @@ function interpretarAvance(cuerpo) {
   return { enabled, seconds };
 }
 
-// Para cuando el admin borra una cuenta.
-async function borrarAvanceDe(nombre) {
+// Para cuando el admin borra una o varias cuentas.
+async function borrarAvanceDe(nombres) {
+  const quitar = new Set(nombres);
   const lista = await leerAvances();
-  const quedan = lista.filter(r => r.owner !== nombre);
+  const quedan = lista.filter(r => !quitar.has(r.owner));
   if (quedan.length !== lista.length) await almacenAvance.escribir(quedan);
 }
 

@@ -125,8 +125,10 @@ usuarios a mano:
 - Opcional: `ADMIN_PIN` en las variables de entorno da un PIN que ve y
   controla las imágenes de todos (para vos, como organizador).
 - **Borrar cuentas (sólo admin):** en Modo avanzado, con el PIN de admin aparece
-  «👥 Personas»: la lista de cuentas con cuántas diapositivas tiene cada una y un 🗑️.
-  Al borrar (pide confirmar) se va todo lo de esa persona, como si nunca hubiera existido:
+  «👥 Personas»: la lista de cuentas con cuántas diapositivas tiene cada una. Tocá las que
+  sobran para marcarlas (o «Seleccionar todas», que respeta el buscador) y abajo aparece
+  «🗑️ Borrar N cuentas». Al borrar (pide confirmar, con los nombres) se va todo lo de esas
+  personas, como si nunca hubieran existido:
   la cuenta y su PIN, sus diapositivas (también en Cloudinary), su frase final, su avance
   automático y sus documentos en proceso. Su nombre queda libre. Nadie más ve esta sección,
   y el servidor rechaza a cualquiera que no sea admin. El nombre «admin» está reservado.
