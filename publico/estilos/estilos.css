@@ -1037,7 +1037,7 @@ body.control {
   .voice-heard.pulse { animation: none; }
 }
 
-/* ---- Gestionar imágenes (manage.html) ---- */
+/* ---- Gestionar imágenes (gestionar.html) ---- */
 
 .image-list {
   display: flex;
@@ -1292,12 +1292,15 @@ body.dragging-active { user-select: none; }
   font-size: 0.98rem;
 }
 
+/* Hasta 2 líneas: en celulares chicos se lee entera en vez de cortarse con «…» */
 .action-desc {
   font-size: 0.8rem;
   color: var(--text-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .action-chevron {
@@ -1552,7 +1555,7 @@ body.dragging-active { user-select: none; }
   .icon-btn { width: 32px; height: 32px; }
 }
 
-/* ---- PIN por persona (auth.js: manage.html / avanzado.html) ---- */
+/* ---- PIN por persona (autenticacion.js: gestionar.html / avanzado.html) ---- */
 
 .auth-gate input {
   width: 100%;
@@ -1658,7 +1661,7 @@ body.dragging-active { user-select: none; }
 }
 
 /* Overlay chico para "Entrando…" / "Cerrando sesión…": círculo de 3
-   puntitos girando ~2s (ver showActionSpinner en auth.js). El color lo pone
+   puntitos girando ~2s (ver showActionSpinner en autenticacion.js). El color lo pone
    el llamador para que combine con el botón que lo disparó (celeste =
    Entrar, rojo = Cerrar sesión). */
 .auth-spinner-box {
@@ -1839,4 +1842,369 @@ body.dragging-active { user-select: none; }
 
 .identity-corner .logout-btn {
   padding: 0.3rem 0.6rem;
+}
+
+/* ---- Subir documento (avanzado.html, scripts/documentos.js) ---- */
+
+/* En tablet/PC: ventana centrada de alto limitado. En el celular (abajo): pantalla completa. */
+.doc-overlay { align-items: center; }
+.doc-card {
+  max-width: 560px;
+  height: min(88vh, 820px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.doc-encabezado {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 12px 18px;
+  border-bottom: 1px solid var(--gray-800);
+}
+.doc-encabezado h2 { flex: 1; min-width: 0; margin: 0; }
+.doc-encabezado .chip-btn { min-height: 40px; padding: 0 14px; font-size: 0.82rem; }
+
+.doc-cerrar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid var(--gray-700);
+  background: var(--gray-850);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.doc-cerrar:active { transform: scale(0.95); }
+
+/* Una sola zona con scroll: la lista de documentos. */
+.doc-lista {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 600px), (max-height: 560px) {
+  .doc-overlay { padding: 0; align-items: stretch; }
+  .doc-card {
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+  }
+  .doc-encabezado { padding-top: max(12px, env(safe-area-inset-top)); }
+}
+
+.doc-trabajo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-md);
+}
+.doc-trabajo.doc-listo { border-color: var(--green-500); }
+.doc-trabajo.doc-error { border-color: var(--red-400); }
+
+.doc-cabecera { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.doc-nombre {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-porcentaje { flex: none; font-weight: 800; font-size: 0.9rem; color: var(--primary-300); font-variant-numeric: tabular-nums; }
+.modal-card .doc-paso { margin: 0; font-size: 0.84rem; color: var(--text); overflow-wrap: anywhere; }
+.doc-error .doc-paso { color: var(--red-300); }
+
+.doc-progreso {
+  height: 8px;
+  background: var(--gray-800);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.doc-progreso span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-400), var(--green-400));
+  transition: width var(--dur-base) var(--ease-out);
+}
+/* Mientras no se puede medir (LibreOffice convirtiendo): un tramo que va y viene */
+.doc-progreso.indeterminado span,
+.doc-aviso-barra.indeterminado span {
+  width: 35% !important;
+  animation: doc-trabajando 1.2s ease-in-out infinite alternate;
+}
+@keyframes doc-trabajando {
+  from { transform: translateX(-10%); }
+  to { transform: translateX(200%); }
+}
+
+.doc-eleccion { display: flex; flex-direction: column; gap: 10px; }
+
+/* Miniaturas en una fila que se desliza de costado (carrusel), con flechas a los lados */
+.doc-carrusel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.doc-paginas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+}
+.doc-paginas > .doc-pagina {
+  flex: none;
+  width: clamp(104px, 30vw, 132px);
+  scroll-snap-align: start;
+}
+.doc-paginas > .doc-paso { flex: 1; }
+.doc-flecha {
+  flex: none;
+  width: 36px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--gray-700);
+  background: var(--gray-900);
+  color: var(--primary-300);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.doc-flecha:active { transform: scale(0.95); }
+
+.doc-conteo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.doc-conteo .doc-resumen { flex: 1; min-width: 7em; font-weight: 700; }
+.doc-card .chip-btn { min-height: 40px; padding: 0 14px; font-size: 0.8rem; }
+
+.doc-bloque { display: flex; flex-direction: column; gap: 6px; }
+
+/* Selector de calidad de ancho completo, con botones altos para el dedo */
+.doc-segmentos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--gray-900);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-md);
+}
+.doc-segmento {
+  min-height: 42px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.doc-segmento[aria-pressed="true"] { background: var(--primary-400); color: var(--gray-950); }
+
+/* «Subir» fijo abajo mientras se ve este documento */
+.doc-acciones {
+  position: sticky;
+  /* pegada al borde de abajo de la lista (compensa su margen interno), sin franja por debajo */
+  bottom: calc(-16px - env(safe-area-inset-bottom));
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  margin: 2px -12px -12px;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  background: var(--gray-850);
+  border-top: 1px solid var(--gray-700);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+.doc-acciones .btn { white-space: nowrap; }
+.doc-cancelar { flex: 1; }
+.doc-subir { flex: 2; }
+
+/* Cada miniatura: tocar la página la muestra en grande; el círculo ✓ (arriba a la derecha) la marca o la quita. */
+.doc-pagina {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: #fff;
+  border: 2px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.doc-pagina.selected { border-color: var(--primary-400); }
+.doc-ver {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.doc-ver:active { transform: scale(0.97); }
+.doc-ver img { width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0.4; transition: opacity var(--dur-fast) var(--ease-out); }
+.doc-pagina.selected .doc-ver img { opacity: 1; }
+
+.doc-numero {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(5, 8, 12, 0.75);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* El ✓ es un botón propio, grande para el dedo (el área tocable es mayor que el círculo). */
+.doc-marca {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0;
+}
+.doc-marca::after {
+  content: '✓';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: rgba(5, 8, 12, 0.6);
+  color: transparent;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.doc-marca[aria-pressed="true"]::after {
+  background: var(--primary-400);
+  border-color: var(--primary-400);
+  color: var(--gray-950);
+}
+
+/* Vista grande de una página: pantalla completa, fondo oscuro. */
+.doc-vista {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: rgba(5, 8, 12, 0.96);
+  padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  gap: 10px;
+}
+.doc-vista[hidden] { display: none; }
+.doc-vista-barra { display: flex; align-items: center; gap: 12px; }
+.doc-vista-volver { flex: none; }
+.doc-vista-titulo { flex: 1; min-width: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.doc-vista-imagen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.doc-vista-imagen img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.9);
+}
+.doc-vista-imagen img[hidden] { display: none; }
+.doc-vista-cargando { color: var(--text-muted); text-align: center; }
+.doc-vista-cargando[hidden] { display: none; }
+.doc-vista-nav { display: flex; gap: 10px; }
+.doc-vista-nav .btn { flex: 1; white-space: nowrap; }
+
+.doc-fila { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-btn.peligro { color: var(--red-300); border-color: var(--red-400); }
+.doc-eleccion .btn-row { margin-top: 2px; }
+.doc-etiqueta { font-size: 0.85rem; font-weight: 700; }
+.doc-card .doc-ayuda { font-size: 0.78rem; margin: 0; }
+.doc-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.doc-check input { flex: none; width: 22px; height: 22px; accent-color: var(--primary-400); }
+.doc-card .doc-resumen { font-size: 0.85rem; margin: 0; color: var(--text); }
+
+/* Aviso de éxito (el aviso normal es de error, en rojo) */
+.toast.ok { border-color: var(--green-500); color: var(--green-300); }
+
+/* Aviso de progreso arriba de control.html y gestionar.html (scripts/progreso-documentos.js) */
+.doc-aviso {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--primary-600);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-decoration: none;
+}
+.doc-aviso[hidden] { display: none; }
+.doc-aviso-texto {
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-aviso-barra { height: 5px; background: var(--gray-800); border-radius: var(--radius-pill); overflow: hidden; }
+.doc-aviso-barra[hidden] { display: none; }
+.doc-aviso-barra span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-400), var(--green-400));
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-progreso.indeterminado span,
+  .doc-aviso-barra.indeterminado span { animation: none; width: 100% !important; opacity: 0.5; }
 }

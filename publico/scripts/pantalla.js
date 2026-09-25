@@ -1,64 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Pantalla</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Los 27 tipos de letra de "Frase final" — mismas keys/fuentes que en el
-       editor de Modo avanzado, para que se vea igual acá y en la vista previa. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&family=Cinzel+Decorative:wght@700&family=Bungee+Shade&family=Monoton&family=Luckiest+Guy&family=Shrikhand&family=Chewy&family=Titan+One&family=Faster+One&family=Bungee+Inline&display=swap" rel="stylesheet">
-</head>
-<body class="pantalla">
-
-<div class="stage">
-  <img id="imgBg" src="" alt="" aria-hidden="true">
-  <div class="img-frame" id="imgFrame">
-    <img id="img" src="" alt="">
-  </div>
-</div>
-
-<div class="hud" id="hud">0 / 0</div>
-<div class="auto-badge" id="autoBadge" hidden></div>
-<div class="identity-corner" id="identityCorner" hidden>
-  <div class="identity-pill" id="authBadge"></div>
-  <button type="button" class="logout-btn" id="logoutBtn">Cerrar sesión</button>
-</div>
-
-<div class="progress-track">
-  <div class="progress-fill" id="progressFill"></div>
-</div>
-
-<div class="waiting" id="waiting">
-  <canvas class="brain-sphere" id="brainSphere" aria-hidden="true"></canvas>
-  <h1>Presentación lista</h1>
-  <p id="waitingHint">Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).</p>
-  <button id="enterFullscreen" class="btn primary">📺 Ir a pantalla completa</button>
-</div>
-
-<div id="fs-indicator" class="fullscreen-indicator">
-  <h2>🖥️ Presiona ESC para salir</h2>
-</div>
-
-<!-- Frase final: mensaje propio de cada persona, aparece cuando SU show llega
-     al final (ver socket 'cambiar' más abajo) o al probarlo desde "Enviar a
-     PC" en Modo avanzado (socket 'fraseFinalAhora'). -->
-<div id="finalPhrase">
-  <div id="finalPhraseText" class="fp-anim-target"></div>
-</div>
-
-<!-- Escribir en vivo: lo que la persona dueña de esta pantalla tipea en su
-     celular (Control → Escribir en vivo) aparece acá al toque, letra por
-     letra — ver socket 'escribirVivoEstado' más abajo. -->
-<div id="liveWrite">
-  <div id="liveWriteText" class="fp-anim-target"></div>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="auth.js"></script>
-<script>
   const socket = io();
 
   let diapositivas = [];
@@ -84,8 +23,8 @@
   const liveWriteText = document.getElementById('liveWriteText');
 
   // ---- Frase final: mensaje propio de cada persona al terminar SU show ----
-  // Mismas keys que FRASE_FONTS/FRASE_EFFECTS de server.js y de avanzado.html
-  // — server.js valida contra esa misma lista, así que las 3 tienen que
+  // Mismas keys que FRASE_FONTS/FRASE_EFFECTS de servidor/validadores-frase.js y de avanzado.html
+  // — el servidor valida contra esa misma lista, así que las 3 tienen que
   // coincidir siempre.
   const FRASE_FONT_FAMILIES = {
     sans: "'Poppins', sans-serif",
@@ -234,7 +173,7 @@
   }
 
   // ---- Escribir en vivo: texto propio, tipeado ahora mismo desde el celular ----
-  // Mismo mapa de fuentes que "Frase final" — server.js valida contra la misma
+  // Mismo mapa de fuentes que "Frase final" — el servidor valida contra la misma
   // lista cerrada, así las keys siempre coinciden acá y en control.html.
   let liveWriteActive = false; // true mientras #liveWrite está en pantalla
   let liveWriteEffect = null;  // efecto que se está reproduciendo ahora, para
@@ -544,7 +483,7 @@
   }
 
   // Acá no se da de alta gente nueva — eso se hace desde el celular
-  // (control.html/manage.html). Esta pantalla sólo pide el PIN ya asignado.
+  // (control.html/gestionar.html). Esta pantalla sólo pide el PIN ya asignado.
   ensureAuthed({ allowRegister: false }).then((auth) => {
     identityCorner.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
@@ -849,7 +788,3 @@
       }
     }
   });
-</script>
-
-</body>
-</html>

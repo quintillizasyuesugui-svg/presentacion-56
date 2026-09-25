@@ -1,4 +1,4 @@
-// Pruebas unitarias de frase-validators.js — corren con el test runner nativo
+// Pruebas unitarias de servidor/validadores-frase.js — corren con el test runner nativo
 // de Node (node --test), sin depender de ningún paquete extra ni de levantar
 // el servidor real (Express/Socket.IO/Cloudinary quedan afuera).
 const test = require('node:test');
@@ -10,7 +10,7 @@ const {
   parseColor2,
   parseFraseBody,
   parseLiveWriteBody
-} = require('./frase-validators');
+} = require('../servidor/validadores-frase');
 
 test('FRASE_FONTS incluye los tipos de letra nuevos (elegantes/3D/curvas/grafiti)', () => {
   for (const key of ['royal', 'shadow-3d', 'neon-tube', 'graffiti', 'curvy-bold', 'bubble', 'comic-3d', 'urban', 'outline']) {

@@ -1,7 +1,6 @@
-// Validación de "Frase final" y "Escribir en vivo" — separado de server.js
-// para poder probarlo con pruebas unitarias sin levantar el servidor entero
-// (Express, Socket.IO, Cloudinary, etc.). server.js importa todo esto tal
-// cual antes vivía ahí adentro; el comportamiento no cambió.
+// Validación de "Frase final" y "Escribir en vivo" — separado del resto del
+// servidor para poder probarlo con pruebas unitarias sin levantarlo entero
+// (Express, Socket.IO, Cloudinary, etc.). frase-final.js y sockets.js lo usan.
 //
 // Los 27 tipos de letra y los efectos son un menú cerrado (no texto libre) —
 // así el cliente sólo manda una "key" y acá se valida contra esta lista,

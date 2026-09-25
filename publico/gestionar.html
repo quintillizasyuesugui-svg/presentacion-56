@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gestionar imágenes</title>
+  <link rel="stylesheet" href="estilos/estilos.css">
+</head>
+<body class="control">
+<div class="app">
+
+  <div class="app-header">
+    <div class="header-id">
+      <h1>Gestionar imágenes</h1>
+      <span class="auth-name-badge" id="authNameBadge" hidden></span>
+      <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
+    </div>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando…</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="btn-row">
+      <button class="btn primary" id="uploadBtn">➕ Subir imágenes</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+    <div class="image-list" id="imageList"></div>
+    <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Subí la primera.</p>
+  </div>
+
+  <div class="btn-row">
+    <a class="btn" href="control.html">⬅️ Volver</a>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="confirmOverlay" hidden>
+  <div class="modal-card">
+    <h2>Eliminar imagen</h2>
+    <p id="confirmMessage">Esta acción no se puede deshacer.</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="confirmCancel">Cancelar</button>
+      <button type="button" class="btn danger-solid" id="confirmAccept">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="alert" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="scripts/autenticacion.js"></script>
+<script src="scripts/gestionar.js"></script>
+<script src="scripts/trabajos-documentos.js"></script>
+<script src="scripts/progreso-documentos.js"></script>
+
+</body>
+</html>

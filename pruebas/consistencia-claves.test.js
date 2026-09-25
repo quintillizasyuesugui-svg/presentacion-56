@@ -1,6 +1,7 @@
 // El proyecto no usa ningún build step: las listas de tipos de letra y
-// efectos viven duplicadas a mano en control.html, avanzado.html y
-// pantalla.html, y server.js valida contra su propia copia (frase-validators.js).
+// efectos viven duplicadas a mano en los scripts de control.html, avanzado.html y
+// pantalla.html (publico/scripts/), y el servidor valida contra su propia copia
+// (servidor/validadores-frase.js).
 // Los propios comentarios del código avisan "las keys tienen que coincidir
 // 1:1" — esta prueba automatiza justo esa verificación, para que agregar o
 // cambiar un tipo de letra/efecto en un solo archivo y olvidarse de los otros
@@ -9,10 +10,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { FRASE_FONTS, FRASE_EFFECTS } = require('./frase-validators');
+const { FRASE_FONTS, FRASE_EFFECTS } = require('../servidor/validadores-frase');
+
+// Cada página tiene su código en publico/scripts/ y los estilos en publico/estilos/.
+const ARCHIVOS = {
+  'control.html': 'publico/scripts/control.js',
+  'avanzado.html': 'publico/scripts/avanzado.js',
+  'pantalla.html': 'publico/scripts/pantalla.js',
+  'style.css': 'publico/estilos/estilos.css'
+};
 
 function readFile(name) {
-  return fs.readFileSync(path.join(__dirname, name), 'utf8');
+  return fs.readFileSync(path.join(__dirname, '..', ARCHIVOS[name]), 'utf8');
 }
 
 // Saca, en orden, las keys de un array de objetos tipo:

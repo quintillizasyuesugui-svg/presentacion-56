@@ -2,6 +2,10 @@ node_modules/
 .DS_Store
 *.log
 .env
+# Datos que genera la app (se respaldan en Cloudinary, no van a git)
+datos/*
+!datos/.gitkeep
+# Nombres viejos, de antes de ordenar las carpetas
 images-order.json
 people.json
 frases-finales.json

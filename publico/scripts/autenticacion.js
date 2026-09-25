@@ -1,4 +1,4 @@
-// auth.js — PIN por persona para manage.html y avanzado.html.
+// autenticacion.js — PIN por persona para gestionar.html y avanzado.html.
 // El sistema da el PIN solo (registro con nombre, 4 dígitos únicos) y el
 // celular lo recuerda (localStorage) — no hay que pedirlo cada vez.
 (function () {
@@ -27,7 +27,7 @@
 
   // allowRegister=false arma sólo el bloque de PIN, sin "Soy nuevo/a" — para
   // pantalla.html: en el proyector/TV no tiene sentido dar de alta gente
-  // nueva, eso se hace desde el propio celular (control.html/manage.html).
+  // nueva, eso se hace desde el propio celular (control.html/gestionar.html).
   //
   // Con allowRegister=true, primero se ven sólo 2 botones para elegir el
   // camino — antes se mostraban los 2 formularios apilados (nombre arriba,
@@ -76,7 +76,7 @@
   // puntito es un <i> que orbita (posición) con un <span> adentro que late
   // (tamaño/brillo) — separados porque van animados con transform los dos
   // y uno le pisaría el transform al otro si fueran el mismo elemento (ver
-  // style.css, .auth-spinner).
+  // estilos.css, .auth-spinner).
   function showActionSpinner(color, label) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
