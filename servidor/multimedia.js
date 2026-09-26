@@ -489,21 +489,23 @@ function registrarRutasMultimedia(app, io) {
     }
   });
 
-  // Cambiar el orden de lo propio de un tipo: { tipo, ids } con TODOS los ids propios de ese tipo.
+  // Cambiar el orden de un tipo: { tipo, ids } con TODOS los ids de ese tipo de la persona.
+  // Cada uno ordena lo suyo; el admin puede ordenar lo de cualquiera con { dueno }.
   app.post('/api/multimedia/orden', requierePersona, async (req, res) => {
     try {
-      const { tipo, ids } = req.body || {};
+      const { tipo, ids, dueno } = req.body || {};
       comprobarTipo(tipo);
+      const de = req.person.isAdmin && typeof dueno === 'string' && dueno ? dueno : req.person.name;
       await almacenMultimedia.modificar((lista) => {
         const lugares = [];
-        lista.forEach((r, i) => { if (r.owner === req.person.name && r.tipo === tipo) lugares.push(i); });
+        lista.forEach((r, i) => { if (r.owner === de && r.tipo === tipo) lugares.push(i); });
         const propios = new Set(lugares.map(i => lista[i].id));
         const valido = Array.isArray(ids) && ids.length === propios.size && new Set(ids).size === ids.length && ids.every(id => propios.has(id));
         if (!valido) throw new ErrorPedido(400, 'Orden inválido. Recargá la página.');
         const porId = new Map(lista.map(r => [r.id, r]));
         lugares.forEach((lugar, i) => { lista[lugar] = porId.get(ids[i]); });
       });
-      avisarCambio([req.person.name]);
+      avisarCambio([de, req.person.name]);
       res.json(resumenPara(req.person));
     } catch (err) {
       responderError(res, err, 'No se pudo cambiar el orden.');

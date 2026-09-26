@@ -249,10 +249,21 @@ test('admin: ve el espacio de cada uno, lo cambia, y al borrar la cuenta se van 
   assert.equal(r.estado, 200, JSON.stringify(r.datos));
   const archivo = r.datos.elementos[0].archivo;
 
+  // El admin puede ordenar lo de otra persona (y la persona no puede ordenar lo ajeno).
+  r = await subirLocal(dani.pin, 'Otro clip.mp4', 1000, 'video');
+  const [clip1, clip2] = r.datos.elementos.filter(e => e.tipo === 'video').map(e => e.id);
+  r = await pedir(ADMIN, '/api/multimedia/orden', { tipo: 'video', ids: [clip2, clip1], dueno: 'Dani prueba' });
+  assert.equal(r.estado, 200, JSON.stringify(r.datos));
+  r = await pedir(dani.pin, '/api/multimedia');
+  assert.deepEqual(r.datos.elementos.filter(e => e.tipo === 'video').map(e => e.id), [clip2, clip1]);
+  const intruso = await registrar('Intruso prueba');
+  r = await pedir(intruso.pin, '/api/multimedia/orden', { tipo: 'video', ids: [clip1, clip2], dueno: 'Dani prueba' });
+  assert.equal(r.estado, 400, 'alguien que no es admin no puede ordenar lo de otra persona');
+
   r = await pedir(ADMIN, '/api/admin/personas');
   const fila = r.datos.find(p => p.name === 'Dani prueba');
-  assert.equal(fila.espacio.videos, 1);
-  assert.equal(fila.espacio.usado, 2 * 1024 * 1024);
+  assert.equal(fila.espacio.videos, 2);
+  assert.equal(fila.espacio.usado, 2 * 1024 * 1024 + 1000);
 
   r = await pedir(ADMIN, '/api/admin/nube');
   assert.equal(r.estado, 200);

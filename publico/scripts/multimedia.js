@@ -118,7 +118,16 @@ const socket = io();
     for (const id of [...sel]) if (!items.some(e => e.id === id)) sel.delete(id);
     const uno = tipo === 'musica' ? 'canción' : 'video';
     const varios = tipo === 'musica' ? 'canciones' : 'videos';
-    const propios = items.filter(e => e.owner === auth.name);
+    // Se ordena lo de una sola persona: lo propio o, para el admin, la persona elegida en «Ver de».
+    const duenos = [...new Set(items.map(e => e.owner))];
+    const dueno = duenos.length === 1 ? duenos[0] : null;
+    const propios = dueno && (dueno === auth.name || auth.isAdmin) ? items : [];
+    const ayuda = tipo === 'musica' ? $('ayudaOrdenMusica') : $('ayudaOrdenVideos');
+    if (ayuda) {
+      ayuda.textContent = auth.isAdmin && duenos.length > 1
+        ? 'Para ordenar, elegí una persona en «Ver de».'
+        : `Arrastrá ≡ (o usá ▲▼) para elegir qué ${tipo === 'musica' ? 'canción' : 'video'} sale primero.`;
+    }
 
     if (seleccionando[tipo]) {
       const todas = crear('input', { type: 'checkbox', id: 'todas-' + tipo });
@@ -143,7 +152,7 @@ const socket = io();
     }
 
     // Se puede ordenar (arrastrando ≡ o con ▲▼) cuando todo lo que se ve es de uno mismo.
-    const ordenable = !seleccionando[tipo] && items.length > 1 && items.every(e => e.owner === auth.name);
+    const ordenable = !seleccionando[tipo] && items.length > 1 && propios.length === items.length;
     const visibles = desplegada[tipo] ? items : items.slice(0, VISIBLES_PLEGADA);
     const boton = tipo === 'musica' ? $('verTodasMusica') : $('verTodasVideos');
     boton.hidden = items.length <= VISIBLES_PLEGADA;
@@ -159,7 +168,7 @@ const socket = io();
       const fila = crear('li', { class: 'fila-medio' + (marcada ? ' marcada' : ''), 'data-id': e.id });
       if (ordenable) {
         const asa = crear('button', { type: 'button', class: 'asa-orden', 'aria-label': 'Arrastrar para cambiar el orden de ' + e.nombre, text: '≡' });
-        asa.addEventListener('pointerdown', (ev) => arrastrar(ev, fila, lista, tipo));
+        asa.addEventListener('pointerdown', (ev) => arrastrar(ev, fila, lista, tipo, dueno));
         fila.append(asa);
       }
       fila.append(crear('span', { class: 'numero-orden', 'aria-hidden': 'true', text: String(n + 1) }));
@@ -174,8 +183,8 @@ const socket = io();
         const i = propios.indexOf(e);
         if (ordenable && i !== -1) {
           fila.append(
-            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Subir de posición', text: '▲', disabled: i === 0, onclick: () => mover(tipo, e.id, -1) }),
-            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Bajar de posición', text: '▼', disabled: i === propios.length - 1, onclick: () => mover(tipo, e.id, 1) })
+            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Subir de posición', text: '▲', disabled: i === 0, onclick: () => mover(tipo, e.id, -1, dueno) }),
+            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Bajar de posición', text: '▼', disabled: i === propios.length - 1, onclick: () => mover(tipo, e.id, 1, dueno) })
           );
         }
         fila.append(crear('button', { type: 'button', class: 'icon-btn danger', 'aria-label': 'Borrar ' + e.nombre, text: '🗑️', onclick: () => pedirBorrar(tipo, [e.id]) }));
@@ -203,7 +212,7 @@ const socket = io();
   }
 
   // ---- Arrastrar con el dedo para ordenar (las flechas ▲▼ quedan de respaldo) ----
-  function arrastrar(e, fila, lista, tipo) {
+  function arrastrar(e, fila, lista, tipo, dueno) {
     e.preventDefault();
     const asa = e.currentTarget;
     let inicioY = e.clientY;
@@ -238,12 +247,12 @@ const socket = io();
       fila.style.transform = '';
       // Lo que se ve quedó en el orden nuevo; lo que estaba plegado sigue detrás, igual que antes.
       const vistos = [...lista.children].map(li => li.dataset.id);
-      const resto = datos.elementos.filter(x => x.tipo === tipo && x.owner === auth.name && !vistos.includes(x.id)).map(x => x.id);
+      const resto = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno && !vistos.includes(x.id)).map(x => x.id);
       const ids = [...vistos, ...resto];
-      const antes = datos.elementos.filter(x => x.tipo === tipo && x.owner === auth.name).map(x => x.id);
+      const antes = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno).map(x => x.id);
       if (ids.join() === antes.join()) return;
       try {
-        datos = await pedir('/api/multimedia/orden', { tipo, ids });
+        datos = await pedir('/api/multimedia/orden', { tipo, ids, dueno });
         pintarTodo();
         avisar('✅ Orden guardado: así van a salir en el celular.', true);
       } catch (err) {
@@ -261,14 +270,14 @@ const socket = io();
     $('verTodasVideos').addEventListener('click', () => { desplegada.video = !desplegada.video; pintarLista('video'); });
   }
 
-  async function mover(tipo, id, paso) {
-    const propios = datos.elementos.filter(e => e.tipo === tipo && e.owner === auth.name).map(e => e.id);
+  async function mover(tipo, id, paso, dueno) {
+    const propios = datos.elementos.filter(e => e.tipo === tipo && e.owner === dueno).map(e => e.id);
     const i = propios.indexOf(id);
     const j = i + paso;
     if (i === -1 || j < 0 || j >= propios.length) return;
     [propios[i], propios[j]] = [propios[j], propios[i]];
     try {
-      datos = await pedir('/api/multimedia/orden', { tipo, ids: propios });
+      datos = await pedir('/api/multimedia/orden', { tipo, ids: propios, dueno });
       pintarTodo();
     } catch (err) {
       avisar(err.message);
