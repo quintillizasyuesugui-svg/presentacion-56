@@ -155,7 +155,8 @@ test('control.html: "Atrás"/"Siguiente" avisan con un mensaje si se tocan antes
     /if \(!showStarted && \(accion === 'anterior' \|\| accion === 'siguiente'\)\) \{\s*\n\s*showToast\(/,
     'enviar() debería avisar con showToast en vez de emitir "anterior"/"siguiente" mientras showStarted sea false'
   );
-  assert.match(source, /if \(accion === 'mostrar'\) \{\s*\n\s*showStarted = true;/, 'enviar() debería poner showStarted en true al mandar "mostrar"');
+  assert.match(source, /if \(accion === 'mostrar'\) \{[\s\S]{0,400}?showStarted = true;/, 'enviar() debería poner showStarted en true al mandar "mostrar"');
+  assert.match(source, /if \(imagenesCargadas && totalSlides === 0\) \{\s*\n\s*showToast\(/, 'sin imágenes, «Mostrar» debería avisar con showToast en vez de mandar a la pantalla');
 });
 
 test('style.css: .is-off se ve igual que .btn:disabled pero sin bloquear el click (para poder avisar por qué)', () => {

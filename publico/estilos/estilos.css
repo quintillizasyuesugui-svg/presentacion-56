@@ -2384,3 +2384,28 @@ body.dragging-active { user-select: none; }
 /* Si en pantallas muy angostas no entran juntos, «Borrar» baja a otra fila en vez de cortarse. */
 .persona-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
 .persona-acciones .btn { flex: 1 1 120px; min-width: 0; white-space: nowrap; }
+
+/* ---- Primeros pasos (control.html) ---- */
+.primeros-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(23, 182, 234, 0.08);
+  border: 1px solid rgba(52, 205, 250, 0.3);
+}
+.primeros-pasos[hidden] { display: none; }
+.pasos-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pasos-cabecera h2 { font-size: 0.95rem; }
+.pasos-cerrar { width: 36px; height: 36px; flex: none; border-radius: 50%; border: 1px solid var(--gray-700); background: var(--gray-850); color: var(--text); cursor: pointer; }
+.pasos-cerrar:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+.pasos-lista { list-style: none; counter-reset: paso; display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; line-height: 1.4; }
+.pasos-lista li { counter-increment: paso; display: flex; align-items: flex-start; gap: 10px; color: var(--gray-200); }
+.pasos-lista a { color: var(--primary-300); }
+.pasos-lista b { overflow-wrap: anywhere; }
+.paso-marca { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--gray-700); color: var(--primary-200); font-size: 0.75rem; font-weight: 800; }
+.paso-marca::before { content: counter(paso); }
+.pasos-lista li.hecho { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--gray-600); }
+.pasos-lista li.hecho .paso-marca { background: var(--green-500); color: var(--gray-950); }
+.pasos-lista li.hecho .paso-marca::before { content: '✓'; }

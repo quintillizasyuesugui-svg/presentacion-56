@@ -22,8 +22,14 @@
       return;
     }
     if (accion === 'mostrar') {
+      // Sin imágenes la pantalla no tiene qué mostrar: se avisa acá en vez de no hacer nada.
+      if (imagenesCargadas && totalSlides === 0) {
+        showToast('📷 Primero subí tus imágenes en «🖼️ Gestionar».');
+        return;
+      }
       showStarted = true;
       updateNavButtonsState();
+      pintarPasos();
     }
     socket.emit('cambiar', accion);
   }
@@ -126,12 +132,40 @@
   // propias de quien está controlando (o todas, con el PIN admin) — mismo
   // criterio que pantalla.html, para que los números coincidan con lo que se ve ahí.
   let totalSlides = 0;
+  let imagenesCargadas = false;
   function refreshSlideCount() {
     authFetch('/api/images')
       .then(res => res.json())
-      .then(images => { totalSlides = images.length; })
+      .then(images => { totalSlides = images.length; imagenesCargadas = true; pintarPasos(); })
       .catch(err => console.error('Error loading images:', err));
   }
+
+  // ---- Primeros pasos: guía de 3 pasos que se marcan solos ----
+  // 1) imágenes subidas, 2) la pantalla de la PC abierta con el mismo PIN (contesta por
+  // socket), 3) «Mostrar». Se oculta sola al completar los tres o con ✕ (queda recordado).
+  const primerosPasos = document.getElementById('primerosPasos');
+  const CLAVE_PASOS = 'conexionesPrimerosPasosOculto';
+  let pantallaVista = false;
+  let pasosOcultos = false;
+  try { pasosOcultos = localStorage.getItem(CLAVE_PASOS) === '1'; } catch { /* sin almacenamiento */ }
+  document.getElementById('direccionPantalla').textContent = location.host + '/pantalla.html';
+  function ocultarPasos() {
+    pasosOcultos = true;
+    try { localStorage.setItem(CLAVE_PASOS, '1'); } catch { /* sin almacenamiento */ }
+    primerosPasos.hidden = true;
+  }
+  document.getElementById('pasosCerrar').addEventListener('click', ocultarPasos);
+  function pintarPasos() {
+    if (pasosOcultos || !imagenesCargadas) return;
+    const hechos = [totalSlides > 0, pantallaVista, showStarted];
+    hechos.forEach((hecho, i) => document.getElementById('paso' + (i + 1)).classList.toggle('hecho', hecho));
+    primerosPasos.hidden = false;
+    if (hechos.every(Boolean)) {
+      document.getElementById('pasosTitulo').textContent = '✅ ¡Listo! Ya estás presentando';
+      setTimeout(ocultarPasos, 4000);
+    }
+  }
+  socket.on('mediosEstado', () => { if (!pantallaVista) { pantallaVista = true; pintarPasos(); } });
 
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;

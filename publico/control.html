@@ -27,6 +27,19 @@
     </div>
   </div>
 
+  <!-- Primeros pasos (scripts/control.js): se marcan solos y se ocultan al terminar o con ✕ -->
+  <section class="primeros-pasos" id="primerosPasos" aria-labelledby="pasosTitulo" hidden>
+    <div class="pasos-cabecera">
+      <h2 id="pasosTitulo">Primeros pasos</h2>
+      <button type="button" class="pasos-cerrar" id="pasosCerrar" aria-label="Ocultar primeros pasos">✕</button>
+    </div>
+    <ol class="pasos-lista">
+      <li id="paso1"><span class="paso-marca" aria-hidden="true"></span><span>Subí tus imágenes o un PDF en <a href="gestionar.html">🖼️ Gestionar</a>.</span></li>
+      <li id="paso2"><span class="paso-marca" aria-hidden="true"></span><span>En la PC abrí <b id="direccionPantalla">pantalla.html</b> y entrá con tu mismo PIN.</span></li>
+      <li id="paso3"><span class="paso-marca" aria-hidden="true"></span><span>Tocá <b>▶️ Mostrar</b> y pasá con <b>Siguiente</b>.</span></li>
+    </ol>
+  </section>
+
   <!-- Avance automático: aparece sólo si está prendido, con el mismo contador
        en vivo que la pantalla — arrancan sincronizados al mismo instante. -->
   <p class="auto-countdown-inline" id="autoCountdownInline" hidden></p>

@@ -657,6 +657,13 @@
       return;
     }
 
+    // Sin imágenes no hay nada que mostrar: se queda en la espera y dice qué hacer (antes la
+    // pantalla daba error al buscar la primera imagen).
+    if (!diapositivas.length && (accion === 'mostrar' || accion === 'siguiente' || accion === 'anterior' || /^[0-9]+$/.test(accion))) {
+      waitingHint.textContent = '📷 Todavía no hay imágenes. Subilas desde el celular en «🖼️ Gestionar» y tocá Mostrar de nuevo.';
+      return;
+    }
+
     if (accion === 'mostrar') {
       if (showingFinal) hideFinalPhrase();
       index = 0;
