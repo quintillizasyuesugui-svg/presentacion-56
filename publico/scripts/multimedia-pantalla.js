@@ -42,6 +42,8 @@
   let elVideo = null;        // <video> para los subidos
   let yt = null;             // reproductor de YouTube
   let volumenVideo = VOLUMEN_INICIAL_VIDEO;
+  let videoSinSonido = false; // arrancó sin sonido porque nadie había tocado la PC
+  let vigiaVideo = null;
 
   // ---------- utilidades ----------
   function emitir(nombre, datos) { socket.emit(nombre, datos); }
@@ -111,6 +113,7 @@
         t: tiempoVideo(),
         duracion: duracionVideo(),
         sonando: videoSonando(),
+        silenciado: videoSinSonido,
         volumen: volumenVideo,
         posicion: videos.indexOf(video),
         total: videos.length
@@ -134,15 +137,16 @@
     botonPermitir.textContent = '🔊 Sonido permitido';
     botonPermitir.disabled = true;
     emitir('mediosPantallaActiva', miPantalla);
-    // Si el celular ya había pedido algo, arranca ahora.
-    if (video) reanudarVideo();
+    // Si el celular ya había pedido algo, arranca ahora (y el video que iba sin sonido, se escucha).
+    if (video) { videoSinSonido = false; activarSonidoDelVideo(); reanudarVideo(); }
     else if (quiereSonar) reproducirMusica();
     publicarEstado();
   }
   botonPermitir.addEventListener('click', permitir);
   botonAvisoPermiso.addEventListener('click', permitir);
   // Cualquier toque cuenta (por ejemplo «Ir a pantalla completa»).
-  document.addEventListener('pointerdown', () => {
+  document.addEventListener('pointerdown', (e) => {
+    if (videoSinSonido && !avisoPermiso.contains(e.target)) { permitir(); return; }
     if (!permitido) { permitido = true; publicarEstado(); }
   }, { capture: true });
 
@@ -325,7 +329,7 @@
             ...(v.inicio ? { start: v.inicio } : {}), ...(v.fin ? { end: v.fin } : {}), origin: location.origin
           },
           events: {
-            onReady: (e) => { e.target.setVolume(volumenVideo); if (permitido) e.target.playVideo(); else pedirPermiso(); publicarEstado(); },
+            onReady: (e) => { arrancarYoutube(e.target); publicarEstado(); },
             onStateChange: (e) => {
               if (e.data === window.YT.PlayerState.ENDED) terminarVideo();
               else publicarEstado();
@@ -363,17 +367,54 @@
     publicarEstado();
   }
 
+  // Los navegadores no dejan que un video CON sonido arranque solo si nadie tocó la pantalla
+  // de la PC. Entonces el video arranca igual, sin sonido (eso siempre está permitido), y se
+  // pide un toque en la PC: con cualquier toque se activa el sonido sin cortar el video.
+  function sinSonido() {
+    if (videoSinSonido) return;
+    videoSinSonido = true;
+    permitido = false;
+    pedirPermiso('Tocá para que se escuche el video');
+    avisarAlCelular('🔇 El video arrancó sin sonido porque nadie tocó la PC todavía. Tocá la pantalla de la PC una vez y se escucha.');
+  }
+
+  function activarSonidoDelVideo() {
+    if (elVideo) { elVideo.muted = false; elVideo.volume = volumenVideo / 100; }
+    if (yt && yt.unMute) { yt.unMute(); yt.setVolume(volumenVideo); }
+  }
+
+  function arrancarYoutube(p) {
+    p.setVolume(volumenVideo);
+    if (permitido && !videoSinSonido) p.unMute(); else { p.mute(); sinSonido(); }
+    p.playVideo();
+    // Si en 2 s no arrancó (el navegador lo frenó por el sonido), arranca sin sonido.
+    clearTimeout(vigiaVideo);
+    vigiaVideo = setTimeout(() => {
+      if (yt !== p || !p.getPlayerState || !window.YT) return;
+      const estadoYt = p.getPlayerState();
+      const S = window.YT.PlayerState;
+      if (estadoYt !== S.PLAYING && estadoYt !== S.BUFFERING && estadoYt !== S.PAUSED) {
+        p.mute();
+        p.playVideo();
+        sinSonido();
+      }
+    }, 2000);
+  }
+
   function reanudarVideo() {
     if (elVideo) {
-      elVideo.play().then(() => { permitido = true; avisoPermiso.hidden = true; }).catch((err) => {
-        if (err && err.name === 'NotAllowedError') {
-          permitido = false;
-          pedirPermiso('Tocá para que se escuche el video');
-          avisarAlCelular('🔇 Tocá «Permitir sonido» en la pantalla para ver el video.');
+      elVideo.muted = videoSinSonido;
+      elVideo.play().then(() => {
+        if (!videoSinSonido) { permitido = true; avisoPermiso.hidden = true; }
+      }).catch((err) => {
+        if (err && err.name === 'NotAllowedError' && elVideo) {
+          elVideo.muted = true;
+          sinSonido();
+          elVideo.play().catch(() => {});
         }
       });
     } else if (yt && yt.playVideo) {
-      yt.playVideo();
+      arrancarYoutube(yt);
     }
   }
 
@@ -390,6 +431,8 @@
     elVideo = null;
     yt = null;
     video = null;
+    clearTimeout(vigiaVideo);
+    if (videoSinSonido) { videoSinSonido = false; avisoPermiso.hidden = true; }
     capaVideo.classList.remove('ver');
     setTimeout(() => { if (!video) { capaVideo.hidden = true; marcoVideo.replaceChildren(); } }, 500);
     if (reanudar) {

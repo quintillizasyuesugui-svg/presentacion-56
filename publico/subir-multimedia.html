@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Subir música y videos</title>
+  <link rel="stylesheet" href="estilos/estilos.css">
+  <link rel="stylesheet" href="estilos/multimedia.css">
+</head>
+<body class="control">
+<div class="app">
+
+  <div class="app-header">
+    <div class="header-id">
+      <h1>Subir música y videos</h1>
+      <span class="auth-name-badge" id="authNameBadge" hidden></span>
+      <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
+    </div>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando…</span>
+    </div>
+  </div>
+
+  <nav class="pestanas-gestion" aria-label="Qué subir">
+    <a href="#musica" id="pestanaMusica">🎵 Música</a>
+    <a href="#videos" id="pestanaVideos">🎬 Videos</a>
+  </nav>
+
+  <!-- Espacio propio de cada persona (el 📦 Guardián del Almacenamiento explica por qué es ese) -->
+  <div class="espacio-caja" id="espacioCaja">
+    <span id="espacioTexto">Cargando tu espacio…</span>
+    <div class="espacio-riel" id="espacioRiel"><i></i></div>
+    <p id="espacioExplicacion"></p>
+  </div>
+
+  <section class="panel" id="seccionMusica" aria-labelledby="pestanaMusica">
+    <button type="button" class="subir-grande" id="subirMusicaBtn">➕ Subir canciones
+      <small>Varias a la vez · MP3, M4A, OGG o WAV · hasta 15 MB cada una</small>
+    </button>
+    <input type="file" id="archivoMusica" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.wav" multiple hidden>
+    <div class="subidas" id="subidasMusica"></div>
+  </section>
+
+  <section class="panel" id="seccionVideos" aria-labelledby="pestanaVideos" hidden>
+    <button type="button" class="subir-grande" id="subirVideoBtn">📤 Subir video
+      <small>MP4, WEBM o MOV · se achica a 720p · hasta 100 MB</small>
+    </button>
+    <input type="file" id="archivoVideo" accept="video/*,.mp4,.m4v,.webm,.mov" multiple hidden>
+    <div class="subidas" id="subidasVideo"></div>
+
+    <h2 class="titulo-bloque">🔗 Enlace de YouTube <small>(no ocupa espacio, sin límite de minutos)</small></h2>
+    <form class="enlace-youtube" id="formYoutube">
+      <label for="enlaceYoutube">Pegá el enlace del video (público o no listado)</label>
+      <div class="fila-enlace">
+        <input type="url" class="campo" id="enlaceYoutube" placeholder="https://youtu.be/…" autocomplete="off" required>
+        <button type="submit" class="btn primary chico" id="guardarYoutube">Guardar</button>
+      </div>
+      <details>
+        <summary>Mostrar sólo una parte (opcional)</summary>
+        <div class="tramo">
+          <label for="inicioYoutube">Desde</label>
+          <input type="text" class="campo" id="inicioYoutube" inputmode="numeric" placeholder="1:10">
+          <label for="finYoutube">hasta</label>
+          <input type="text" class="campo" id="finYoutube" inputmode="numeric" placeholder="2:30">
+        </div>
+      </details>
+    </form>
+
+  </section>
+
+  <div class="btn-row">
+    <a class="btn" href="multimedia.html" id="verLista">📋 Ver y ordenar mi lista</a>
+  </div>
+
+</div>
+
+<div class="toast" id="toast" role="alert" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="scripts/autenticacion.js"></script>
+<script src="scripts/multimedia.js"></script>
+
+</body>
+</html>

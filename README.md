@@ -9,13 +9,16 @@ Controla diapositivas en tiempo real:
 - **Música y videos** (`/multimedia.html`, pestañas en Gestionar): subir canciones y videos o guardar enlaces de YouTube, y manejarlos desde el celular mientras presentás
 
 ## 🎵 Música y videos
-- **Subir**: en Gestionar → 🎵 Música o 🎬 Videos. Música MP3/M4A/OGG/WAV hasta 15 MB; video
+- **Subir** (`/subir-multimedia.html`, botón «➕ Subir» en Gestionar → 🎵 Música o 🎬 Videos). Música MP3/M4A/OGG/WAV hasta 15 MB; video
   MP4/WEBM/MOV hasta 100 MB. Los videos se achican a 720p **en el celular** antes de subir
   (Mediabunny, `publico/vendor/`), así gastan menos espacio. Con Cloudinary, el celular sube
   directo a Cloudinary con una firma del servidor (el archivo no pasa por la memoria de Render).
 - **YouTube**: se guarda sólo el enlace (no ocupa espacio). Tiene que ser público o no listado;
   se puede elegir desde qué minuto y hasta cuál se muestra.
-- **Borrar varios**: «☑️ Seleccionar», marcar y «🗑️ Borrar». El admin ve y borra lo de todos.
+- **Ordenar y borrar** (`/multimedia.html`, su propia página): arrastrar ≡ (o ▲▼) para elegir qué
+  sale primero; «☑️ Seleccionar», marcar y «🗑️ Borrar». El admin ve y borra lo de todos.
+- **YouTube desde el celular**: si nadie tocó la PC, el video arranca igual sin sonido y con un
+  toque en la pantalla de la PC se escucha (los navegadores no dejan arrancar con sonido solo).
 - **En el control**: «🎵 Música» (▶/⏸, barra para arrastrar con el dedo, ±10 s, siguiente,
   volumen y lista) y «🎬 Video» (se manda a la pantalla). La línea chica del reproductor aparece
   también en Gestionar y Modo avanzado.
@@ -88,7 +91,8 @@ servidor/                 Todo lo que corre en el servidor (Node)
   validadores-medios.js   Validación de las órdenes de música/video y del estado de la pantalla
   guardian.js             Los 4 guardianes: filas con empleados, turnos, espacio y mensajes de más
 publico/                  Lo único que ve el navegador
-  pantalla.html, control.html, gestionar.html, multimedia.html, avanzado.html, index.html
+  pantalla.html, control.html, gestionar.html, multimedia.html, subir-multimedia.html,
+  avanzado.html, index.html
   estilos/estilos.css     Estilos de todas las páginas
   estilos/multimedia.css  Estilos de la música y los videos
   vendor/                 Mediabunny (achica los videos en el navegador; licencia MPL-2.0)

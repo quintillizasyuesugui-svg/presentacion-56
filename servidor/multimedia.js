@@ -305,7 +305,9 @@ const subidaLocal = multer({
     destination: (req, file, cb) => fs.mkdir(CARPETA_MULTIMEDIA, { recursive: true }).then(() => cb(null, CARPETA_MULTIMEDIA), cb),
     filename: (req, file, cb) => cb(null, crypto.randomUUID() + path.extname(file.originalname).toLowerCase())
   }),
-  limits: { fileSize: LIMITE_BYTES.video, files: 1 }
+  limits: { fileSize: LIMITE_BYTES.video, files: 1 },
+  // Nombres con tildes o ñ («Canción.mp3»): el navegador los manda en UTF-8.
+  defParamCharset: 'utf8'
 });
 
 function registrarRutasMultimedia(app, io) {

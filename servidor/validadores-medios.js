@@ -48,6 +48,7 @@ function limpiarPista(p) {
     t: esNumero(p.t) ? Math.max(0, Math.min(p.t, SEGUNDOS_MAXIMOS)) : 0,
     duracion: esNumero(p.duracion) ? Math.max(0, Math.min(p.duracion, SEGUNDOS_MAXIMOS)) : 0,
     sonando: Boolean(p.sonando),
+    silenciado: Boolean(p.silenciado),
     volumen: esNumero(p.volumen) ? Math.max(0, Math.min(100, Math.round(p.volumen))) : 70,
     posicion: Number.isInteger(p.posicion) ? p.posicion : 0,
     total: Number.isInteger(p.total) ? p.total : 0

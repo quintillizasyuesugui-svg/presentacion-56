@@ -41,41 +41,19 @@
   </div>
 
   <section class="panel" id="seccionMusica" aria-labelledby="pestanaMusica">
-    <button type="button" class="subir-grande" id="subirMusicaBtn">➕ Subir canciones
-      <small>Podés elegir varias. MP3, M4A, OGG o WAV, hasta 15 MB cada una (unos 15 minutos).</small>
-    </button>
-    <input type="file" id="archivoMusica" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.wav" multiple hidden>
-    <div class="subidas" id="subidasMusica"></div>
+    <a class="btn chico subir-enlace" href="subir-multimedia.html#musica">➕ Subir canciones</a>
     <div class="barra-seleccion" id="seleccionMusica"></div>
+    <p class="ayuda-orden">Arrastrá ≡ (o usá ▲▼) para elegir qué canción sale primero.</p>
     <ul class="lista-medios" id="listaMusica"></ul>
+    <button type="button" class="ver-todas" id="verTodasMusica" hidden></button>
   </section>
 
   <section class="panel" id="seccionVideos" aria-labelledby="pestanaVideos" hidden>
-    <button type="button" class="subir-grande" id="subirVideoBtn">📤 Subir video
-      <small>MP4, WEBM o MOV. Se achica a 720p antes de subir para gastar menos espacio. Hasta 100 MB (unos 7 minutos).</small>
-    </button>
-    <input type="file" id="archivoVideo" accept="video/*,.mp4,.m4v,.webm,.mov" multiple hidden>
-    <div class="subidas" id="subidasVideo"></div>
-
-    <form class="enlace-youtube" id="formYoutube">
-      <label for="enlaceYoutube">🔗 O guardá un enlace de YouTube (no ocupa espacio, sin límite de minutos)</label>
-      <div class="fila-enlace">
-        <input type="url" class="campo" id="enlaceYoutube" placeholder="https://youtu.be/…" autocomplete="off" required>
-        <button type="submit" class="btn primary chico" id="guardarYoutube">Guardar</button>
-      </div>
-      <details>
-        <summary>Mostrar sólo una parte (opcional)</summary>
-        <div class="tramo">
-          <label for="inicioYoutube">Desde</label>
-          <input type="text" class="campo" id="inicioYoutube" inputmode="numeric" placeholder="1:10">
-          <label for="finYoutube">hasta</label>
-          <input type="text" class="campo" id="finYoutube" inputmode="numeric" placeholder="2:30">
-        </div>
-      </details>
-    </form>
-
+    <a class="btn chico subir-enlace" href="subir-multimedia.html#videos">📤 Subir video o guardar un enlace de YouTube</a>
     <div class="barra-seleccion" id="seleccionVideos"></div>
+    <p class="ayuda-orden">Arrastrá ≡ (o usá ▲▼) para elegir qué video sale primero.</p>
     <ul class="lista-medios" id="listaVideos"></ul>
+    <button type="button" class="ver-todas" id="verTodasVideos" hidden></button>
   </section>
 
   <div id="lugarMiniReproductor"></div>

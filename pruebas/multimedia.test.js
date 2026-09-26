@@ -43,6 +43,7 @@ test('estado de medios: limpia y acota lo que manda la pantalla', () => {
   assert.equal(e.musica.nombre.length, 200);
   assert.equal(e.musica.volumen, 100);
   assert.equal(e.video, null);
+  assert.equal(e.musica.silenciado, false);
   assert.equal(limpiarEstadoMedios({ pantalla: 'p1', musica: { nombre: 'sin id' } }), null);
   assert.equal(limpiarEstadoMedios({ musica: null }), null);
 });
@@ -83,7 +84,7 @@ let base;
 let datosTemporales;
 
 async function esperarServidor(url) {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 400; i++) { // hasta 60 s: con todas las pruebas juntas la PC va más lenta
     try {
       const r = await fetch(url + '/api/multimedia');
       if (r.status === 401) return;
@@ -167,6 +168,9 @@ test('subir, espacio por persona, borrar varios y orden', async () => {
   assert.equal(r.estado, 200, JSON.stringify(r.datos));
   r = await subirLocal(ana.pin, 'Tema dos.mp3', 300 * 1024);
   assert.equal(r.estado, 200);
+  r = await subirLocal(ana.pin, 'Canción ñandú.mp3', 1024);
+  assert.equal(r.datos.elementos[2].nombre, 'Canción ñandú', 'los nombres con tilde y ñ llegan bien');
+  r = await pedir(ana.pin, '/api/multimedia/borrar', { ids: [r.datos.elementos[2].id] });
   const [uno, dos] = r.datos.elementos;
   assert.equal(uno.nombre, 'Tema uno');
   assert.equal(uno.duracion, 42);

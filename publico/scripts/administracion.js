@@ -6,6 +6,7 @@
 (function () {
   const seccion = document.getElementById('adminSeccion');
   const boton = document.getElementById('personasBtn');
+  const botonGuardianes = document.getElementById('guardianesBtn');
   const capa = document.getElementById('personasOverlay');
   const cerrar = document.getElementById('personasCerrar');
   const buscar = document.getElementById('personasBuscar');
@@ -257,6 +258,11 @@
   }
 
   boton.addEventListener('click', abrir);
+  // «Guardianes y espacio» abre la misma ventana, con los guardianes arriba a la vista.
+  botonGuardianes.addEventListener('click', () => {
+    abrir();
+    requestAnimationFrame(() => cajaGuardianes.scrollIntoView({ block: 'start' }));
+  });
   cerrar.addEventListener('click', ocultar);
   buscar.addEventListener('input', () => { confirmando = false; pintar(); });
   // «Seleccionar todas» marca las que se ven (si hay un filtro, sólo las que coinciden).
@@ -269,5 +275,6 @@
     const esAdmin = !!(auth && auth.isAdmin);
     seccion.hidden = !esAdmin;
     boton.hidden = !esAdmin;
+    botonGuardianes.hidden = !esAdmin;
   }).catch(() => {});
 })();

@@ -1,7 +1,9 @@
-// multimedia.html: subir, ordenar y borrar tu música y tus videos (o guardar un enlace de
-// YouTube). Los videos se achican a 720p en el mismo celular antes de subir (Mediabunny,
-// publico/vendor), así gastan menos espacio. El admin ve lo de todas las personas y puede
-// borrar lo de cualquiera.
+// Dos páginas usan este script:
+//  - multimedia.html: ver, ordenar (arrastrando o con ▲▼) y borrar tu música y tus videos.
+//    El admin ve lo de todas las personas y puede borrar lo de cualquiera.
+//  - subir-multimedia.html: subir canciones y videos o guardar un enlace de YouTube. Los
+//    videos se achican a 720p en el mismo celular antes de subir (Mediabunny, publico/vendor).
+// Cada parte se activa sólo si su página la tiene.
 const socket = io();
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -20,10 +22,15 @@ const socket = io();
   };
   const fmtMb = (b) => (Math.round((b / MB) * 10) / 10).toLocaleString('es') + ' MB';
 
+  const hayListas = !!$('listaMusica');
+  const haySubida = !!$('subirMusicaBtn');
   let auth = null;
   let datos = { elementos: [], espacio: { usado: 0, total: 0 }, explicacion: '', subida: 'no', limites: { musica: 15 * MB, video: 100 * MB } };
   const seleccion = { musica: new Set(), video: new Set() };
   const seleccionando = { musica: false, video: false };
+  // Listas plegadas: se ven las primeras VISIBLES_PLEGADA y un botón «Ver todas».
+  const VISIBLES_PLEGADA = 5;
+  const desplegada = { musica: false, video: false };
   let filtroPersona = new URLSearchParams(location.search).get('de') || ''; // el admin llega desde «Personas»
 
   // ---------- aviso ----------
@@ -71,6 +78,7 @@ const socket = io();
     $('seccionVideos').hidden = !videosActiva;
     $('pestanaMusica').setAttribute('aria-current', videosActiva ? 'false' : 'page');
     $('pestanaVideos').setAttribute('aria-current', videosActiva ? 'page' : 'false');
+    if ($('verLista')) $('verLista').href = 'multimedia.html' + (videosActiva ? '#videos' : '#musica');
   }
   window.addEventListener('hashchange', pestana);
   pestana();
@@ -92,7 +100,7 @@ const socket = io();
   }
 
   function pintarFiltroAdmin() {
-    if (!auth || !auth.isAdmin) return;
+    if (!auth || !auth.isAdmin || !$('filtroAdmin')) return;
     const personas = [...new Set(datos.elementos.map(e => e.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
     const select = $('filtroPersona');
     const actual = filtroPersona;
@@ -134,14 +142,27 @@ const socket = io();
       );
     }
 
-    lista.replaceChildren(...items.map((e) => {
+    // Se puede ordenar (arrastrando ≡ o con ▲▼) cuando todo lo que se ve es de uno mismo.
+    const ordenable = !seleccionando[tipo] && items.length > 1 && items.every(e => e.owner === auth.name);
+    const visibles = desplegada[tipo] ? items : items.slice(0, VISIBLES_PLEGADA);
+    const boton = tipo === 'musica' ? $('verTodasMusica') : $('verTodasVideos');
+    boton.hidden = items.length <= VISIBLES_PLEGADA;
+    boton.textContent = desplegada[tipo] ? 'Ver menos ▴' : `Ver todas (${items.length}) ▾`;
+
+    lista.replaceChildren(...visibles.map((e, n) => {
       const marcada = sel.has(e.id);
       const detalles = [];
       if (e.origen === 'youtube') detalles.push('🔗 YouTube' + (e.inicio != null || e.fin != null ? ` (${fmtTiempo(e.inicio || 0)} a ${e.fin != null ? fmtTiempo(e.fin) : 'el final'})` : ''));
       if (e.duracion) detalles.push(fmtTiempo(e.duracion));
       detalles.push(e.bytes ? fmtMb(e.bytes) : '0 MB');
       if (auth.isAdmin && e.owner && e.owner !== auth.name) detalles.push('👤 ' + e.owner);
-      const fila = crear('li', { class: 'fila-medio' + (marcada ? ' marcada' : '') });
+      const fila = crear('li', { class: 'fila-medio' + (marcada ? ' marcada' : ''), 'data-id': e.id });
+      if (ordenable) {
+        const asa = crear('button', { type: 'button', class: 'asa-orden', 'aria-label': 'Arrastrar para cambiar el orden de ' + e.nombre, text: '≡' });
+        asa.addEventListener('pointerdown', (ev) => arrastrar(ev, fila, lista, tipo));
+        fila.append(asa);
+      }
+      fila.append(crear('span', { class: 'numero-orden', 'aria-hidden': 'true', text: String(n + 1) }));
       if (seleccionando[tipo]) {
         const cb = crear('input', { type: 'checkbox', 'aria-label': 'Marcar ' + e.nombre });
         cb.checked = marcada;
@@ -151,7 +172,7 @@ const socket = io();
       fila.append(crear('span', { class: 'datos-medio' }, [crear('b', { text: (e.origen === 'youtube' ? '' : tipo === 'video' ? '📁 ' : '') + e.nombre }), crear('span', { text: detalles.join(' · ') })]));
       if (!seleccionando[tipo]) {
         const i = propios.indexOf(e);
-        if (i !== -1 && propios.length > 1) {
+        if (ordenable && i !== -1) {
           fila.append(
             crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Subir de posición', text: '▲', disabled: i === 0, onclick: () => mover(tipo, e.id, -1) }),
             crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Bajar de posición', text: '▼', disabled: i === propios.length - 1, onclick: () => mover(tipo, e.id, 1) })
@@ -165,11 +186,12 @@ const socket = io();
 
   function pintarTodo() {
     pintarEspacio();
+    if (!hayListas) return;
     pintarFiltroAdmin();
     pintarLista('musica');
     pintarLista('video');
   }
-  $('filtroPersona').addEventListener('change', (e) => { filtroPersona = e.target.value; pintarLista('musica'); pintarLista('video'); });
+  if (hayListas) $('filtroPersona').addEventListener('change', (e) => { filtroPersona = e.target.value; pintarLista('musica'); pintarLista('video'); });
 
   async function cargar() {
     try {
@@ -178,6 +200,65 @@ const socket = io();
     } catch (err) {
       avisar(err.message);
     }
+  }
+
+  // ---- Arrastrar con el dedo para ordenar (las flechas ▲▼ quedan de respaldo) ----
+  function arrastrar(e, fila, lista, tipo) {
+    e.preventDefault();
+    const asa = e.currentTarget;
+    let inicioY = e.clientY;
+    fila.classList.add('arrastrando');
+    asa.setPointerCapture(e.pointerId);
+    function mover(ev) {
+      fila.style.transform = `translateY(${ev.clientY - inicioY}px)`;
+      const r = fila.getBoundingClientRect();
+      const centro = r.top + r.height / 2;
+      for (const otra of [...lista.children]) {
+        if (otra === fila) continue;
+        const o = otra.getBoundingClientRect();
+        const filas = [...lista.children];
+        const yo = filas.indexOf(fila);
+        const ella = filas.indexOf(otra);
+        if (yo < ella && centro > o.top + o.height / 2) {
+          lista.insertBefore(otra, fila);
+          inicioY += o.height + 8;
+        } else if (yo > ella && centro < o.top + o.height / 2) {
+          lista.insertBefore(fila, otra);
+          inicioY -= o.height + 8;
+        }
+        fila.style.transform = `translateY(${ev.clientY - inicioY}px)`;
+      }
+    }
+    async function soltar(ev) {
+      asa.releasePointerCapture(ev.pointerId);
+      asa.removeEventListener('pointermove', mover);
+      asa.removeEventListener('pointerup', soltar);
+      asa.removeEventListener('pointercancel', soltar);
+      fila.classList.remove('arrastrando');
+      fila.style.transform = '';
+      // Lo que se ve quedó en el orden nuevo; lo que estaba plegado sigue detrás, igual que antes.
+      const vistos = [...lista.children].map(li => li.dataset.id);
+      const resto = datos.elementos.filter(x => x.tipo === tipo && x.owner === auth.name && !vistos.includes(x.id)).map(x => x.id);
+      const ids = [...vistos, ...resto];
+      const antes = datos.elementos.filter(x => x.tipo === tipo && x.owner === auth.name).map(x => x.id);
+      if (ids.join() === antes.join()) return;
+      try {
+        datos = await pedir('/api/multimedia/orden', { tipo, ids });
+        pintarTodo();
+        avisar('✅ Orden guardado: así van a salir en el celular.', true);
+      } catch (err) {
+        avisar(err.message);
+        pintarTodo();
+      }
+    }
+    asa.addEventListener('pointermove', mover);
+    asa.addEventListener('pointerup', soltar);
+    asa.addEventListener('pointercancel', soltar);
+  }
+
+  if (hayListas) {
+    $('verTodasMusica').addEventListener('click', () => { desplegada.musica = !desplegada.musica; pintarLista('musica'); });
+    $('verTodasVideos').addEventListener('click', () => { desplegada.video = !desplegada.video; pintarLista('video'); });
   }
 
   async function mover(tipo, id, paso) {
@@ -218,9 +299,9 @@ const socket = io();
     setTimeout(() => { capa.hidden = true; }, 200);
     porBorrar = null;
   }
-  $('confirmarNo').addEventListener('click', cerrarConfirmar);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !capa.hidden) cerrarConfirmar(); });
-  $('confirmarSi').addEventListener('click', async () => {
+  if (hayListas) $('confirmarNo').addEventListener('click', cerrarConfirmar);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && capa && !capa.hidden) cerrarConfirmar(); });
+  if (hayListas) $('confirmarSi').addEventListener('click', async () => {
     if (!porBorrar) return;
     const { tipo, ids } = porBorrar;
     $('confirmarSi').disabled = true;
@@ -334,7 +415,7 @@ const socket = io();
         estado.textContent = texto;
         if (fraccion != null) barra.style.width = Math.round(fraccion * 100) + '%';
       },
-      listo(texto) { fila.classList.add('lista'); estado.textContent = texto; barra.style.width = '100%'; setTimeout(() => fila.remove(), 6000); },
+      listo(texto) { fila.classList.add('lista'); estado.textContent = texto; barra.style.width = '100%'; setTimeout(() => fila.remove(), 8000); },
       error(texto) { fila.classList.add('error'); estado.textContent = texto; }
     };
   }
@@ -370,7 +451,7 @@ const socket = io();
         datos = await enviarConProgreso(firma.url, formulario, { 'x-pin': auth.pin }, avance);
       }
       pintarTodo();
-      ui.listo('✅ Listo');
+      ui.listo('✅ Listo: ya está en tu lista');
     } catch (err) {
       ui.error('❌ ' + err.message);
     }
@@ -384,10 +465,12 @@ const socket = io();
     cargar();
   }
 
-  $('subirMusicaBtn').addEventListener('click', () => $('archivoMusica').click());
-  $('subirVideoBtn').addEventListener('click', () => $('archivoVideo').click());
-  $('archivoMusica').addEventListener('change', (e) => { subirVarios(e.target.files, 'musica', $('subidasMusica')); e.target.value = ''; });
-  $('archivoVideo').addEventListener('change', (e) => { subirVarios(e.target.files, 'video', $('subidasVideo')); e.target.value = ''; });
+  if (haySubida) {
+    $('subirMusicaBtn').addEventListener('click', () => $('archivoMusica').click());
+    $('subirVideoBtn').addEventListener('click', () => $('archivoVideo').click());
+    $('archivoMusica').addEventListener('change', (e) => { subirVarios(e.target.files, 'musica', $('subidasMusica')); e.target.value = ''; });
+    $('archivoVideo').addEventListener('change', (e) => { subirVarios(e.target.files, 'video', $('subidasVideo')); e.target.value = ''; });
+  }
 
   // ---------- YouTube ----------
   function aSegundos(texto) {
@@ -396,7 +479,7 @@ const socket = io();
     if (!/^\d+(:\d{1,2}){0,2}$/.test(t)) return NaN;
     return t.split(':').reduce((s, p) => s * 60 + Number(p), 0);
   }
-  $('formYoutube').addEventListener('submit', async (e) => {
+  if (haySubida) $('formYoutube').addEventListener('submit', async (e) => {
     e.preventDefault();
     const inicio = aSegundos($('inicioYoutube').value);
     const fin = aSegundos($('finYoutube').value);

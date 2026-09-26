@@ -312,7 +312,7 @@
       panelVideo.hidden = !v;
       panelNavegacion.hidden = !!v;
       if (v) {
-        pvNombre.textContent = '🎬 En tu pantalla: ' + v.nombre;
+        pvNombre.textContent = (v.silenciado ? '🔇 Sin sonido: tocá la pantalla de la PC · ' : '🎬 En tu pantalla: ') + v.nombre;
         pvBarra.pintar(ahora(v), v.duracion);
         pvPlay.textContent = v.sonando ? '⏸' : '▶';
         pvPlay.setAttribute('aria-label', v.sonando ? 'Pausar video' : 'Reproducir video');
