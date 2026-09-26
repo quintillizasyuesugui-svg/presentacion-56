@@ -133,7 +133,7 @@ function empezar(tipo, t) {
   if (tipo === 'nube') usosNube.push(Date.now());
   if (t.esperoDesde) {
     const segundos = Math.round((Date.now() - t.esperoDesde) / 1000);
-    if (segundos >= 3) anotar('tareas', t.persona, `esperó ${segundos} s en la fila (${tipo})`, 'había muchas personas pidiendo lo mismo a la vez');
+    if (segundos >= 10) anotar('tareas', t.persona, `esperó ${segundos} s en la fila (${tipo})`, 'había muchas personas pidiendo lo mismo a la vez');
   }
   Promise.resolve()
     .then(t.tarea)
@@ -237,6 +237,31 @@ function pantallaConSonido(persona, pantalla) {
   pantallasConSonido.set(persona, { pantalla, desde: new Date().toISOString() });
 }
 
+// ================= Simulacro (sólo el admin, para verlos trabajar) =================
+// 20 personas de mentira piden 60 tareas de imagen a la vez (cada una espera 1 a 3 s, no sube
+// nada) y una más intenta acaparar enlaces de YouTube. Se ve cómo se contratan empleados,
+// cómo reparten por turnos, a quién frenan y cómo vuelven al mínimo. No toca datos reales.
+let simulacroEnCurso = false;
+function simulacro() {
+  if (simulacroEnCurso) return false;
+  simulacroEnCurso = true;
+  anotar('tareas', '—', 'empezó un simulacro', 'el admin quiso ver a los guardianes trabajar');
+  const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+  const tareas = [];
+  for (let i = 0; i < 60; i++) {
+    const persona = `Simulacro ${(i % 20) + 1}`;
+    tareas.push(enFila('imagenes', persona, () => esperar(1000 + Math.random() * 2000)).catch(() => {}));
+  }
+  for (let i = 0; i < 5; i++) {
+    tareas.push(enFila('youtube', 'Simulacro acaparador', () => esperar(2500)).catch(() => {}));
+  }
+  Promise.all(tareas).then(() => {
+    simulacroEnCurso = false;
+    anotar('tareas', '—', 'terminó el simulacro', 'se atendieron todas las tareas y los empleados volvieron al mínimo');
+  });
+  return true;
+}
+
 // ================= Resumen para el admin =================
 
 function estadoGuardian() {
@@ -257,6 +282,7 @@ function estadoGuardian() {
     tareas: porTipo,
     almacenamiento: { cupoNube: { usado: usosNube.length, limite: CUPO_NUBE_POR_HORA } },
     pantallas: { conSonido: pantallasConSonido.size, mensajesPorSegundo: MENSAJES_POR_SEGUNDO },
+    simulacro: simulacroEnCurso,
     decisiones
   };
 }
@@ -267,6 +293,7 @@ module.exports = {
   explicarEspacio,
   estadoGuardian,
   empleadosAhora,
+  simulacro,
   conectar,
   desconectar,
   vigilanteDeMensajes,

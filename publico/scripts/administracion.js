@@ -53,6 +53,7 @@
   document.getElementById('personasLista').prepend(cajaGuardianes);
   const NOMBRES_TAREAS = { imagenes: 'imágenes y páginas de PDF', nube: 'música y videos', local: 'subidas en esta PC', youtube: 'enlaces de YouTube' };
 
+  let relojGuardianes = null;
   async function cargarGuardianes() {
     try {
       const [g, n] = await Promise.all([
@@ -63,8 +64,27 @@
       const partes = [crear('h3', '', '🛡️ Los 4 guardianes')];
       const cuantos = g.usuarios.conectados.length;
       partes.push(crear('p', '', `👤 Usuarios: ${cuantos} ${cuantos === 1 ? 'persona conectada' : 'personas conectadas'} ahora.`));
-      const tareas = Object.entries(g.tareas).map(([t, f]) => `${NOMBRES_TAREAS[t] || t}: ${f.empleados} empleados (máx. ${f.maximo})${f.esperando.length ? `, ${f.esperando.length} en fila` : ''}`);
-      partes.push(crear('p', '', `👷 Tareas: ${tareas.join(' · ')}.`));
+      partes.push(crear('p', '', '👷 Tareas: cada 👷 es un empleado trabajando y cada ⏳ una tarea esperando su turno.'));
+      for (const [t, f] of Object.entries(g.tareas)) {
+        const fila = crear('div', 'guardian-fila');
+        const trabajando = f.trabajando.length;
+        const esperando = f.esperando.length;
+        fila.append(
+          crear('span', 'guardian-nombre', `${NOMBRES_TAREAS[t] || t}: ${f.empleados} ${f.empleados === 1 ? 'empleado' : 'empleados'} (mín. ${f.minimo}, máx. ${f.maximo})`),
+          crear('span', 'guardian-iconos', '👷'.repeat(trabajando) + '⏳'.repeat(Math.min(esperando, 30)) + (esperando > 30 ? ` +${esperando - 30}` : '') || '— sin trabajo ahora')
+        );
+        partes.push(fila);
+      }
+      const probar = crear('button', 'btn chico', g.simulacro ? '⏳ Simulacro en marcha…' : '▶ Ver a los guardianes trabajar (simulacro)');
+      probar.type = 'button';
+      probar.disabled = !!g.simulacro;
+      probar.addEventListener('click', async () => {
+        probar.disabled = true;
+        const res = await authFetch('/api/admin/guardian/simulacro', { method: 'POST' });
+        if (!res.ok) avisar((await res.json().catch(() => ({}))).error || 'No se pudo lanzar el simulacro.');
+        cargarGuardianes();
+      });
+      partes.push(probar);
       let almacen = `📦 Almacenamiento: ${c.mbPorPersona.toLocaleString('es')} MB por persona (${(c.presupuestoMb / 1000).toLocaleString('es')} GB ÷ ${c.personas} ${c.personas === 1 ? 'persona' : 'personas'}, entre ${c.minimoMb} MB y ${c.maximoMb.toLocaleString('es')} MB). Guardado en total: ${fmtMb(n.usadoTotal)}. Subidas a Cloudinary esta hora: ${g.almacenamiento.cupoNube.usado} de ${g.almacenamiento.cupoNube.limite}.`;
       const alerta = !!(n.nube && n.nube.porcentaje >= 80);
       if (n.nube && n.nube.porcentaje != null) almacen += ` Cloudinary este mes: ${Math.round(n.nube.porcentaje)} % de lo gratis.`;
@@ -250,9 +270,13 @@
     buscar.value = '';
     cargar();
     cargarGuardianes();
+    // En vivo mientras la ventana está abierta.
+    clearInterval(relojGuardianes);
+    relojGuardianes = setInterval(cargarGuardianes, 1500);
   }
 
   function ocultar() {
+    clearInterval(relojGuardianes);
     capa.classList.remove('show');
     setTimeout(() => { capa.hidden = true; }, 200);
   }

@@ -8,7 +8,7 @@ const { contarPorDueno, quitarDiapositivasDe } = require('./diapositivas');
 const { borrarFraseDe } = require('./frase-final');
 const { borrarAvanceDe } = require('./avance-automatico');
 const { cancelarTrabajosDe } = require('./documentos');
-const { estadoGuardian } = require('./guardian');
+const { estadoGuardian, simulacro } = require('./guardian');
 const { espacioPorPersona, espacioDe, espacioFijoDe, calculoAutomatico, usadoTotal, fijarEspacio, quitarMultimediaDe, usoDeLaNube, MB } = require('./multimedia');
 
 const ESPACIO_MAXIMO_MB = 5000;
@@ -110,6 +110,12 @@ function registrarRutasAdministracion(app) {
   // últimas decisiones con el motivo.
   app.get('/api/admin/guardian', requiereAdmin, (req, res) => {
     res.json(estadoGuardian());
+  });
+
+  // POST /api/admin/guardian/simulacro — lanza un simulacro para ver trabajar a los guardianes.
+  app.post('/api/admin/guardian/simulacro', requiereAdmin, (req, res) => {
+    if (!simulacro()) return res.status(409).json({ error: 'Ya hay un simulacro en marcha.' });
+    res.json({ ok: true });
   });
 
   // GET /api/admin/nube — el calculador de espacio, cuánto se guardó en total y cuánto se usó

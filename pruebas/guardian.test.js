@@ -9,7 +9,7 @@ const esperar = (ms) => new Promise(r => setTimeout(r, ms));
 test('atiende varias a la vez sin pasar del máximo aunque pidan muchas personas', async () => {
   let enCurso = 0;
   let maximo = 0;
-  const tarea = async () => { enCurso++; maximo = Math.max(maximo, enCurso); await esperar(3200); enCurso--; return 'ok'; };
+  const tarea = async () => { enCurso++; maximo = Math.max(maximo, enCurso); await esperar(10500); enCurso--; return 'ok'; };
   const personas = Array.from({ length: 15 }, (_, i) => `persona ${i}`);
   const resultados = await Promise.all(personas.map(p => enFila('youtube', p, tarea)));
   assert.ok(resultados.every(r => r === 'ok'));
@@ -92,4 +92,17 @@ test('los 4 guardianes: usuarios conectados, pantallas y mensajes de más', () =
   for (let i = 0; i < 100; i++) if (permitir('Ruidoso')) pasaron++;
   assert.ok(pasaron >= 20 && pasaron < 100, `pasaron ${pasaron} de 100 en un segundo`);
   assert.ok(estadoGuardian().decisiones.some(d => d.guardian === 'pantallas' && d.persona === 'Ruidoso'));
+});
+
+test('simulacro: se ven empleados trabajando y no se lanzan dos a la vez', async () => {
+  const { simulacro } = require('../servidor/guardian');
+  assert.equal(simulacro(), true);
+  assert.equal(simulacro(), false, 'no arranca otro mientras hay uno');
+  await esperar(300);
+  const e = estadoGuardian();
+  assert.ok(e.simulacro);
+  assert.ok(e.tareas.imagenes.trabajando.length > LIMITES.imagenes.minimo, 'contrató más empleados');
+  assert.ok(e.decisiones.some(d => d.persona === 'Simulacro acaparador'), 'frenó al que quería acaparar');
+  while (estadoGuardian().simulacro) await esperar(200);
+  assert.equal(estadoGuardian().tareas.imagenes.empleados, LIMITES.imagenes.minimo);
 });
