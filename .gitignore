@@ -10,3 +10,5 @@ images-order.json
 people.json
 frases-finales.json
 avance-automatico.json
+# Música y videos subidos al probar en la PC sin Cloudinary
+publico/multimedia/

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pantalla</title>
   <link rel="stylesheet" href="estilos/estilos.css">
+  <link rel="stylesheet" href="estilos/multimedia.css">
   <!-- Los 27 tipos de letra de "Frase final" — mismas keys/fuentes que en el
        editor de Modo avanzado, para que se vea igual acá y en la vista previa. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,6 +39,7 @@
   <div class="waiting-botones">
     <button id="enterFullscreen" class="btn primary">📺 Ir a pantalla completa</button>
     <button type="button" id="qrBtn" class="btn">📱 QR</button>
+    <button type="button" id="permitirSonido" class="btn">🔊 Permitir sonido</button>
   </div>
 </div>
 
@@ -72,9 +74,24 @@
   <div id="liveWriteText" class="fp-anim-target"></div>
 </div>
 
+<!-- Música y videos (scripts/multimedia-pantalla.js): el video tapa las diapositivas mientras
+     dura; el sello con el nombre de la canción aparece unos segundos al cambiar o pausar. -->
+<div class="capa-video" id="capaVideo" hidden>
+  <div class="marco-video" id="marcoVideo"></div>
+  <p class="titulo-video" id="tituloVideo"></p>
+</div>
+<div class="sello-musica" id="selloMusica" hidden>
+  <span class="ondas" aria-hidden="true"><i></i><i></i><i></i></span>
+  <span id="selloMusicaTexto"></span>
+</div>
+<div class="aviso-permiso" id="avisoPermiso" hidden>
+  <button type="button" class="btn primary" id="avisoPermisoBtn">🔊 <span id="avisoPermisoTexto">Tocá para que se escuche la música y los videos</span></button>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="scripts/autenticacion.js"></script>
 <script src="scripts/pantalla.js"></script>
+<script src="scripts/multimedia-pantalla.js"></script>
 
 </body>
 </html>

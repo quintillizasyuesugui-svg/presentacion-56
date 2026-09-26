@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Música y videos</title>
+  <link rel="stylesheet" href="estilos/estilos.css">
+  <link rel="stylesheet" href="estilos/multimedia.css">
+</head>
+<body class="control">
+<div class="app">
+
+  <div class="app-header">
+    <div class="header-id">
+      <h1>Gestionar</h1>
+      <span class="auth-name-badge" id="authNameBadge" hidden></span>
+      <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
+    </div>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando…</span>
+    </div>
+  </div>
+
+  <nav class="pestanas-gestion" aria-label="Qué gestionar">
+    <a href="gestionar.html">🖼️ Imágenes</a>
+    <a href="#musica" id="pestanaMusica">🎵 Música</a>
+    <a href="#videos" id="pestanaVideos">🎬 Videos</a>
+  </nav>
+
+  <!-- Espacio propio de cada persona (el 📦 Guardián del Almacenamiento explica por qué es ese) -->
+  <div class="espacio-caja" id="espacioCaja">
+    <span id="espacioTexto">Cargando tu espacio…</span>
+    <div class="espacio-riel" id="espacioRiel"><i></i></div>
+    <p id="espacioExplicacion"></p>
+  </div>
+
+  <div class="filtro-admin" id="filtroAdmin" hidden>
+    <label for="filtroPersona">Ver de:</label>
+    <select class="campo" id="filtroPersona"></select>
+  </div>
+
+  <section class="panel" id="seccionMusica" aria-labelledby="pestanaMusica">
+    <button type="button" class="subir-grande" id="subirMusicaBtn">➕ Subir canciones
+      <small>Podés elegir varias. MP3, M4A, OGG o WAV, hasta 15 MB cada una (unos 15 minutos).</small>
+    </button>
+    <input type="file" id="archivoMusica" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.wav" multiple hidden>
+    <div class="subidas" id="subidasMusica"></div>
+    <div class="barra-seleccion" id="seleccionMusica"></div>
+    <ul class="lista-medios" id="listaMusica"></ul>
+  </section>
+
+  <section class="panel" id="seccionVideos" aria-labelledby="pestanaVideos" hidden>
+    <button type="button" class="subir-grande" id="subirVideoBtn">📤 Subir video
+      <small>MP4, WEBM o MOV. Se achica a 720p antes de subir para gastar menos espacio. Hasta 100 MB (unos 7 minutos).</small>
+    </button>
+    <input type="file" id="archivoVideo" accept="video/*,.mp4,.m4v,.webm,.mov" multiple hidden>
+    <div class="subidas" id="subidasVideo"></div>
+
+    <form class="enlace-youtube" id="formYoutube">
+      <label for="enlaceYoutube">🔗 O guardá un enlace de YouTube (no ocupa espacio, sin límite de minutos)</label>
+      <div class="fila-enlace">
+        <input type="url" class="campo" id="enlaceYoutube" placeholder="https://youtu.be/…" autocomplete="off" required>
+        <button type="submit" class="btn primary chico" id="guardarYoutube">Guardar</button>
+      </div>
+      <details>
+        <summary>Mostrar sólo una parte (opcional)</summary>
+        <div class="tramo">
+          <label for="inicioYoutube">Desde</label>
+          <input type="text" class="campo" id="inicioYoutube" inputmode="numeric" placeholder="1:10">
+          <label for="finYoutube">hasta</label>
+          <input type="text" class="campo" id="finYoutube" inputmode="numeric" placeholder="2:30">
+        </div>
+      </details>
+    </form>
+
+    <div class="barra-seleccion" id="seleccionVideos"></div>
+    <ul class="lista-medios" id="listaVideos"></ul>
+  </section>
+
+  <div id="lugarMiniReproductor"></div>
+
+  <div class="btn-row">
+    <a class="btn" href="control.html">⬅️ Volver</a>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="confirmar" hidden>
+  <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmarTitulo" aria-describedby="confirmarTexto">
+    <h2 id="confirmarTitulo">¿Borrar?</h2>
+    <p id="confirmarTexto">No se puede deshacer.</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="confirmarNo">Cancelar</button>
+      <button type="button" class="btn danger-solid" id="confirmarSi">🗑️ Borrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="alert" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="scripts/autenticacion.js"></script>
+<script src="scripts/multimedia.js"></script>
+<script src="scripts/reproductor-celular.js"></script>
+
+</body>
+</html>

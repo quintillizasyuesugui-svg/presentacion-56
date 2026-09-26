@@ -11,6 +11,7 @@ const multer = require('multer');
 const { CARPETA_DIAPOSITIVAS, EXTENSIONES_IMAGEN, cloudinary, nubeLista } = require('./configuracion');
 const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona, visiblePara } = require('./personas');
+const { enFila } = require('./guardian');
 
 const ERROR_SIN_NUBE = 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá .env.example.';
 
@@ -71,7 +72,7 @@ class ErrorPedido extends Error {
 }
 
 function responderError(res, err, mensajeGeneral) {
-  if (err instanceof ErrorPedido) return res.status(err.estado).json({ error: err.message });
+  if (err instanceof ErrorPedido || (err && err.guardian)) return res.status(err.estado).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: mensajeGeneral });
 }
@@ -93,7 +94,7 @@ function avisarCambioDeImagenes() {
 async function subirImagen(contenido, tipo, owner, nombreLocal) {
   if (nubeLista) {
     const dataUri = `data:${tipo};base64,${contenido.toString('base64')}`;
-    const resultado = await cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' });
+    const resultado = await enFila('imagenes', owner, () => cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' }));
     return { id: resultado.public_id, src: resultado.secure_url, owner };
   }
   if (process.env.DOCUMENTOS_SIN_NUBE_LOCAL === '1') {
@@ -201,10 +202,11 @@ function registrarRutasDiapositivas(app, io) {
         return res.status(400).json({ error: 'No se recibió ninguna imagen válida.' });
       }
 
-      // Primero se suben (lo lento) y recién después se agregan al orden.
+      // Primero se suben (lo lento) y recién después se agregan al orden. Los empleados del
+      // Guardián las suben de a varias, por turnos con las de otras personas.
       const nuevos = await Promise.all(archivos.map(async (archivo) => {
         const dataUri = `data:${archivo.mimetype};base64,${archivo.buffer.toString('base64')}`;
-        const resultado = await cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' });
+        const resultado = await enFila('imagenes', req.person.name, () => cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' }));
         return { id: resultado.public_id, src: resultado.secure_url, owner: req.person.name };
       }));
 
@@ -288,7 +290,7 @@ function registrarRutasDiapositivas(app, io) {
     let unida = null;
     try {
       comprobar(almacenOrden.actual());
-      const resultado = await cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' });
+      const resultado = await enFila('imagenes', req.person.name, () => cloudinary.uploader.upload(dataUri, { folder: 'presentacion/slides' }));
       unida = { id: resultado.public_id, src: resultado.secure_url, owner: req.person.name };
 
       const siguiente = await almacenOrden.modificar((orden) => {

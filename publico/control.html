@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Control</title>
   <link rel="stylesheet" href="estilos/estilos.css">
+  <link rel="stylesheet" href="estilos/multimedia.css">
   <!-- Los 27 tipos de letra de "Escribir en vivo" (mismos que "Frase final") —
        hacen falta acá para que el selector y la vista previa se vean bien. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&family=Cinzel+Decorative:wght@700&family=Bungee+Shade&family=Monoton&family=Luckiest+Guy&family=Shrikhand&family=Chewy&family=Titan+One&family=Faster+One&family=Bungee+Inline&display=swap" rel="stylesheet">
 </head>
-<body class="control">
+<body class="control" data-reproductor="control">
 <div class="app">
 
   <div class="app-header">
@@ -39,7 +40,15 @@
     <button type="button" class="btn ghost" id="liveWriteBtn">✍️ Escribir en vivo</button>
   </div>
 
+  <!-- Música y videos en tu pantalla (scripts/reproductor-celular.js) -->
+  <div class="btn-row medios-row">
+    <button type="button" class="btn ghost medio" id="musicaBtn">🎵 Música</button>
+    <button type="button" class="btn ghost medio" id="videoBtn">🎬 Video</button>
+  </div>
+
   <div class="spacer"></div>
+
+  <div id="lugarMiniReproductor"></div>
 
   <!-- Zona de pulgar: lo que más se toca durante toda la presentación, abajo y grande -->
   <div class="panel nav-panel">
@@ -57,7 +66,7 @@
     <div class="btn-row utility-row">
       <button class="btn small" onclick="openFullscreenPicker()">📺 Pantalla</button>
       <button class="btn small voice" id="voiceBtn" onclick="toggleVoice()">🎤 Voz</button>
-      <a class="btn small" href="gestionar.html">🖼️ Imágenes</a>
+      <a class="btn small" href="gestionar.html">🖼️ Gestionar</a>
       <a class="btn small icon-only" href="avanzado.html" aria-label="Modo avanzado">☰</a>
     </div>
   </div>
@@ -154,6 +163,7 @@
 <script src="scripts/control.js"></script>
 <script src="scripts/trabajos-documentos.js"></script>
 <script src="scripts/progreso-documentos.js"></script>
+<script src="scripts/reproductor-celular.js"></script>
 
 </body>
 </html>

@@ -6,6 +6,40 @@ Controla diapositivas en tiempo real:
 - **Control** (`/control.html`): Botones anterior/mostrar/siguiente/fullscreen/voz
 - **Gestionar imágenes** (`/gestionar.html`, antes `/manage.html` — el enlace viejo sigue funcionando): Subir, ordenar y borrar diapositivas desde el celular
 - **Modo avanzado** (`/avanzado.html`): tamaño y posición, unir imágenes, subir documento, frase final y avance automático
+- **Música y videos** (`/multimedia.html`, pestañas en Gestionar): subir canciones y videos o guardar enlaces de YouTube, y manejarlos desde el celular mientras presentás
+
+## 🎵 Música y videos
+- **Subir**: en Gestionar → 🎵 Música o 🎬 Videos. Música MP3/M4A/OGG/WAV hasta 15 MB; video
+  MP4/WEBM/MOV hasta 100 MB. Los videos se achican a 720p **en el celular** antes de subir
+  (Mediabunny, `publico/vendor/`), así gastan menos espacio. Con Cloudinary, el celular sube
+  directo a Cloudinary con una firma del servidor (el archivo no pasa por la memoria de Render).
+- **YouTube**: se guarda sólo el enlace (no ocupa espacio). Tiene que ser público o no listado;
+  se puede elegir desde qué minuto y hasta cuál se muestra.
+- **Borrar varios**: «☑️ Seleccionar», marcar y «🗑️ Borrar». El admin ve y borra lo de todos.
+- **En el control**: «🎵 Música» (▶/⏸, barra para arrastrar con el dedo, ±10 s, siguiente,
+  volumen y lista) y «🎬 Video» (se manda a la pantalla). La línea chica del reproductor aparece
+  también en Gestionar y Modo avanzado.
+- **En la pantalla**: tocar una vez «🔊 Permitir sonido» (los navegadores no dejan sonar nada
+  sin un toque; «Ir a pantalla completa» también sirve). La música suena encima de todo; un
+  video pausa todo (música, avance automático, texto en vivo) y al terminar vuelve a la misma
+  diapositiva. Si la misma persona abre dos pantallas, suena sólo la última donde se permitió.
+- **Espacio por persona**: `PRESUPUESTO_MB` (12 GB) se reparte entre las personas
+  registradas, entre `ESPACIO_MIN_MB` (100) y `ESPACIO_MAX_MB` (2000). Con pocas personas cada
+  una tiene más; con muchas, menos. El admin puede fijarle un espacio propio a alguien.
+- Al borrar una cuenta se borran también su música y sus videos.
+
+## 🛡️ Los 4 guardianes (`servidor/guardian.js`)
+Para que con muchos usuarios no se atore el servidor gratis:
+- **👤 Usuarios**: nadie acapara (máximo de subidas en curso por persona, turnos justos) y
+  cuenta quién está conectado.
+- **👷 Tareas**: «empleados» que suben imágenes (también las páginas de PDF y documentos),
+  música y videos en paralelo. Si crece la fila contrata más (hasta un máximo) y después
+  vuelven al mínimo. El próximo turno es para quien menos tareas tiene en curso.
+- **📦 Almacenamiento**: reparte el espacio, cuida el cupo por hora de Cloudinary
+  (`CUPO_NUBE_POR_HORA`, 400) y explica por qué cuando a alguien no le alcanza.
+- **📺 Pantallas**: la música y los videos de cada persona van sólo a su pantalla y frena a
+  quien manda más de 30 mensajes por segundo.
+El admin los ve en Modo avanzado → Personas, con sus últimas decisiones y el motivo.
 
 ## 📄 Subir documento (Modo avanzado)
 
@@ -50,9 +84,15 @@ servidor/                 Todo lo que corre en el servidor (Node)
   avance-automatico.js    Avance automático de cada persona
   sockets.js              Tiempo real entre el control y la pantalla
   validadores-frase.js    Listas de letras/efectos y validación de textos
+  multimedia.js           Música y videos: subir (firma de Cloudinary), YouTube, borrar, orden y espacio
+  validadores-medios.js   Validación de las órdenes de música/video y del estado de la pantalla
+  guardian.js             Los 4 guardianes: filas con empleados, turnos, espacio y mensajes de más
 publico/                  Lo único que ve el navegador
-  pantalla.html, control.html, gestionar.html, avanzado.html, index.html
+  pantalla.html, control.html, gestionar.html, multimedia.html, avanzado.html, index.html
   estilos/estilos.css     Estilos de todas las páginas
+  estilos/multimedia.css  Estilos de la música y los videos
+  vendor/                 Mediabunny (achica los videos en el navegador; licencia MPL-2.0)
+  multimedia/             Música y videos subidos al probar en la PC sin Cloudinary (no va a git)
   scripts/                El código de cada página (pantalla.js, control.js, …), autenticacion.js y
                           documentos.js / trabajos-documentos.js / progreso-documentos.js
   diapositivas/           Imágenes opcionales que viajan con el código
@@ -178,6 +218,8 @@ npm start
 - http://localhost:3000/pantalla.html
 - http://localhost:3000/control.html
 - http://localhost:3000/gestionar.html
+- Para probar música y videos sin Cloudinary: `DOCUMENTOS_SIN_NUBE_LOCAL=1 npm start`
+  (se guardan en `publico/multimedia/`)
 - `npm test` corre las pruebas de `pruebas/`
 - `npm run carga -- http://localhost:3000 400 20` simula 400 personas y 20 documentos a la vez
   (crea cuentas de prueba: no usarlo contra Render sin borrarlas después)

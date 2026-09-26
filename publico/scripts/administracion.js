@@ -1,6 +1,8 @@
 // «Personas» (Modo avanzado, sólo admin): lista de cuentas para marcar y borrar varias juntas.
-// Borrar quita las cuentas y todo lo suyo (diapositivas, frase final, avance automático y
-// documentos), como si nunca hubieran existido. Pide confirmar antes, en la barra de abajo.
+// Borrar quita las cuentas y todo lo suyo (diapositivas, frase final, avance automático,
+// música, videos y documentos), como si nunca hubieran existido. Pide confirmar antes, en la
+// barra de abajo. Arriba se ve qué hacen los 4 guardianes y cómo se reparte el espacio; con
+// una sola persona marcada se le puede fijar su espacio para música y videos.
 (function () {
   const seccion = document.getElementById('adminSeccion');
   const boton = document.getElementById('personasBtn');
@@ -40,6 +42,49 @@
   }
 
   const textoDiapositivas = (n) => (n === 1 ? '1 diapositiva' : `${n} diapositivas`);
+  const MB = 1024 * 1024;
+  const fmtMb = (b) => (Math.round((b / MB) * 10) / 10).toLocaleString('es') + ' MB';
+  const textoEspacio = (e) => (e ? `🎵 ${fmtMb(e.usado)} de ${fmtMb(e.total)}${e.fijoMb != null ? ' (fijo)' : ''}` : '');
+
+  // ---- Los 4 guardianes y el espacio ----
+  const cajaGuardianes = crear('div', 'guardian-caja');
+  cajaGuardianes.setAttribute('aria-live', 'polite');
+  document.getElementById('personasLista').prepend(cajaGuardianes);
+  const NOMBRES_TAREAS = { imagenes: 'imágenes y páginas de PDF', nube: 'música y videos', local: 'subidas en esta PC', youtube: 'enlaces de YouTube' };
+
+  async function cargarGuardianes() {
+    try {
+      const [g, n] = await Promise.all([
+        authFetch('/api/admin/guardian').then(r => r.json()),
+        authFetch('/api/admin/nube').then(r => r.json())
+      ]);
+      const c = n.calculo;
+      const partes = [crear('h3', '', '🛡️ Los 4 guardianes')];
+      const cuantos = g.usuarios.conectados.length;
+      partes.push(crear('p', '', `👤 Usuarios: ${cuantos} ${cuantos === 1 ? 'persona conectada' : 'personas conectadas'} ahora.`));
+      const tareas = Object.entries(g.tareas).map(([t, f]) => `${NOMBRES_TAREAS[t] || t}: ${f.empleados} empleados (máx. ${f.maximo})${f.esperando.length ? `, ${f.esperando.length} en fila` : ''}`);
+      partes.push(crear('p', '', `👷 Tareas: ${tareas.join(' · ')}.`));
+      let almacen = `📦 Almacenamiento: ${c.mbPorPersona.toLocaleString('es')} MB por persona (${(c.presupuestoMb / 1000).toLocaleString('es')} GB ÷ ${c.personas} ${c.personas === 1 ? 'persona' : 'personas'}, entre ${c.minimoMb} MB y ${c.maximoMb.toLocaleString('es')} MB). Guardado en total: ${fmtMb(n.usadoTotal)}. Subidas a Cloudinary esta hora: ${g.almacenamiento.cupoNube.usado} de ${g.almacenamiento.cupoNube.limite}.`;
+      const alerta = !!(n.nube && n.nube.porcentaje >= 80);
+      if (n.nube && n.nube.porcentaje != null) almacen += ` Cloudinary este mes: ${Math.round(n.nube.porcentaje)} % de lo gratis.`;
+      if (alerta) almacen = '⚠️ ' + almacen + ' Conviene borrar videos viejos o bajar el espacio por persona.';
+      partes.push(crear('p', alerta ? 'alerta' : '', almacen));
+      partes.push(crear('p', '', `📺 Pantallas: ${g.pantallas.conSonido} con sonido; cada conexión puede mandar hasta ${g.pantallas.mensajesPorSegundo} mensajes por segundo.`));
+      if (g.decisiones.length) {
+        const emoji = { usuarios: '👤', tareas: '👷', almacenamiento: '📦', pantallas: '📺' };
+        const lista = crear('ul', 'guardian-decisiones');
+        for (const d of g.decisiones.slice(0, 12)) {
+          const hora = new Date(d.cuando).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+          const quien = d.persona !== '—' ? d.persona + ': ' : '';
+          lista.append(crear('li', '', `${hora} ${emoji[d.guardian] || '🛡️'} ${quien}${d.que}, porque ${d.porque}.`));
+        }
+        partes.push(lista);
+      }
+      cajaGuardianes.replaceChildren(...partes);
+    } catch (err) {
+      cajaGuardianes.replaceChildren(crear('p', '', 'No se pudo leer a los guardianes: ' + err.message));
+    }
+  }
   const textoCuentas = (n) => (n === 1 ? '1 cuenta' : `${n} cuentas`);
 
   function visibles() {
@@ -99,7 +144,7 @@
     fila.setAttribute('aria-checked', String(marcada));
     fila.disabled = borrando;
     const datos = crear('span', 'persona-datos');
-    datos.append(crear('span', 'persona-nombre', p.name), crear('span', 'persona-detalle', textoDiapositivas(p.diapositivas)));
+    datos.append(crear('span', 'persona-nombre', p.name), crear('span', 'persona-detalle', [textoDiapositivas(p.diapositivas), textoEspacio(p.espacio)].filter(Boolean).join(' · ')));
     fila.append(crear('span', 'persona-casilla'), datos);
     fila.addEventListener('click', () => {
       if (marcada) seleccion.delete(p.name); else seleccion.add(p.name);
@@ -120,6 +165,7 @@
       borrar.type = 'button';
       borrar.addEventListener('click', () => { confirmando = true; pintar(); });
       barra.replaceChildren(borrar);
+      if (n === 1) barra.prepend(editorDeEspacio(marcadas[0]));
       return;
     }
     const pregunta = crear('p', 'persona-pregunta');
@@ -137,6 +183,50 @@
     si.addEventListener('click', borrarSeleccion);
     acciones.append(cancelar, si);
     barra.replaceChildren(pregunta, acciones);
+  }
+
+  // Con una sola persona marcada: fijarle su espacio para música y videos, o volver al automático.
+  function editorDeEspacio(p) {
+    const caja = crear('div', 'espacio-editor');
+    const campo = crear('input', 'campo');
+    campo.type = 'number';
+    campo.min = '0';
+    campo.max = '5000';
+    campo.id = 'espacioPersona';
+    campo.value = String(Math.round((p.espacio ? p.espacio.total : 0) / MB));
+    const etiqueta = crear('label', '', `📦 Espacio de ${p.name} (MB):`);
+    etiqueta.htmlFor = 'espacioPersona';
+    const guardar = crear('button', 'btn chico', 'Guardar');
+    guardar.type = 'button';
+    const automatico = crear('button', 'btn chico', 'Automático');
+    automatico.type = 'button';
+    automatico.disabled = !p.espacio || p.espacio.fijoMb == null;
+    const ver = crear('a', 'btn chico', '🎵 Ver su música y videos');
+    ver.href = 'multimedia.html?de=' + encodeURIComponent(p.name);
+    async function fijar(mb) {
+      guardar.disabled = true;
+      automatico.disabled = true;
+      try {
+        const res = await authFetch('/api/admin/espacio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: p.name, mb }) });
+        const r = await res.json();
+        if (!res.ok) throw new Error(r.error || 'No se pudo cambiar el espacio.');
+        p.espacio = { ...p.espacio, ...r.espacio };
+        avisar(mb === null ? `📦 ${p.name} volvió al espacio automático (${fmtMb(r.espacio.total)}).` : `📦 ${p.name} ahora tiene ${fmtMb(r.espacio.total)} fijos.`, true);
+        pintar();
+        cargarGuardianes();
+      } catch (err) {
+        avisar(err.message);
+        guardar.disabled = false;
+      }
+    }
+    guardar.addEventListener('click', () => {
+      const mb = Number(campo.value);
+      if (!Number.isInteger(mb) || mb < 0 || mb > 5000) return avisar('Escribí un número de MB entre 0 y 5000.');
+      fijar(mb);
+    });
+    automatico.addEventListener('click', () => fijar(null));
+    caja.append(etiqueta, campo, guardar, automatico, ver);
+    return caja;
   }
 
   function pintar() {
@@ -158,6 +248,7 @@
     confirmando = false;
     buscar.value = '';
     cargar();
+    cargarGuardianes();
   }
 
   function ocultar() {

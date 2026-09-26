@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Gestionar imágenes</title>
+  <title>Gestionar</title>
   <link rel="stylesheet" href="estilos/estilos.css">
+  <link rel="stylesheet" href="estilos/multimedia.css">
 </head>
 <body class="control">
 <div class="app">
 
   <div class="app-header">
     <div class="header-id">
-      <h1>Gestionar imágenes</h1>
+      <h1>Gestionar</h1>
       <span class="auth-name-badge" id="authNameBadge" hidden></span>
       <button type="button" class="logout-btn" id="logoutBtn" hidden>Cerrar sesión</button>
     </div>
@@ -20,6 +21,12 @@
       <span id="statusText">Conectando…</span>
     </div>
   </div>
+
+  <nav class="pestanas-gestion" aria-label="Qué gestionar">
+    <a href="gestionar.html" aria-current="page">🖼️ Imágenes</a>
+    <a href="multimedia.html#musica">🎵 Música</a>
+    <a href="multimedia.html#videos">🎬 Videos</a>
+  </nav>
 
   <div class="panel">
     <div class="btn-row">
@@ -30,6 +37,8 @@
     <div class="image-list" id="imageList"></div>
     <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Subí la primera.</p>
   </div>
+
+  <div id="lugarMiniReproductor"></div>
 
   <div class="btn-row">
     <a class="btn" href="control.html">⬅️ Volver</a>
@@ -55,6 +64,7 @@
 <script src="scripts/gestionar.js"></script>
 <script src="scripts/trabajos-documentos.js"></script>
 <script src="scripts/progreso-documentos.js"></script>
+<script src="scripts/reproductor-celular.js"></script>
 
 </body>
 </html>

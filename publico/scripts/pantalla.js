@@ -252,7 +252,7 @@
         // terminara, o recién ahora se prendió desde otro dispositivo —
         // lo arranca acá. Si YA hay uno corriendo, no lo toca (eso es lo
         // que hace que sobreviva a este mismo refresco cada 4s).
-        if (started && !autoAdvanceTimer) scheduleAutoAdvance();
+        if (started && !autoAdvanceTimer && !videoEnPantalla) scheduleAutoAdvance();
       })
       .catch(err => console.error('Error loading avance automático:', err));
   }
@@ -295,6 +295,38 @@
       aplicarCambio('siguiente', { auto: true });
     }, autoAdvance.seconds * 1000);
   }
+
+  // ---- Pausa mientras se ve un video (scripts/multimedia-pantalla.js) ----
+  // Al mandar un video desde el celular se pausa todo: el avance automático guarda cuánto le
+  // faltaba, y el texto en vivo y la frase final se ocultan (sin perderse). Al terminar el
+  // video, todo sigue donde estaba.
+  let videoEnPantalla = false;
+  let avanceRestanteMs = null;
+  window.pantallaVideo = {
+    empezar() {
+      videoEnPantalla = true;
+      if (autoAdvanceTimer) {
+        avanceRestanteMs = Math.max(1000, autoAdvanceEndAt - Date.now());
+        clearTimeout(autoAdvanceTimer);
+        autoAdvanceTimer = null;
+        autoAdvanceEndAt = null;
+        updateAutoBadge();
+      }
+      document.body.classList.add('video-en-pantalla');
+    },
+    terminar() {
+      videoEnPantalla = false;
+      document.body.classList.remove('video-en-pantalla');
+      const restante = avanceRestanteMs;
+      avanceRestanteMs = null;
+      if (restante && started && autoAdvance && autoAdvance.enabled && !autoAdvanceTimer) {
+        autoAdvanceEndAt = Date.now() + restante;
+        updateAutoBadge();
+        socket.emit('avanceAutoAviso', { tipo: 'cuenta', segundos: Math.ceil(restante / 1000) });
+        autoAdvanceTimer = setTimeout(() => aplicarCambio('siguiente', { auto: true }), restante);
+      }
+    }
+  };
 
   // ---- Red neuronal esférica 3D (pantalla de espera) ----
   // Los nodos viven en coordenadas (x,y,z) reales sobre una esfera y se rotan
@@ -600,6 +632,9 @@
   // toda la lógica de la frase final, el confetti, etc. sin duplicar nada.
   function aplicarCambio(accion, opts = {}) {
     const fromAuto = !!opts.auto;
+    // Mientras hay un video en pantalla no se mueven las diapositivas: al terminarlo se
+    // vuelve a la misma en la que estaba.
+    if (videoEnPantalla) return;
     // Avance automático prendido: los botones manuales de Siguiente/Atrás no
     // hacen nada en ESTA pantalla (el reloj es el que manda) — "Mostrar" y el
     // salto por número de voz siguen funcionando igual.

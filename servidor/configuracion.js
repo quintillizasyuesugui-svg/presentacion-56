@@ -20,6 +20,17 @@ const CARPETA_DATOS = process.env.CARPETA_DATOS || path.join(RAIZ, 'datos');
 const EXTENSIONES_IMAGEN = ['.jpg', '.jpeg', '.png', '.webp'];
 const ADMIN_PIN = process.env.ADMIN_PIN || null;
 
+// Música y videos subidos: sin Cloudinary (sólo para probar en la PC) quedan en esta carpeta.
+const CARPETA_MULTIMEDIA = path.join(CARPETA_PUBLICA, 'multimedia');
+// Espacio para música y videos: se reparte solo entre las personas registradas.
+// PRESUPUESTO_MB es lo que se guarda en total (12 GB de los 25 GB gratis de Cloudinary; el
+// resto queda para reproducir). Cada persona recibe presupuesto ÷ personas, sin bajar de
+// ESPACIO_MIN_MB ni pasar de ESPACIO_MAX_MB: con pocas personas, más para cada una; con
+// muchas, menos. El admin puede fijarle a alguien un espacio propio.
+const PRESUPUESTO_MB = Number(process.env.PRESUPUESTO_MB) || 12000;
+const ESPACIO_MIN_MB = Number(process.env.ESPACIO_MIN_MB) || 100;
+const ESPACIO_MAX_MB = Number(process.env.ESPACIO_MAX_MB) || 2000;
+
 // ---- Cloudinary (almacenamiento permanente para lo que se sube desde /gestionar.html) ----
 // Las imágenes que vienen con el repo se despliegan siempre junto al código (git las
 // conserva). Lo que se sube en vivo desde el celular, en cambio, se pierde en cada
@@ -46,6 +57,10 @@ module.exports = {
   CARPETA_DATOS,
   EXTENSIONES_IMAGEN,
   ADMIN_PIN,
+  CARPETA_MULTIMEDIA,
+  PRESUPUESTO_MB,
+  ESPACIO_MIN_MB,
+  ESPACIO_MAX_MB,
   cloudinary,
   nubeLista
 };
