@@ -28,8 +28,7 @@
     "win": {
       "icon": "icono.png",
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ]
     },
     "nsis": {
@@ -45,9 +44,6 @@
       ],
       "language": "3082",
       "artifactName": "Conexiones-Pantalla-Instalador-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "Conexiones-Pantalla-Portable-${version}.exe"
     }
   }
 }
