@@ -1,11 +1,20 @@
 package com.conexiones.control;
 
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
+import java.io.File;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -32,6 +41,7 @@ public class Principal extends Activity {
     private WebChromeClient.CustomViewCallback cerrarVideoGrande;
     private ValueCallback<Uri[]> archivosPedidos;
     private String ultimaDireccion = CONTROL;
+    private long descargaId = -1;
 
     @Override
     protected void onCreate(Bundle guardado) {
@@ -104,9 +114,27 @@ public class Principal extends Activity {
 
         web.addJavascriptInterface(new Reintento(), "App");
         web.addJavascriptInterface(new Memoria(), "Memoria");
+        web.addJavascriptInterface(new Actualizador(), "Actualizador");
 
         if (guardado != null) web.restoreState(guardado);
-        else web.loadUrl(CONTROL);
+        else web.loadUrl(direccionDe(getIntent()));
+    }
+
+    // El QR de una invitación (…/celular.html?inv=TIGRE-4821) abre la app: el código pasa al
+    // control para que el alumno sólo escriba su nombre.
+    private String direccionDe(Intent intento) {
+        Uri datos = intento == null ? null : intento.getData();
+        String codigo = datos == null ? null : datos.getQueryParameter("inv");
+        if (codigo == null || codigo.isEmpty()) return CONTROL;
+        return CONTROL + "?inv=" + Uri.encode(codigo);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intento) {
+        super.onNewIntent(intento);
+        setIntent(intento);
+        String direccion = direccionDe(intento);
+        if (!direccion.equals(CONTROL)) web.loadUrl(direccion);
     }
 
     private class Reintento {
@@ -136,6 +164,91 @@ public class Principal extends Activity {
         @JavascriptInterface
         public void borrar() {
             datos().edit().remove("auth").commit();
+        }
+    }
+
+    // Versión nueva: la página pregunta qué versión es ésta, y si hay otra la baja con el
+    // DownloadManager de Android (sin pedir permisos de archivos) y abre el instalador.
+    private class Actualizador {
+        private DownloadManager descargas() {
+            return (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        }
+
+        private File archivo() {
+            return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "conexiones-control.apk");
+        }
+
+        @JavascriptInterface
+        public int versionCodigo() {
+            try {
+                PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+                return Build.VERSION.SDK_INT >= 28 ? (int) info.getLongVersionCode() : info.versionCode;
+            } catch (PackageManager.NameNotFoundException e) {
+                return 0;
+            }
+        }
+
+        @JavascriptInterface
+        public String versionNombre() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (PackageManager.NameNotFoundException e) {
+                return "";
+            }
+        }
+
+        // Sólo baja APK del propio servidor de Conexiones.
+        @JavascriptInterface
+        public boolean descargar(String direccion) {
+            Uri uri = Uri.parse(direccion);
+            if (!"https".equals(uri.getScheme()) || !SERVIDOR.equals(uri.getHost())) return false;
+            File viejo = archivo();
+            if (viejo.exists()) viejo.delete();
+            DownloadManager.Request pedido = new DownloadManager.Request(uri)
+                .setTitle("Conexiones Control")
+                .setDescription("Versión nueva")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                .setDestinationInExternalFilesDir(Principal.this, Environment.DIRECTORY_DOWNLOADS, "conexiones-control.apk");
+            descargaId = descargas().enqueue(pedido);
+            return true;
+        }
+
+        // 0 a 99 mientras baja, 100 cuando terminó, -1 si falló.
+        @JavascriptInterface
+        public int progreso() {
+            if (descargaId < 0) return -1;
+            try (Cursor c = descargas().query(new DownloadManager.Query().setFilterById(descargaId))) {
+                if (c == null || !c.moveToFirst()) return -1;
+                int estado = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                if (estado == DownloadManager.STATUS_SUCCESSFUL) return 100;
+                if (estado == DownloadManager.STATUS_FAILED) return -1;
+                long bajado = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                return total > 0 ? (int) Math.min(99, bajado * 100 / total) : 0;
+            }
+        }
+
+        // Abre el instalador de Android. La primera vez Android pide «Permitir de esta fuente»:
+        // se abre esa pantalla y devuelve false (al volver, se toca «Instalar» de nuevo).
+        @JavascriptInterface
+        public boolean instalar() {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                Intent permiso = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
+                runOnUiThread(() -> {
+                    try { startActivity(permiso); } catch (ActivityNotFoundException ignorado) { }
+                });
+                return false;
+            }
+            Uri apk = descargaId >= 0 ? descargas().getUriForDownloadedFile(descargaId) : null;
+            if (apk == null) return false;
+            Intent instalar = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(apk, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            runOnUiThread(() -> {
+                try { startActivity(instalar); } catch (ActivityNotFoundException ignorado) { }
+            });
+            return true;
         }
     }
 

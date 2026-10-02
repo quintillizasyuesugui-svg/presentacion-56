@@ -1,4 +1,4 @@
-// autenticacion.js — PIN por persona para gestionar.html y avanzado.html.
+// autenticacion.js — PIN por persona para gestionar.html, avanzado.html, control.html y pantalla.html.
 // El sistema da el PIN solo (registro con nombre, 4 dígitos únicos) y el
 // celular lo recuerda (localStorage) — no hay que pedirlo cada vez.
 (function () {
@@ -10,6 +10,34 @@
   // olvida al cerrar la app o la pestaña (celular prestado).
   const memoriaApp = window.Memoria || null;
 
+  // ---- Dentro de la app del celular (opción A) ----
+  // La sesión de ahora va en sessionStorage (se borra al cerrar la app) y la cuenta guardada en
+  // la memoria de Android. Cerrar sesión no borra la guardada: la próxima vez aparece «Entrar
+  // como …». Al reabrir la app, si hay una guardada, entra sola.
+  const enApp = Boolean(memoriaApp);
+  const SALIO_KEY = 'presentacionSalio';
+
+  function leerGuardada() {
+    try {
+      const t = memoriaApp.leer() || localStorage.getItem(STORAGE_KEY); // localStorage: lo de la 1.0.3
+      return t ? JSON.parse(t) : null;
+    } catch { return null; }
+  }
+  function guardarEnCelular(auth) {
+    try { memoriaApp.guardar(JSON.stringify(auth)); } catch { /* sin app */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
+  }
+  function olvidarDelCelular() {
+    try { memoriaApp.borrar(); } catch { /* sin app */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
+  }
+  function leerSesionApp() {
+    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; }
+  }
+  function salioRecien() {
+    try { return sessionStorage.getItem(SALIO_KEY) === '1'; } catch { return false; }
+  }
+
   function leerTexto() {
     try { const t = localStorage.getItem(STORAGE_KEY); if (t) return t; } catch { /* privado/bloqueado */ }
     try { const t = memoriaApp && memoriaApp.leer(); if (t) return t; } catch { /* sin app */ }
@@ -20,10 +48,20 @@
     catch { return false; }
   }
   function getStored() {
+    if (enApp) return leerSesionApp() || (salioRecien() ? null : leerGuardada());
     try { return JSON.parse(leerTexto()); } catch { return null; }
   }
   // recordar sin pasar = se guarda donde ya estaba (para refrescar el nombre sin cambiar la elección).
   function setStored(auth, recordar) {
+    if (enApp) {
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+        sessionStorage.removeItem(SALIO_KEY);
+      } catch { /* privado/bloqueado */ }
+      const guardada = leerGuardada();
+      if (recordar === true || (guardada && guardada.name === auth.name)) guardarEnCelular(auth);
+      return;
+    }
     if (recordar === undefined) recordar = !soloEnSesion();
     const texto = JSON.stringify(auth);
     clearStored();
@@ -35,6 +73,10 @@
     }
   }
   function clearStored() {
+    if (enApp) {
+      try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
+      return;
+    }
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
     try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
     try { if (memoriaApp) memoriaApp.borrar(); } catch { /* sin app */ }
@@ -72,6 +114,15 @@
       <div class="modal-card">
         <h2>${allowRegister ? '¿Quién sos?' : 'Ingresá tu PIN'}</h2>
         <p id="authError">${allowRegister ? 'Elegí una opción para entrar.' : 'Es el PIN que te dieron al registrarte desde tu celular.'}</p>
+
+        ${enApp && allowRegister ? `
+        <div id="authGuardadaBox" hidden>
+          <button type="button" class="auth-guardada" id="authGuardada">
+            <span class="auth-guardada-letra" id="authGuardadaLetra"></span>
+            <span><b id="authGuardadaNombre"></b><small>PIN guardado en este celular</small></span>
+          </button>
+          <p class="auth-o">o</p>
+        </div>` : ''}
 
         ${allowRegister ? `
         <div id="authChoice" class="btn-row">
@@ -114,7 +165,7 @@
           <form id="authOldForm" autocomplete="on">
             <input type="text" name="username" autocomplete="username" value="Conexiones" class="auth-usuario" tabindex="-1" aria-hidden="true" readonly>
             <input type="password" id="authPin" name="password" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password">
-            <label class="auth-recordar"><input type="checkbox" id="authRecordar" checked> Recordarme en ${allowRegister ? 'este celular' : 'esta pantalla'}</label>
+            ${enApp ? '' : `<label class="auth-recordar"><input type="checkbox" id="authRecordar" checked> Recordarme en ${allowRegister ? 'este celular' : 'esta pantalla'}</label>`}
             <p class="auth-lock-msg" id="authLockMsg" hidden></p>
             <div class="btn-row">
               <button type="submit" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
@@ -123,6 +174,7 @@
           ${allowRegister ? '<button type="button" class="auth-back" id="authBackFromOld">← Volver</button>' : ''}
           ${cancelable ? '<button type="button" class="auth-back" id="authCancel">✕ Cancelar</button>' : ''}
         </div>
+        ${enApp && allowRegister ? '<button type="button" class="auth-olvidar" id="authOlvidar" hidden></button>' : ''}
       </div>`;
     return el;
   }
@@ -320,11 +372,44 @@
       if (!applyLockState() && !allowRegister) setTimeout(() => pinInput.focus(), 50);
 
       function finish(auth, recordar = true) {
-        setStored(auth, recordar);
+        setStored(auth, enApp ? undefined : recordar);
         gate.classList.remove('show');
         setTimeout(() => gate.remove(), 200);
         document.removeEventListener('keydown', escCancela);
         resolve(auth);
+        if (enApp) setTimeout(() => preguntarGuardar(auth), 350);
+      }
+
+      // «Entrar como …» (cuenta guardada en el celular) y «Olvidar a … de este celular».
+      const guardadaBox = gate.querySelector('#authGuardadaBox');
+      const olvidarBtn = gate.querySelector('#authOlvidar');
+      const guardada = guardadaBox ? leerGuardada() : null;
+      if (guardada) {
+        guardadaBox.hidden = false;
+        gate.querySelector('#authGuardadaLetra').textContent = guardada.name.charAt(0).toUpperCase();
+        gate.querySelector('#authGuardadaNombre').textContent = 'Entrar como ' + guardada.name;
+        errorEl.textContent = 'Si sos otra persona, elegí una opción:';
+        olvidarBtn.hidden = false;
+        olvidarBtn.textContent = 'Olvidar a ' + guardada.name + ' de este celular';
+        olvidarBtn.addEventListener('click', () => {
+          olvidarDelCelular();
+          guardadaBox.hidden = true;
+          olvidarBtn.hidden = true;
+          errorEl.textContent = guardada.name + ' ya no está guardado en este celular.';
+        });
+        gate.querySelector('#authGuardada').addEventListener('click', async () => {
+          const spinnerDone = showActionSpinner('blue', 'Entrando…');
+          let auth, error;
+          try { auth = await callAuth('/api/auth/login', { pin: guardada.pin }); } catch (err) { error = err; }
+          await spinnerDone;
+          if (!error) return finish(Object.assign({}, auth, { pin: guardada.pin }));
+          if (error.estado === 401) {
+            olvidarDelCelular();
+            guardadaBox.hidden = true;
+            olvidarBtn.hidden = true;
+          }
+          errorEl.textContent = error.estado === 401 ? 'Esa cuenta ya no existe. Entrá con otro PIN o registrate.' : error.message;
+        });
       }
 
       // Cancelar (y Esc) cierra la caja sin entrar; no se puede mientras se está comprobando el PIN.
@@ -349,7 +434,8 @@
       function showPinOnce(auth) {
         // El PIN sólo se muestra en este momento — después queda guardado en
         // el celular y no hace falta volver a escribirlo en este dispositivo.
-        errorEl.innerHTML = `¡Listo, ${auth.name}! Tu PIN es <strong>${auth.pin}</strong> — anotalo, te sirve para entrar desde otro celular.`;
+        errorEl.textContent = '';
+        errorEl.append(`¡Listo, ${auth.name}! Tu PIN es `, Object.assign(document.createElement('strong'), { textContent: auth.pin }), ' — anotalo, te sirve para entrar desde otro celular.');
         if (registerBtn) registerBtn.disabled = true;
         loginBtn.disabled = true;
         if (nameInput) nameInput.disabled = true;
@@ -405,7 +491,7 @@
 
         if (!error) {
           clearLock();
-          finish(Object.assign({}, auth, { pin }), recordarBox.checked);
+          finish(Object.assign({}, auth, { pin }), recordarBox ? recordarBox.checked : true);
           return;
         }
 
@@ -436,6 +522,52 @@
     });
   }
 
+  function preguntarGuardar(auth) {
+    const guardada = leerGuardada();
+    if (guardada && guardada.name === auth.name) return guardarEnCelular(auth);
+    const capa = document.createElement('div');
+    capa.className = 'modal-overlay auth-pregunta';
+    const tarjeta = document.createElement('div');
+    tarjeta.className = 'modal-card';
+    const titulo = document.createElement('h2');
+    const texto = document.createElement('p');
+    const fila = document.createElement('div');
+    fila.className = 'btn-row';
+    const no = Object.assign(document.createElement('button'), { type: 'button', className: 'btn' });
+    const si = Object.assign(document.createElement('button'), { type: 'button', className: 'btn primary' });
+    no.style.flex = si.style.flex = '1';
+    if (!guardada) {
+      titulo.textContent = '🔐 ¿Guardar tu PIN en este celular?';
+      texto.textContent = 'Así la próxima vez entrás directo, sin escribirlo. Sólo en este celular.';
+      no.textContent = 'Ahora no';
+      si.textContent = 'Guardar';
+      tarjeta.append(titulo, texto);
+    } else {
+      titulo.textContent = '🔄 ¿Cambiar la cuenta guardada?';
+      texto.textContent = 'En este celular está guardada otra cuenta. ¿Querés guardar la tuya en su lugar?';
+      const cambio = document.createElement('div');
+      cambio.className = 'auth-cambio';
+      const vieja = Object.assign(document.createElement('span'), { className: 'auth-guardada-letra vieja', textContent: guardada.name.charAt(0).toUpperCase() });
+      const nueva = Object.assign(document.createElement('span'), { className: 'auth-guardada-letra', textContent: auth.name.charAt(0).toUpperCase() });
+      const nombres = document.createElement('p');
+      nombres.className = 'auth-cambio-nombres';
+      nombres.append(guardada.name, ' → ', Object.assign(document.createElement('b'), { textContent: auth.name }));
+      cambio.append(vieja, '→', nueva);
+      no.textContent = 'Dejar ' + guardada.name;
+      si.textContent = 'Guardar ' + auth.name;
+      tarjeta.append(titulo, texto, cambio, nombres);
+    }
+    fila.append(no, si);
+    tarjeta.append(fila);
+    capa.append(tarjeta);
+    document.body.appendChild(capa);
+    requestAnimationFrame(() => capa.classList.add('show'));
+    const cerrar = () => { capa.classList.remove('show'); setTimeout(() => capa.remove(), 200); };
+    no.addEventListener('click', cerrar);
+    si.addEventListener('click', () => { guardarEnCelular(auth); cerrar(); });
+    si.focus();
+  }
+
   let authPromise = null;
   let lastGateOpts = undefined; // para que un reintento tras 401 respete el mismo modo de puerta
 
@@ -455,8 +587,11 @@
         } catch (err) {
           // Sólo se olvida el PIN si el servidor dice que ya no sirve (cuenta borrada). Si es
           // un bloqueo por intentos o se cortó internet, se conserva y se vuelve a probar después.
-          if (err.estado === 401) clearStored();
-          else return Object.assign({}, stored);
+          if (err.estado === 401) {
+            clearStored();
+            const guardada = enApp ? leerGuardada() : null;
+            if (guardada && guardada.pin === stored.pin) olvidarDelCelular(); // la cuenta ya no existe
+          } else return Object.assign({}, stored);
         }
       }
       return showGate(lastGateOpts);
@@ -477,6 +612,8 @@
   window.logoutAuth = function logoutAuth() {
     showActionSpinner('red', 'Cerrando sesión…').then(() => {
       clearStored();
+      // En la app la cuenta guardada queda: la próxima vez aparece «Entrar como …».
+      if (enApp) try { sessionStorage.setItem(SALIO_KEY, '1'); } catch { /* privado/bloqueado */ }
       authPromise = null;
       location.reload();
     });
@@ -490,6 +627,8 @@
     let res = await fetch(url, Object.assign({}, options, { headers }));
     if (res.status === 401) {
       clearStored();
+      const guardada = enApp ? leerGuardada() : null;
+      if (auth && guardada && guardada.pin === auth.pin) olvidarDelCelular();
       authPromise = null;
       const fresh = await window.ensureAuthed();
       const retryHeaders = Object.assign({}, options.headers, fresh ? { 'x-pin': fresh.pin } : {});

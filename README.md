@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.0.exe) — instalador, 89 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.3.apk) — APK, 26 KB
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.4.apk) — APK, 29 KB
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:
@@ -61,6 +61,17 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
   `aplicacion-celular/clave-android/`, que no va a git: sin esa misma clave el celular no
   puede actualizar la app sin desinstalarla). El APK listo para bajar está en
   `publico/descargas/conexiones-control.apk`.
+  - **PIN en la app:** después de entrar pregunta «¿Guardar tu PIN en este celular?». Cerrar
+    sesión no lo borra: aparece «Entrar como …» (y «Olvidar»); si entra otra persona, pregunta
+    «¿Cambiar la cuenta guardada?».
+  - **Versión nueva:** al abrir, si `publico/descargas/version-app.json` tiene un `codigo` más alto
+    que el de la app, sube una hoja con las novedades; «Actualizar» baja el APK y abre el
+    instalador de Android (la primera vez pide «Permitir de esta fuente»). **Al sacar una versión:**
+    subir `versionCode`/`versionName` en `aplicacion-celular/app/build.gradle`, copiar el APK a
+    `publico/descargas/conexiones-control.apk` y al Release, y actualizar `version-app.json`
+    (`codigo`, `version`, `peso`, `apkExterno` y las novedades). Las apps de antes de la 1.0.4
+    abren `apkExterno` en el navegador.
+  - **Invitación:** el QR de una invitación abre la app con el código ya puesto.
 - **QR de la pantalla** (`/celular.html`): en Android, si la app está instalada se abre directo, sin
   preguntar (App Link verificado con `/.well-known/assetlinks.json`, que lleva la huella de la clave
   de firma). Si no está, el APK se descarga solo y sólo hay que tocar «Instalar» (Android no deja
