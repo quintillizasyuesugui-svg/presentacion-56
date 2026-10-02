@@ -1,0 +1,53 @@
+{
+  "name": "conexiones-pantalla",
+  "productName": "Conexiones Pantalla",
+  "version": "1.0.0",
+  "description": "Pantalla de Conexiones como aplicación de Windows",
+  "main": "principal.js",
+  "author": "Conexiones",
+  "license": "ISC",
+  "scripts": {
+    "iniciar": "electron .",
+    "compilar": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.conexiones.pantalla",
+    "productName": "Conexiones Pantalla",
+    "directories": {
+      "output": "instalador"
+    },
+    "files": [
+      "principal.js",
+      "sin-conexion.html",
+      "icono.png"
+    ],
+    "win": {
+      "icon": "icono.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Conexiones Pantalla",
+      "installerLanguages": [
+        "es_ES"
+      ],
+      "language": "3082",
+      "artifactName": "Conexiones-Pantalla-Instalador-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "Conexiones-Pantalla-Portable-${version}.exe"
+    }
+  }
+}

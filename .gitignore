@@ -12,3 +12,7 @@ frases-finales.json
 avance-automatico.json
 # Música y videos subidos al probar en la PC sin Cloudinary
 publico/multimedia/
+
+# Instaladores compilados (pesan mucho) y clave de firma del APK
+instalador pc/
+instalador celular/

@@ -1,0 +1,46 @@
+apply plugin: 'com.android.application'
+
+// La clave de firma vive en clave-android/ (no va a git). Misma clave = el celular actualiza sin desinstalar.
+def propiedadesClave = new Properties()
+def archivoClave = rootProject.file('clave-android/clave.properties')
+if (archivoClave.exists()) archivoClave.withInputStream { propiedadesClave.load(it) }
+
+android {
+    namespace 'com.conexiones.control'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.conexiones.control'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (archivoClave.exists()) {
+                storeFile rootProject.file('clave-android/' + propiedadesClave['archivo'])
+                storePassword propiedadesClave['clave']
+                keyAlias propiedadesClave['alias']
+                keyPassword propiedadesClave['clave']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

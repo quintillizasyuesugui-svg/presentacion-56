@@ -1,12 +1,10 @@
 // «Personas» (Modo avanzado, sólo admin): lista de cuentas para marcar y borrar varias juntas.
 // Borrar quita las cuentas y todo lo suyo (diapositivas, frase final, avance automático,
 // música, videos y documentos), como si nunca hubieran existido. Pide confirmar antes, en la
-// barra de abajo. Arriba se ve qué hacen los 4 guardianes y cómo se reparte el espacio; con
-// una sola persona marcada se le puede fijar su espacio para música y videos.
+// barra de abajo. Con una sola persona marcada se le puede fijar su espacio para música y videos.
 (function () {
   const seccion = document.getElementById('adminSeccion');
   const boton = document.getElementById('personasBtn');
-  const botonGuardianes = document.getElementById('guardianesBtn');
   const capa = document.getElementById('personasOverlay');
   const cerrar = document.getElementById('personasCerrar');
   const buscar = document.getElementById('personasBuscar');
@@ -47,65 +45,6 @@
   const fmtMb = (b) => (Math.round((b / MB) * 10) / 10).toLocaleString('es') + ' MB';
   const textoEspacio = (e) => (e ? `🎵 ${fmtMb(e.usado)} de ${fmtMb(e.total)}${e.fijoMb != null ? ' (fijo)' : ''}` : '');
 
-  // ---- Los 4 guardianes y el espacio ----
-  const cajaGuardianes = crear('div', 'guardian-caja');
-  cajaGuardianes.setAttribute('aria-live', 'polite');
-  document.getElementById('personasLista').prepend(cajaGuardianes);
-  const NOMBRES_TAREAS = { imagenes: 'imágenes y páginas de PDF', nube: 'música y videos', local: 'subidas en esta PC', youtube: 'enlaces de YouTube' };
-
-  let relojGuardianes = null;
-  async function cargarGuardianes() {
-    try {
-      const [g, n] = await Promise.all([
-        authFetch('/api/admin/guardian').then(r => r.json()),
-        authFetch('/api/admin/nube').then(r => r.json())
-      ]);
-      const c = n.calculo;
-      const partes = [crear('h3', '', '🛡️ Los 4 guardianes')];
-      const cuantos = g.usuarios.conectados.length;
-      partes.push(crear('p', '', `👤 Usuarios: ${cuantos} ${cuantos === 1 ? 'persona conectada' : 'personas conectadas'} ahora.`));
-      partes.push(crear('p', '', '👷 Tareas: cada 👷 es un empleado trabajando y cada ⏳ una tarea esperando su turno.'));
-      for (const [t, f] of Object.entries(g.tareas)) {
-        const fila = crear('div', 'guardian-fila');
-        const trabajando = f.trabajando.length;
-        const esperando = f.esperando.length;
-        fila.append(
-          crear('span', 'guardian-nombre', `${NOMBRES_TAREAS[t] || t}: ${f.empleados} ${f.empleados === 1 ? 'empleado' : 'empleados'} (mín. ${f.minimo}, máx. ${f.maximo})`),
-          crear('span', 'guardian-iconos', '👷'.repeat(trabajando) + '⏳'.repeat(Math.min(esperando, 30)) + (esperando > 30 ? ` +${esperando - 30}` : '') || '— sin trabajo ahora')
-        );
-        partes.push(fila);
-      }
-      const probar = crear('button', 'btn chico', g.simulacro ? '⏳ Simulacro en marcha…' : '▶ Ver a los guardianes trabajar (simulacro)');
-      probar.type = 'button';
-      probar.disabled = !!g.simulacro;
-      probar.addEventListener('click', async () => {
-        probar.disabled = true;
-        const res = await authFetch('/api/admin/guardian/simulacro', { method: 'POST' });
-        if (!res.ok) avisar((await res.json().catch(() => ({}))).error || 'No se pudo lanzar el simulacro.');
-        cargarGuardianes();
-      });
-      partes.push(probar);
-      let almacen = `📦 Almacenamiento: ${c.mbPorPersona.toLocaleString('es')} MB por persona (${(c.presupuestoMb / 1000).toLocaleString('es')} GB ÷ ${c.personas} ${c.personas === 1 ? 'persona' : 'personas'}, entre ${c.minimoMb} MB y ${c.maximoMb.toLocaleString('es')} MB). Guardado en total: ${fmtMb(n.usadoTotal)}. Subidas a Cloudinary esta hora: ${g.almacenamiento.cupoNube.usado} de ${g.almacenamiento.cupoNube.limite}.`;
-      const alerta = !!(n.nube && n.nube.porcentaje >= 80);
-      if (n.nube && n.nube.porcentaje != null) almacen += ` Cloudinary este mes: ${Math.round(n.nube.porcentaje)} % de lo gratis.`;
-      if (alerta) almacen = '⚠️ ' + almacen + ' Conviene borrar videos viejos o bajar el espacio por persona.';
-      partes.push(crear('p', alerta ? 'alerta' : '', almacen));
-      partes.push(crear('p', '', `📺 Pantallas: ${g.pantallas.conSonido} con sonido; cada conexión puede mandar hasta ${g.pantallas.mensajesPorSegundo} mensajes por segundo.`));
-      if (g.decisiones.length) {
-        const emoji = { usuarios: '👤', tareas: '👷', almacenamiento: '📦', pantallas: '📺' };
-        const lista = crear('ul', 'guardian-decisiones');
-        for (const d of g.decisiones.slice(0, 12)) {
-          const hora = new Date(d.cuando).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-          const quien = d.persona !== '—' ? d.persona + ': ' : '';
-          lista.append(crear('li', '', `${hora} ${emoji[d.guardian] || '🛡️'} ${quien}${d.que}, porque ${d.porque}.`));
-        }
-        partes.push(lista);
-      }
-      cajaGuardianes.replaceChildren(...partes);
-    } catch (err) {
-      cajaGuardianes.replaceChildren(crear('p', '', 'No se pudo leer a los guardianes: ' + err.message));
-    }
-  }
   const textoCuentas = (n) => (n === 1 ? '1 cuenta' : `${n} cuentas`);
 
   function visibles() {
@@ -234,7 +173,6 @@
         p.espacio = { ...p.espacio, ...r.espacio };
         avisar(mb === null ? `📦 ${p.name} volvió al espacio automático (${fmtMb(r.espacio.total)}).` : `📦 ${p.name} ahora tiene ${fmtMb(r.espacio.total)} fijos.`, true);
         pintar();
-        cargarGuardianes();
       } catch (err) {
         avisar(err.message);
         guardar.disabled = false;
@@ -269,24 +207,14 @@
     confirmando = false;
     buscar.value = '';
     cargar();
-    cargarGuardianes();
-    // En vivo mientras la ventana está abierta.
-    clearInterval(relojGuardianes);
-    relojGuardianes = setInterval(cargarGuardianes, 1500);
   }
 
   function ocultar() {
-    clearInterval(relojGuardianes);
     capa.classList.remove('show');
     setTimeout(() => { capa.hidden = true; }, 200);
   }
 
   boton.addEventListener('click', abrir);
-  // «Guardianes y espacio» abre la misma ventana, con los guardianes arriba a la vista.
-  botonGuardianes.addEventListener('click', () => {
-    abrir();
-    requestAnimationFrame(() => cajaGuardianes.scrollIntoView({ block: 'start' }));
-  });
   cerrar.addEventListener('click', ocultar);
   buscar.addEventListener('input', () => { confirmando = false; pintar(); });
   // «Seleccionar todas» marca las que se ven (si hay un filtro, sólo las que coinciden).
@@ -299,6 +227,5 @@
     const esAdmin = !!(auth && auth.isAdmin);
     seccion.hidden = !esAdmin;
     boton.hidden = !esAdmin;
-    botonGuardianes.hidden = !esAdmin;
   }).catch(() => {});
 })();

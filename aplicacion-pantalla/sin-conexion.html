@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Conexiones Pantalla</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: #000; color: #f2f2f2; font-family: 'Segoe UI', system-ui, sans-serif; text-align: center; }
+    h1 { font-size: 2rem; margin: 0 0 12px; }
+    p { color: #a8a8a8; margin: 0 0 24px; font-size: 1.05rem; line-height: 1.5; }
+    button { font: inherit; font-weight: 600; padding: 12px 28px; border: 0; border-radius: 999px; background: #f2f2f2; color: #000; cursor: pointer; }
+    button:hover { background: #fff; }
+    #cuenta { margin-top: 16px; font-size: 0.9rem; color: #777; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>No se pudo abrir la pantalla</h1>
+    <p>Revisá que la PC tenga internet.<br>Si el servidor estaba dormido, tarda hasta un minuto en despertar.</p>
+    <button type="button" id="reintentar">Reintentar</button>
+    <div id="cuenta"></div>
+  </main>
+  <script>
+    const destino = new URLSearchParams(location.search).get('destino');
+    const ir = () => { if (/^https?:/.test(destino)) location.href = destino; };
+    document.getElementById('reintentar').addEventListener('click', ir);
+    let segundos = 20;
+    const cuenta = document.getElementById('cuenta');
+    setInterval(() => {
+      segundos -= 1;
+      cuenta.textContent = `Reintenta solo en ${segundos} s`;
+      if (segundos <= 0) ir();
+    }, 1000);
+  </script>
+</body>
+</html>
