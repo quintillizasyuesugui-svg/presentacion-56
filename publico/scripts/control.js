@@ -746,3 +746,5 @@
   lwNext.addEventListener('click', () => { if (lwCanAdvance()) lwShowStep(lwStepIndex + 1); });
   lwBack.addEventListener('click', () => lwShowStep(lwStepIndex - 1));
   lwFinish.addEventListener('click', closeLiveWrite);
+  document.getElementById('lwCancel').addEventListener('click', closeLiveWrite);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lwOverlay.hidden) closeLiveWrite(); });

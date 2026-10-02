@@ -1397,6 +1397,9 @@ body.dragging-active { user-select: none; }
 }
 
 .picker-card, .editor-card, .fp-card { max-width: 380px; }
+.lw-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.lw-cabecera h2 { margin-bottom: 0; }
+.lw-cabecera .btn { flex: none; }
 
 .picker-list {
   display: flex;

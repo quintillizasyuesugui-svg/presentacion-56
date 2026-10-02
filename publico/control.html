@@ -106,7 +106,11 @@
      nunca aparece ni afecta la pantalla de otro usuario. -->
 <div class="modal-overlay" id="lwOverlay" hidden>
   <div class="modal-card fp-card">
-    <h2>Escribir en vivo</h2>
+    <!-- Cancelar está siempre a la vista, por si se abrió sin querer: cierra y borra el texto de la pantalla -->
+    <div class="lw-cabecera">
+      <h2>Escribir en vivo</h2>
+      <button type="button" class="btn chico" id="lwCancel">✕ Cancelar</button>
+    </div>
     <p id="lwStepHint"></p>
 
     <div class="fp-tab-panel" data-step="tamano" hidden>
