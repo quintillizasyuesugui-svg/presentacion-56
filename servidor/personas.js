@@ -9,6 +9,8 @@ const crypto = require('crypto');
 const { ADMIN_PIN } = require('./configuracion');
 const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { ipDe, esperaDe, anotarFallo, mensajeDeEspera } = require('./limite-intentos');
+const { revisarRegistro, anotarRegistro, mensajeRegistro, anotarIngreso } = require('./limite-registros');
+const invitaciones = require('./invitaciones');
 
 const NOMBRE_ADMIN = 'admin';
 const DIGITOS_PIN = 4;
@@ -57,10 +59,11 @@ function pinEnUso(pin) {
 // PIN al azar (criptográfico) de 4 dígitos que no choque con otro ni con el ADMIN_PIN
 // (antes podía tocar el mismo que el admin, y esa persona entraba como admin).
 // Hay 9.000 PIN posibles: si casi todos están usados, se corta en vez de probar para siempre.
-function generarPin() {
+// «tomados»: los PIN que ya se dieron en esta misma tanda y todavía no están en la lista.
+function generarPin(tomados = new Set()) {
   for (let intento = 0; intento < 50000; intento++) {
     const pin = String(crypto.randomInt(10 ** (DIGITOS_PIN - 1), 10 ** DIGITOS_PIN));
-    if (!pinEnUso(pin)) return pin;
+    if (!tomados.has(pin) && !pinEnUso(pin)) return pin;
   }
   throw new Error('No quedan PIN libres.');
 }
@@ -68,12 +71,15 @@ function generarPin() {
 // Si el nombre ya está tomado, no le presta el PIN ajeno (sería dejar entrar a
 // alguien a las fotos de otro con sólo adivinar su nombre) — le arma uno propio.
 // «admin» está reservado: es el nombre del ADMIN_PIN, y quien se llamara así vería sus imágenes.
-function nombreUnico(base, personas) {
-  const usados = new Set([NOMBRE_ADMIN, ...personas.map(p => p.name.toLowerCase())]);
-  if (!usados.has(base.toLowerCase())) return base;
-  let n = 2;
-  while (usados.has(`${base} (${n})`.toLowerCase())) n++;
-  return `${base} (${n})`;
+function nombresUsados(personas) {
+  return new Set([NOMBRE_ADMIN, ...personas.map(p => p.name.toLowerCase())]);
+}
+// «usados» (en minúsculas) se arma una vez por tanda y se va completando con cada alta.
+function nombreLibre(base, usados) {
+  let nombre = base;
+  for (let n = 2; usados.has(nombre.toLowerCase()); n++) nombre = `${base} (${n})`;
+  usados.add(nombre.toLowerCase());
+  return nombre;
 }
 
 function igualSeguro(a, b) {
@@ -112,7 +118,10 @@ async function identificarDesde(ip, pin) {
   const espera = esperaDe(ip);
   if (espera) return { estado: 429, error: mensajeDeEspera(espera) };
   const persona = await identificar(pin);
-  if (persona) return { persona };
+  if (persona) {
+    anotarIngreso(ip, persona);
+    return { persona };
+  }
   if (pin) anotarFallo(ip, pin);
   return { estado: 401 };
 }
@@ -164,25 +173,131 @@ function visiblePara(persona, orden) {
   return persona.isAdmin ? orden : orden.filter(r => r.owner === persona.name);
 }
 
+// ---- Fila de registros ----
+// Si llegan miles de registros juntos, no se guardan de a uno: se juntan en tandas y cada tanda
+// se guarda de una sola vez (un solo viaje a la base en vez de miles). Mientras una tanda se
+// guarda, las que llegan esperan en la fila. Con poca gente se responde directo; con mucha, el
+// celular recibe un turno y pregunta cada segundo cuánto le falta (sala de espera).
+const TANDA_MAXIMA = 500;
+const ESPERA_DIRECTA = 30;  // hasta esta cantidad adelante, se espera dentro del mismo pedido
+const TURNO_VIVE_MS = 2 * 60 * 1000;
+const fila = [];
+const turnos = new Map(); // turno → registro en la fila
+let numerados = 0;        // cuántos entraron a la fila en total
+let atendidos = 0;        // número del último ya guardado (o que falló)
+let guardando = false;
+
+function encolar(crudo) {
+  const r = { crudo, numero: ++numerados, turno: crypto.randomBytes(16).toString('hex'), alta: null, error: null };
+  r.listo = new Promise((resolver) => { r.avisar = resolver; });
+  fila.push(r);
+  if (!guardando) setImmediate(atenderFila);
+  return r;
+}
+
+function adelanteDe(r) {
+  return Math.max(0, r.numero - atendidos - 1);
+}
+
+async function atenderFila() {
+  if (guardando) return;
+  guardando = true;
+  try {
+    while (fila.length) {
+      const tanda = fila.splice(0, TANDA_MAXIMA);
+      try {
+        await almacenPersonas.modificar((personas) => {
+          const tomados = new Set();
+          const usados = nombresUsados(personas);
+          for (const r of tanda) {
+            const name = nombreLibre(r.crudo, usados);
+            const pin = generarPin(tomados);
+            tomados.add(pin);
+            personas.push({ name, pinHash: huella(pin, Boolean(SECRETO)), conSecreto: Boolean(SECRETO) });
+            r.alta = { name, pin, isAdmin: false };
+          }
+        });
+      } catch (err) {
+        console.error('No se pudo guardar una tanda de registros:', err.message);
+        for (const r of tanda) { r.alta = null; r.error = 'No se pudo registrar. Probá de nuevo.'; }
+      }
+      atendidos = tanda[tanda.length - 1].numero;
+      for (const r of tanda) {
+        r.avisar();
+        setTimeout(() => turnos.delete(r.turno), TURNO_VIVE_MS).unref();
+      }
+    }
+  } finally {
+    guardando = false;
+  }
+}
+
+function responderAlta(res, r) {
+  turnos.delete(r.turno);
+  if (r.error) return res.status(500).json({ error: r.error });
+  res.json(r.alta);
+}
+
 function registrarRutasPersonas(app) {
   // POST /api/auth/register — alta nueva: el sistema genera el PIN, nadie lo elige.
+  // Con { invitacion: «TIGRE-4821» } (QR de la pantalla del aula) no pasa por el portero.
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const crudo = String((req.body || {}).name || '').trim().slice(0, 40);
+      const ip = ipDelPedido(req);
+      const cuerpo = req.body || {};
+      let invitacion = null;
+      if (String(cuerpo.invitacion || '').trim()) {
+        const r = invitaciones.revisar(cuerpo.invitacion);
+        if (r.error) {
+          // Probar códigos al azar cuenta para el portero igual que un registro.
+          const freno = revisarRegistro(ip);
+          if (freno) return res.status(429).json({ error: mensajeRegistro(freno) });
+          anotarRegistro(ip);
+          return res.status(400).json({ error: r.error });
+        }
+        invitacion = r.inv;
+      } else {
+        const freno = revisarRegistro(ip);
+        if (freno) return res.status(429).json({ error: mensajeRegistro(freno) });
+        // Se anota ya, antes de esperar a guardar: si llegan cien pedidos juntos, el portero los
+        // cuenta en el momento y no se cuela ninguno de más.
+        anotarRegistro(ip);
+      }
+      // Trampa: «sitio_web» es un campo escondido del formulario que una persona nunca ve ni
+      // completa; si viene con algo, lo mandó un programa (y ya contó para el portero).
+      if (String(cuerpo.sitio_web || '').trim()) {
+        return res.status(400).json({ error: 'No se pudo registrar.' });
+      }
+      const crudo = String(cuerpo.name || '').trim().slice(0, 40);
       if (!crudo) return res.status(400).json({ error: 'Escribí tu nombre.' });
+      if (invitacion) invitaciones.anotarUso(invitacion);
 
-      let alta;
-      await almacenPersonas.modificar((personas) => {
-        const name = nombreUnico(crudo, personas);
-        const pin = generarPin();
-        personas.push({ name, pinHash: huella(pin, Boolean(SECRETO)), conSecreto: Boolean(SECRETO) });
-        alta = { name, pin, isAdmin: false };
-      });
-      res.json(alta);
+      const r = encolar(crudo);
+      turnos.set(r.turno, r);
+      const adelante = adelanteDe(r);
+      if (adelante > ESPERA_DIRECTA) return res.status(202).json({ turno: r.turno, adelante });
+      await r.listo;
+      responderAlta(res, r);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'No se pudo registrar.' });
     }
+  });
+
+  // GET /api/auth/turno/:turno — sala de espera: { adelante } mientras espera, o la cuenta
+  // nueva ({ name, pin }) una sola vez cuando ya está guardada.
+  app.get('/api/auth/turno/:turno', (req, res) => {
+    const r = turnos.get(String(req.params.turno));
+    if (!r) return res.status(404).json({ error: 'Ese turno ya no existe. Probá registrarte de nuevo.' });
+    if (r.alta || r.error) return responderAlta(res, r);
+    res.status(202).json({ turno: r.turno, adelante: adelanteDe(r) });
+  });
+
+  // GET /api/invitacion/:codigo — si el código sirve y de quién es (para el cartel del celular).
+  app.get('/api/invitacion/:codigo', (req, res) => {
+    const r = invitaciones.revisar(req.params.codigo);
+    if (r.error) return res.status(404).json({ error: r.error });
+    res.json({ codigo: r.inv.codigo, de: r.inv.dueno });
   });
 
   // POST /api/auth/login — volver a entrar con un PIN ya asignado (ej. otro celular).

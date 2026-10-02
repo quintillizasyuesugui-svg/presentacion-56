@@ -13,11 +13,13 @@ const { registrarRutasAdministracion } = require('./administracion');
 const { registrarRutasCodigoQr } = require('./codigo-qr');
 const { registrarRutasMultimedia } = require('./multimedia');
 const { registrarSockets } = require('./sockets');
+const { porteroDePedidos } = require('./portero-pedidos');
 
 const app = express();
 const servidor = http.createServer(app);
 const io = new Server(servidor);
 
+app.use(porteroDePedidos);
 app.use(express.static(CARPETA_PUBLICA));
 app.use(express.static(CARPETA_DIAPOSITIVAS));
 // Límite alto porque /api/images/combine manda el collage ya armado como data URI en el body
@@ -34,7 +36,7 @@ app.get('/manage.html', (req, res) => {
 
 registrarRutasPersonas(app);
 registrarRutasFraseFinal(app, io);
-registrarRutasAvanceAutomatico(app);
+registrarRutasAvanceAutomatico(app, io);
 registrarRutasDiapositivas(app, io);
 registrarRutasDocumentos(app, io);
 registrarRutasAdministracion(app);

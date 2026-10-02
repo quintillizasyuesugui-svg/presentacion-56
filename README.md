@@ -239,6 +239,30 @@ usuarios a mano:
   automático y sus documentos en proceso. Su nombre queda libre. Nadie más ve esta sección,
   y el servidor rechaza a cualquiera que no sea admin. El nombre «admin» está reservado.
 
+## 🎟️ Invitación de clase y porteros (muchas escuelas a la vez)
+
+- **Invitación de clase:** al iniciar sesión en la pantalla, una banda dorada pregunta
+  «¿Invitar alumnos nuevos?». Con «Sí» aparece un QR abajo a la derecha con un código (por
+  ejemplo `TIGRE-4821`) y cuántos se registraron. Quien lo escanea (o escribe el código en
+  «Soy nuevo/a») se registra sin esperar a los porteros. Vence a las 3 horas; el interruptor
+  bajo el nombre lo apaga (el código deja de servir) o lo vuelve a prender con un código nuevo.
+  Sólo puede invitar el admin o una cuenta con alguna foto subida. Se esconde al tocar
+  «Mostrar». Con la app del celular instalada, el QR abre la app y el código se escribe a mano.
+- **Sala de espera:** si miles se registran a la vez, el servidor los guarda en tandas y el
+  celular muestra un anillo con cuántos tiene adelante hasta darle su PIN.
+- **Portero de registros** (`servidor/limite-registros.js`), sin invitación: por conexión,
+  60 por minuto, 300 por hora y 500 por día; sumando las conexiones desconocidas, 300 por hora y
+  1.000 por día. Las conexiones donde entró el admin o alguien con fotos (la escuela) son VIP:
+  no cuentan para el tope total y tienen topes 10 veces más altos. Además, una trampa
+  invisible en el formulario frena a los programas que lo llenan solo.
+- **Portero de pedidos** (`servidor/portero-pedidos.js`): 3.000 pedidos por minuto por conexión
+  (30.000 si es VIP); frena a quien inunda el servidor sin molestar a una escuela entera.
+- Todos los números se pueden cambiar en Render → Environment: `REGISTRO_POR_MINUTO`,
+  `REGISTRO_POR_HORA`, `REGISTRO_POR_DIA`, `REGISTRO_TOTAL_POR_HORA`, `REGISTRO_TOTAL_POR_DIA`,
+  `REGISTRO_VECES_VIP`, `INVITACION_POR_HORA` (2.000 por código) y `PEDIDOS_POR_MINUTO`.
+  Para `npm run carga` (400 registros desde una sola PC) hay que subir los de registro mientras
+  dure la prueba.
+
 ## 🧪 Local
 ```bash
 npm install

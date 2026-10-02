@@ -36,6 +36,11 @@
     (function () {
       const SERVIDOR_APP = 'presentacion-56.onrender.com'; // la app sólo abre este servidor
       const esAndroid = /Android/i.test(navigator.userAgent);
+      const invitacion = new URLSearchParams(location.search).get('inv');
+      if (invitacion) {
+        location.replace('control.html?inv=' + encodeURIComponent(invitacion));
+        return;
+      }
       if (!esAndroid || location.host !== SERVIDOR_APP) {
         location.replace('control.html');
         return;

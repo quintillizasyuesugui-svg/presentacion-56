@@ -40,7 +40,7 @@ async function borrarAvanceDe(nombres) {
   });
 }
 
-function registrarRutasAvanceAutomatico(app) {
+function registrarRutasAvanceAutomatico(app, io) {
   app.get('/api/avance-automatico', requierePersona, (req, res) => {
     try {
       const propio = almacenAvance.actual().find(r => r.owner === req.person.name);
@@ -61,6 +61,8 @@ function registrarRutasAvanceAutomatico(app) {
         const registro = { owner: req.person.name, ...datos };
         if (posicion === -1) lista.push(registro); else lista[posicion] = registro;
       });
+      // La pantalla y el control de esta persona lo toman al instante (antes, cada 4 segundos).
+      if (io) io.to('owner:' + req.person.name).emit('avanceActualizado');
       res.json(datos);
     } catch (err) {
       console.error(err);

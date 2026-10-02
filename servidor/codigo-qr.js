@@ -3,11 +3,25 @@
 // Conexiones Control si está instalada, la descarga si no (Android) o va a control.html (iPhone).
 // Se arma con la dirección con la que se abrió la pantalla, así funciona igual en Render, en la PC o en la red de la casa.
 const QRCode = require('qrcode');
+const { requierePersona } = require('./personas');
+const { puedeInvitar } = require('./limite-registros');
+const invitaciones = require('./invitaciones');
 
 function direccionDelControl(req) {
   // En Render la app está detrás de un proxy: el protocolo real viene en X-Forwarded-Proto.
   const protocolo = String(req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
   return `${protocolo}://${req.get('host')}/celular.html`;
+}
+
+// Lo que necesita la pantalla para la invitación: estado, si puede invitar y el QR.
+async function estadoInvitacion(req) {
+  const inv = invitaciones.deDueno(req.person.name);
+  const estado = Object.assign({ puede: puedeInvitar(req.person) }, invitaciones.resumen(inv));
+  if (inv) {
+    estado.direccion = direccionDelControl(req) + '?inv=' + encodeURIComponent(inv.codigo);
+    estado.svg = await QRCode.toString(estado.direccion, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+  }
+  return estado;
 }
 
 // Huella de la clave con la que se firma el APK de Conexiones Control (aplicacion-celular/clave-android).
@@ -21,6 +35,33 @@ function registrarRutasCodigoQr(app) {
       relation: ['delegate_permission/common.handle_all_urls'],
       target: { namespace: 'android_app', package_name: 'com.conexiones.control', sha256_cert_fingerprints: [HUELLA_APK] }
     }]);
+  });
+
+  // ---- Invitación de clase (pantalla.html, esquina) ----
+  // GET: estado; POST: activarla (o devolver la que ya está); DELETE: apagarla.
+  app.get('/api/invitacion', requierePersona, async (req, res) => {
+    try {
+      res.set('Cache-Control', 'no-store').json(await estadoInvitacion(req));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'No se pudo armar la invitación.' });
+    }
+  });
+  app.post('/api/invitacion', requierePersona, async (req, res) => {
+    try {
+      if (!puedeInvitar(req.person)) {
+        return res.status(403).json({ error: 'Para invitar alumnos, primero subí al menos una foto. Así sabemos que sos un profesor de verdad y no un programa.' });
+      }
+      invitaciones.activar(req.person.name);
+      res.json(await estadoInvitacion(req));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'No se pudo armar la invitación.' });
+    }
+  });
+  app.delete('/api/invitacion', requierePersona, (req, res) => {
+    invitaciones.apagar(req.person.name);
+    res.json({ activa: false, puede: puedeInvitar(req.person) });
   });
 
   // GET /api/qr-control — { direccion, svg }

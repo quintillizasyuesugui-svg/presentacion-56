@@ -30,6 +30,29 @@
 <div class="identity-corner" id="identityCorner" hidden>
   <div class="identity-pill" id="authBadge"></div>
   <button type="button" class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+  <!-- Invitación de clase: el QR de abajo a la derecha deja registrarse a los alumnos nuevos. -->
+  <button type="button" class="interruptor-invitacion" id="invitacionInterruptor" role="switch" aria-checked="false" hidden>
+    <span class="riel" aria-hidden="true"></span><span id="invitacionInterruptorTexto">🎟️ Invitación: apagada</span>
+  </button>
+</div>
+
+<!-- Pregunta al iniciar sesión (y aviso si la cuenta todavía no puede invitar). -->
+<div class="banda-invitacion" id="invitacionBanda" role="dialog" aria-live="polite" hidden>
+  <p id="invitacionBandaTexto">🎟️ <strong>¿Invitar alumnos nuevos?</strong> Se muestra un QR en la esquina para que se registren. Vence en 3 horas.</p>
+  <div class="banda-botones" id="invitacionBandaBotones">
+    <button type="button" class="btn" id="invitacionNo">No</button>
+    <button type="button" class="btn oro" id="invitacionSi">Sí, mostrar</button>
+  </div>
+  <button type="button" class="btn" id="invitacionEntendido" hidden>Entendido</button>
+</div>
+
+<div class="qr-invitacion" id="invitacionQr" hidden>
+  <div class="qr-invitacion-codigo" id="invitacionQrCodigo" aria-label="Código QR para que los alumnos nuevos se registren"></div>
+  <div class="qr-invitacion-textos">
+    <strong>🎟️ Alumnos nuevos: escaneen</strong>
+    <span class="qr-invitacion-clave" id="invitacionClave"></span>
+    <span class="qr-invitacion-info" id="invitacionInfo"></span>
+  </div>
 </div>
 
 <div class="progress-track">

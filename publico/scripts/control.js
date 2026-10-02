@@ -175,7 +175,10 @@
     refreshSlideCount();
     socket.on('imagenesActualizadas', refreshSlideCount);
     refreshAutoAdvanceEnabled();
-    setInterval(refreshAutoAdvanceEnabled, 4000);
+    // El servidor avisa al instante cuando cambia ('avanceActualizado'); esto es sólo un respaldo
+    // por si se cortó el aviso (antes era cada 4 s: con varias escuelas eran miles de pedidos).
+    socket.on('avanceActualizado', refreshAutoAdvanceEnabled);
+    setInterval(refreshAutoAdvanceEnabled, 30000);
 
     // Vincula este socket a la sala de este dueño (por PIN) para recibir los
     // avisos del avance automático de SU PROPIA pantalla.html — nunca los de

@@ -63,6 +63,8 @@ function registrarRutasFraseFinal(app, io) {
         const registro = { owner: req.person.name, ...datos };
         if (posicion === -1) frases.push(registro); else frases[posicion] = registro;
       });
+      // La pantalla de esta persona la toma al instante (antes la buscaba cada 4 segundos).
+      io.to('owner:' + req.person.name).emit('fraseFinalActualizada');
       res.json(datos);
     } catch (err) {
       console.error(err);

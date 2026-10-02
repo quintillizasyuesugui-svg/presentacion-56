@@ -14,6 +14,16 @@
   const logoutBtn = document.getElementById('logoutBtn');
   const iniciarSesionBtn = document.getElementById('iniciarSesionBtn');
   const loginCorner = document.getElementById('loginCorner');
+  const invitacionInterruptor = document.getElementById('invitacionInterruptor');
+  const invitacionInterruptorTexto = document.getElementById('invitacionInterruptorTexto');
+  const invitacionBanda = document.getElementById('invitacionBanda');
+  const invitacionBandaTexto = document.getElementById('invitacionBandaTexto');
+  const invitacionBandaBotones = document.getElementById('invitacionBandaBotones');
+  const invitacionEntendido = document.getElementById('invitacionEntendido');
+  const invitacionQr = document.getElementById('invitacionQr');
+  const invitacionQrCodigo = document.getElementById('invitacionQrCodigo');
+  const invitacionClave = document.getElementById('invitacionClave');
+  const invitacionInfo = document.getElementById('invitacionInfo');
   const progressFill = document.getElementById('progressFill');
   const waiting = document.getElementById('waiting');
   const waitingHint = document.getElementById('waitingHint');
@@ -539,8 +549,128 @@
   if (getAuth()) iniciarSesion();
   else loginCorner.hidden = false;
 
+  // ---- Invitación de clase ----
+  // Al iniciar sesión, la banda dorada pregunta si se invita a alumnos nuevos. «Sí» muestra un QR
+  // abajo a la derecha: quien lo escanea se registra sin pasar por el portero de registros (ver
+  // servidor/invitaciones.js). El interruptor bajo el nombre la prende o la apaga cuando se
+  // quiera. Sólo puede invitar una cuenta con alguna foto subida (o el admin): un bot no tiene.
+  // Si el servidor se reinició o la invitación venció mientras seguía prendida, se pide otra sola.
+  const PREFERENCIA_INVITACION = 'pantallaInvitacion';
+  let invitacion = { activa: false, puede: false };
+  let invitacionRefresco = null;
+
+  function leerPreferencia() {
+    try { return sessionStorage.getItem(PREFERENCIA_INVITACION); } catch { return null; }
+  }
+  function guardarPreferencia(valor) {
+    try { sessionStorage.setItem(PREFERENCIA_INVITACION, valor); } catch { /* privado/bloqueado */ }
+  }
+
+  function horaDe(ms) {
+    return new Date(ms).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function pintarInvitacion() {
+    const activa = invitacion.activa && !started;
+    invitacionInterruptor.hidden = started;
+    invitacionInterruptor.setAttribute('aria-checked', String(!!invitacion.activa));
+    invitacionInterruptorTexto.textContent = '🎟️ Invitación: ' + (invitacion.activa ? 'activada' : 'apagada');
+    invitacionQr.hidden = !activa;
+    if (invitacion.activa) {
+      if (invitacion.svg && invitacionQrCodigo.dataset.codigo !== invitacion.codigo) {
+        invitacionQrCodigo.innerHTML = invitacion.svg; // SVG armado por el servidor (librería qrcode)
+        invitacionQrCodigo.dataset.codigo = invitacion.codigo;
+      }
+      invitacionClave.textContent = invitacion.codigo;
+      const n = invitacion.registrados || 0;
+      invitacionInfo.textContent = n + (n === 1 ? ' registrado' : ' registrados') + ' · vence ' + horaDe(invitacion.vence);
+    }
+  }
+
+  const textoPregunta = invitacionBandaTexto.innerHTML;
+  function abrirBanda({ pregunta }) {
+    if (pregunta) invitacionBandaTexto.innerHTML = textoPregunta;
+    invitacionBandaBotones.hidden = !pregunta;
+    invitacionEntendido.hidden = pregunta;
+    invitacionBanda.hidden = false;
+    document.body.classList.add('con-banda-invitacion');
+    (pregunta ? document.getElementById('invitacionSi') : invitacionEntendido).focus();
+  }
+  function cerrarBanda() {
+    invitacionBanda.hidden = true;
+    document.body.classList.remove('con-banda-invitacion');
+  }
+  function avisarSinFotos(mensaje) {
+    invitacionBandaTexto.textContent = '📷 ' + (mensaje || 'Para invitar alumnos, primero subí al menos una foto desde el celular en «Gestionar».');
+    abrirBanda({ pregunta: false });
+  }
+
+  async function pedirInvitacion(metodo) {
+    const res = await authFetch('/api/invitacion', { method: metodo });
+    const datos = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(datos.error || 'No se pudo armar la invitación.'), { estado: res.status });
+    invitacion = datos;
+    pintarInvitacion();
+    return datos;
+  }
+
+  async function activarInvitacion() {
+    try {
+      await pedirInvitacion('POST');
+      guardarPreferencia('si');
+      cerrarBanda();
+      seguirInvitacion();
+    } catch (err) {
+      if (err.estado === 403) avisarSinFotos(err.message);
+      else console.error(err);
+    }
+  }
+  async function apagarInvitacion() {
+    guardarPreferencia('no');
+    cerrarBanda();
+    try { await pedirInvitacion('DELETE'); } catch (err) { console.error(err); }
+  }
+
+  // Mientras está prendida, cada 15 s trae cuántos se registraron (y si venció, pide otra).
+  function seguirInvitacion() {
+    if (invitacionRefresco) return;
+    invitacionRefresco = setInterval(async () => {
+      if (started || leerPreferencia() !== 'si') return;
+      try {
+        const datos = await pedirInvitacion('GET');
+        if (!datos.activa && datos.puede) await pedirInvitacion('POST');
+      } catch (err) { console.error(err); }
+    }, 15000);
+  }
+
+  document.getElementById('invitacionSi').addEventListener('click', activarInvitacion);
+  document.getElementById('invitacionNo').addEventListener('click', apagarInvitacion);
+  invitacionEntendido.addEventListener('click', cerrarBanda);
+  invitacionInterruptor.addEventListener('click', () => {
+    if (invitacion.activa) apagarInvitacion();
+    else if (invitacion.puede) activarInvitacion();
+    else avisarSinFotos();
+  });
+
+  async function empezarInvitacion() {
+    try {
+      const datos = await pedirInvitacion('GET');
+      const preferencia = leerPreferencia();
+      if (datos.activa || (preferencia === 'si' && datos.puede)) {
+        if (!datos.activa) await pedirInvitacion('POST');
+        guardarPreferencia('si');
+        seguirInvitacion();
+      } else if (datos.puede && preferencia !== 'no') {
+        abrirBanda({ pregunta: true }); // primera vez en esta pantalla: se pregunta
+      }
+    } catch (err) {
+      console.error('No se pudo revisar la invitación:', err);
+    }
+  }
+
   sesionLista.then((auth) => {
     conSesion = true;
+    empezarInvitacion();
     loginCorner.hidden = true;
     waitingHint.textContent = 'Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).';
     identityCorner.hidden = false;
@@ -559,7 +689,12 @@
     // el dato guardado, nunca reinicia la cuenta regresiva que ya está
     // corriendo (eso sólo lo hace scheduleAutoAdvance(), al cambiar de
     // diapositiva de verdad).
-    setInterval(() => { refreshSlides(); refreshFraseFinal(); refreshAutoAdvance(); }, 4000);
+    // Cada 30 s (antes 4): los cambios llegan al instante por los avisos del servidor
+    // ('imagenesActualizadas', 'fraseFinalActualizada', 'avanceActualizado'); esto queda de
+    // respaldo, y con varias escuelas a la vez son 8 veces menos pedidos.
+    socket.on('fraseFinalActualizada', refreshFraseFinal);
+    socket.on('avanceActualizado', refreshAutoAdvance);
+    setInterval(() => { refreshSlides(); refreshFraseFinal(); refreshAutoAdvance(); }, 30000);
 
     // Vincula este socket a la sala de este dueño (por PIN) para que "Enviar
     // a PC" (Modo avanzado) le pueda mandar la frase sólo a esta pantalla, no
@@ -700,6 +835,8 @@
       started = true;
       waiting.classList.add('hide');
       identityCorner.hidden = true; // deja de taparle una esquina a las fotos
+      cerrarBanda();
+      pintarInvitacion();
     } else if (accion === 'siguiente') {
       if (showingFinal) {
         // Si era sólo una prueba ("Enviar a PC"), no tocó el índice — al
@@ -753,6 +890,8 @@
       started = true;
       waiting.classList.add('hide');
       identityCorner.hidden = true;
+      cerrarBanda();
+      pintarInvitacion();
     } else {
       return;
     }

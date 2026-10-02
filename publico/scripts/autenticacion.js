@@ -80,11 +80,31 @@
         </div>
 
         <div id="authNew" hidden>
+          <p class="auth-invitacion" id="authInvitacion" hidden></p>
           <input type="text" id="authName" placeholder="Tu nombre" autocomplete="off" maxlength="40">
+          <input type="text" id="authCodigo" placeholder="Código de invitación (si tenés)" autocomplete="off" autocapitalize="characters" maxlength="16">
+          <!-- Trampa para programas que llenan formularios: no se ve ni se puede tocar; si llega con algo, el servidor no registra. -->
+          <input type="text" id="authSitioWeb" name="sitio_web" class="auth-usuario" tabindex="-1" autocomplete="off" aria-hidden="true">
           <div class="btn-row">
             <button type="button" class="btn primary" id="authRegisterBtn" style="flex:1">Dame un PIN</button>
           </div>
           <button type="button" class="auth-back" id="authBackFromNew">← Volver</button>
+        </div>
+
+        <!-- Sala de espera: con miles registrándose a la vez, el servidor da un turno. -->
+        <div id="authEspera" class="auth-espera" hidden>
+          <div class="auth-anillo">
+            <svg viewBox="0 0 170 170" aria-hidden="true">
+              <circle cx="85" cy="85" r="76" class="auth-anillo-fondo"></circle>
+              <circle cx="85" cy="85" r="76" class="auth-anillo-avance" id="authAnillo"></circle>
+            </svg>
+            <div class="auth-anillo-dentro">
+              <small>ADELANTE</small>
+              <strong id="authAdelante">0</strong>
+            </div>
+          </div>
+          <h3>Registrándote…</h3>
+          <p id="authEsperaTexto">Hay mucha gente entrando a la vez. No cierres esta pantalla.</p>
         </div>
         ` : ''}
 
@@ -203,6 +223,62 @@
         errorEl.textContent = '';
         nameInput.focus();
       }
+
+      // Código de invitación: viene en la dirección del QR (?inv=TIGRE-4821) o se escribe a mano.
+      const codigoInput = gate.querySelector('#authCodigo');
+      const invitacionEl = gate.querySelector('#authInvitacion');
+      async function mostrarInvitacion(codigo) {
+        if (!invitacionEl) return;
+        invitacionEl.hidden = true;
+        if (!codigo) return;
+        try {
+          const res = await fetch('/api/invitacion/' + encodeURIComponent(codigo));
+          const datos = await res.json().catch(() => ({}));
+          invitacionEl.textContent = res.ok ? '🎟️ Invitación de ' + datos.de : '⚠️ ' + (datos.error || 'Ese código no sirve.');
+          invitacionEl.classList.toggle('mal', !res.ok);
+          invitacionEl.hidden = false;
+        } catch { /* sin conexión: se revisa al registrarse */ }
+      }
+      if (codigoInput) {
+        codigoInput.addEventListener('input', () => {
+          codigoInput.value = codigoInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        });
+        codigoInput.addEventListener('change', () => mostrarInvitacion(codigoInput.value.trim()));
+        let deLaDireccion = '';
+        try { deLaDireccion = new URLSearchParams(location.search).get('inv') || ''; } catch { /* sin dirección */ }
+        if (deLaDireccion) {
+          codigoInput.value = deLaDireccion.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 16);
+          showNewForm(); // quien escanea la invitación es nuevo: va directo a poner su nombre
+          mostrarInvitacion(codigoInput.value);
+        }
+      }
+
+      // Sala de espera: pregunta cada segundo cuántos tiene adelante hasta que está su cuenta.
+      const esperaBox = gate.querySelector('#authEspera');
+      async function esperarTurno(turno, adelante) {
+        const anillo = gate.querySelector('#authAnillo');
+        const numero = gate.querySelector('#authAdelante');
+        const largo = 2 * Math.PI * 76;
+        const total = Math.max(1, adelante);
+        anillo.style.strokeDasharray = String(largo);
+        authNewBox.hidden = true;
+        errorEl.textContent = '';
+        esperaBox.hidden = false;
+        for (;;) {
+          numero.textContent = adelante.toLocaleString('es');
+          anillo.style.strokeDashoffset = String(largo * Math.min(1, adelante / total));
+          await new Promise(r => setTimeout(r, 1000));
+          const res = await fetch('/api/auth/turno/' + encodeURIComponent(turno));
+          const datos = await res.json().catch(() => ({}));
+          if (res.status === 202) { adelante = datos.adelante || 0; continue; }
+          esperaBox.hidden = true;
+          if (!res.ok) {
+            authNewBox.hidden = false;
+            throw new Error(datos.error || 'No se pudo registrar. Probá de nuevo.');
+          }
+          return datos;
+        }
+      }
       function showOldForm() {
         choiceBox.hidden = true;
         authOldBox.hidden = false;
@@ -288,7 +364,13 @@
           if (name.length < 2) { errorEl.textContent = 'El nombre tiene que tener al menos 2 letras.'; return; }
           registerBtn.disabled = true;
           try {
-            const auth = await callAuth('/api/auth/register', { name });
+            const sitioWeb = gate.querySelector('#authSitioWeb');
+            let auth = await callAuth('/api/auth/register', {
+              name,
+              invitacion: codigoInput ? codigoInput.value.trim() : '',
+              sitio_web: sitioWeb ? sitioWeb.value : ''
+            });
+            if (auth.turno) auth = await esperarTurno(auth.turno, auth.adelante || 0);
             showPinOnce(auth);
           } catch (err) {
             errorEl.textContent = err.message;

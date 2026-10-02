@@ -12,6 +12,7 @@ const { CARPETA_DIAPOSITIVAS, EXTENSIONES_IMAGEN, cloudinary, nubeLista } = requ
 const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona, visiblePara } = require('./personas');
 const { enFila } = require('./guardian');
+const { definirConfianza } = require('./limite-registros');
 
 const ERROR_SIN_NUBE = 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá .env.example.';
 
@@ -63,6 +64,9 @@ const almacenOrden = crearAlmacen({
   normalizar: quitarLocalesQueFaltan
 });
 
+// Para el portero de registros: quien ya subió algo es una persona de verdad, no un bot.
+definirConfianza(nombre => almacenOrden.actual().some(r => r.owner === nombre));
+
 // Error con el código HTTP para responder (se tira adentro de modificar() y corta sin guardar).
 class ErrorPedido extends Error {
   constructor(estado, mensaje) {
@@ -84,8 +88,14 @@ function idDeLaRuta(req) {
 
 let ioActual = null; // lo fija registrarRutasDiapositivas; lo usan también los trabajos de documentos
 
-function avisarCambioDeImagenes() {
-  if (ioActual) ioActual.emit('imagenesActualizadas');
+// Avisa sólo a las pantallas y celulares de esas personas (y al admin, que ve todo).
+// Sin nombres (lo hizo el admin, que puede tocar las de cualquiera) avisa a todas.
+function avisarCambioDeImagenes(nombres) {
+  if (!ioActual) return;
+  if (!nombres) return ioActual.emit('imagenesActualizadas');
+  let destino = ioActual.to('admins');
+  for (const n of new Set(nombres)) if (n) destino = destino.to('owner:' + n);
+  destino.emit('imagenesActualizadas');
 }
 
 // Sube una imagen ya comprimida (Buffer) y devuelve su registro para el orden.
@@ -117,7 +127,7 @@ async function borrarImagenSubida(registro) {
 // Agrega diapositivas al final del orden, en el orden recibido, y avisa a las pantallas.
 async function agregarDiapositivas(registros) {
   await almacenOrden.modificar((orden) => { orden.push(...registros); });
-  avisarCambioDeImagenes();
+  avisarCambioDeImagenes(registros.map(r => r.owner));
 }
 
 // Cuántas diapositivas tiene cada persona: { nombre: cantidad }.
@@ -141,7 +151,7 @@ async function quitarDiapositivasDe(nombres) {
   if (!suyas.length) return cantidades;
   for (const r of suyas) cantidades[r.owner] = (cantidades[r.owner] || 0) + 1;
   await Promise.all(suyas.flatMap(r => [r, ...(r.originals || [])]).map(borrarImagenSubida));
-  avisarCambioDeImagenes();
+  avisarCambioDeImagenes(Object.keys(cantidades));
   return cantidades;
 }
 
@@ -211,7 +221,7 @@ function registrarRutasDiapositivas(app, io) {
       }));
 
       const orden = await almacenOrden.modificar((o) => { o.push(...nuevos); });
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, orden));
     } catch (err) {
       responderError(res, err, 'Error al subir la imagen.');
@@ -228,7 +238,7 @@ function registrarRutasDiapositivas(app, io) {
         [registro] = o.splice(posicion, 1);
       });
       await borrarImagenSubida(registro);
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, orden));
     } catch (err) {
       responderError(res, err, 'Error al borrar la imagen.');
@@ -253,7 +263,7 @@ function registrarRutasDiapositivas(app, io) {
       const orden = await almacenOrden.modificar((o) => {
         o[propiaDe(o, id, req.person, 'ajustar')].transform = { scale, x, y };
       });
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, orden));
     } catch (err) {
       responderError(res, err, 'Error al guardar el ajuste.');
@@ -310,7 +320,7 @@ function registrarRutasDiapositivas(app, io) {
         });
         return nuevo;
       });
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, siguiente));
     } catch (err) {
       if (unida) await borrarImagenSubida(unida); // el collage subido no quedó en el show
@@ -332,7 +342,7 @@ function registrarRutasDiapositivas(app, io) {
       if (registro.id.startsWith('presentacion/') && nubeLista) {
         await cloudinary.uploader.destroy(registro.id).catch(() => {});
       }
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, siguiente));
     } catch (err) {
       responderError(res, err, 'Error al separar la unión.');
@@ -369,7 +379,7 @@ function registrarRutasDiapositivas(app, io) {
 
         posicionesPropias.forEach((lugar, i) => { actual[lugar] = porId.get(idsNuevos[i]); });
       });
-      avisarCambio();
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, siguiente));
     } catch (err) {
       responderError(res, err, 'Error al reordenar.');

@@ -245,4 +245,8 @@
       if (ok) logoutAuth();
     });
     loadImages();
+    // El aviso de fotos nuevas le llega sólo a la sala de cada persona: este socket se suma a la suya.
+    const identificarSocket = () => socket.emit('identificar', auth.pin);
+    if (socket.connected) identificarSocket();
+    socket.on('connect', identificarSocket);
   });

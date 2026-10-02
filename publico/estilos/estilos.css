@@ -1666,7 +1666,46 @@ body.dragging-active { user-select: none; }
 
 .auth-gate input::placeholder { color: var(--text-muted); }
 
-/* Usuario fijo del formulario de PIN: sólo para que Google guarde «Conexiones» + PIN, no se ve. */
+/* Cartel de la invitación con la que se registra (verde) o aviso si el código no sirve. */
+.auth-gate .auth-invitacion {
+  margin: 0 0 10px;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: #2a2410;
+  border: 1px solid rgba(255, 203, 77, 0.45);
+  color: var(--amber-400);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+.auth-gate .auth-invitacion.mal { background: rgba(240, 57, 63, 0.12); border-color: rgba(255, 107, 107, 0.45); color: var(--red-300); }
+.auth-gate .auth-invitacion[hidden] { display: none; }
+
+/* Sala de espera del registro: anillo que se llena con cuántos faltan en el medio. */
+.auth-espera { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.auth-espera[hidden] { display: none; }
+.auth-espera h3 { font-size: 1.1rem; }
+.auth-espera p { color: var(--text-muted); font-size: 0.88rem; }
+.auth-anillo { position: relative; width: 170px; height: 170px; display: grid; place-items: center; }
+.auth-anillo svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.auth-anillo circle { fill: none; stroke-width: 12; }
+.auth-anillo-fondo { stroke: var(--gray-700); }
+.auth-anillo-avance { stroke: var(--primary-400); stroke-linecap: round; transition: stroke-dashoffset 600ms var(--ease-out); }
+.auth-anillo-dentro { display: flex; flex-direction: column; align-items: center; }
+.auth-anillo-dentro small { color: var(--text-muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; }
+.auth-anillo-dentro strong {
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1.1;
+  background: linear-gradient(180deg, var(--primary-100), var(--primary-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@media (prefers-reduced-motion: reduce) { .auth-anillo-avance { transition: none; } }
+
+/* Campos que no se ven: el usuario fijo del formulario de PIN (para que Google guarde
+   «Conexiones» + PIN) y la trampa «sitio_web» del registro. */
 .auth-gate .auth-usuario {
   position: absolute;
   width: 1px;
@@ -1969,6 +2008,120 @@ body.dragging-active { user-select: none; }
 }
 .login-pill:hover { border-color: var(--primary-300); }
 .login-pill:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
+
+/* ---- Invitación de clase (pantalla.html): banda dorada arriba, interruptor bajo el nombre y
+   QR chico abajo a la derecha. Todo se esconde al arrancar el show. ---- */
+.banda-invitacion {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+  background: linear-gradient(90deg, #2a2410, #1d1a0d);
+  border-bottom: 1px solid rgba(255, 203, 77, 0.4);
+  animation: banda-baja 320ms var(--ease-out);
+}
+.banda-invitacion[hidden] { display: none; }
+.banda-invitacion p {
+  flex: 1 1 280px;
+  color: #e9dcb0;
+  font-size: clamp(0.85rem, 1.6vw, 0.98rem);
+}
+.banda-invitacion .banda-botones { display: flex; gap: 10px; }
+.banda-invitacion .banda-botones[hidden] { display: none; }
+.banda-invitacion .btn { min-height: 42px; padding: 0.45rem 1.1rem; font-size: 0.95rem; }
+.banda-invitacion .btn[hidden] { display: none; }
+@keyframes banda-baja { from { opacity: 0; transform: translateY(-14px); } }
+/* Con la banda abierta, el nombre y el contador bajan para que no queden tapados. */
+body.con-banda-invitacion .identity-corner,
+body.con-banda-invitacion .hud { top: calc(max(16px, env(safe-area-inset-top)) + 72px); }
+
+.btn.oro {
+  background: linear-gradient(180deg, #ffd76a, #e0a400);
+  border-color: #ffe9a8;
+  color: #1a1400;
+}
+.btn.oro:hover { background: linear-gradient(180deg, #ffe08a, #ebb000); border-color: #fff1c4; }
+
+.interruptor-invitacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.interruptor-invitacion[hidden] { display: none; }
+.interruptor-invitacion:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
+.interruptor-invitacion .riel {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--gray-600);
+  transition: background var(--dur-base) var(--ease-out);
+}
+.interruptor-invitacion .riel::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.interruptor-invitacion[aria-checked="true"] { color: var(--amber-400); border-color: rgba(255, 203, 77, 0.35); }
+.interruptor-invitacion[aria-checked="true"] .riel { background: var(--amber-600); }
+.interruptor-invitacion[aria-checked="true"] .riel::after { transform: translateX(14px); }
+
+.qr-invitacion {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px 10px 10px;
+  background: var(--gray-850);
+  border: 1px solid rgba(255, 203, 77, 0.45);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+.qr-invitacion[hidden] { display: none; }
+.qr-invitacion-codigo {
+  flex: none;
+  width: clamp(80px, min(12vw, 14vh), 150px);
+  height: clamp(80px, min(12vw, 14vh), 150px);
+  padding: 6px;
+  background: #fff;
+  border-radius: 10px;
+}
+.qr-invitacion-codigo svg { display: block; width: 100%; height: 100%; }
+.qr-invitacion-textos { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qr-invitacion-textos strong { color: var(--amber-400); font-size: clamp(0.85rem, 1.4vw, 1rem); }
+.qr-invitacion-clave {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: clamp(1rem, 2vw, 1.4rem);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--primary-200);
+}
+.qr-invitacion-info { color: var(--text-muted); font-size: 0.8rem; }
 
 .identity-corner .logout-btn {
   padding: 0.3rem 0.6rem;
