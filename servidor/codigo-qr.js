@@ -10,7 +10,19 @@ function direccionDelControl(req) {
   return `${protocolo}://${req.get('host')}/celular.html`;
 }
 
+// Huella de la clave con la que se firma el APK de Conexiones Control (aplicacion-celular/clave-android).
+// Android la compara con la del APK instalado: si coinciden, el QR abre la app directo, sin preguntar.
+const HUELLA_APK = '4A:EB:B2:00:FB:01:59:18:C6:30:20:13:3D:76:91:FD:86:05:7F:B8:03:F6:58:D0:BB:D4:62:91:F3:87:B9:41';
+
 function registrarRutasCodigoQr(app) {
+  // GET /.well-known/assetlinks.json — App Links de Android (express.static no sirve carpetas con punto)
+  app.get('/.well-known/assetlinks.json', (req, res) => {
+    res.json([{
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: { namespace: 'android_app', package_name: 'com.conexiones.control', sha256_cert_fingerprints: [HUELLA_APK] }
+    }]);
+  });
+
   // GET /api/qr-control — { direccion, svg }
   app.get('/api/qr-control', async (req, res) => {
     try {

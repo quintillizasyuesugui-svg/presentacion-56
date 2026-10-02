@@ -27,6 +27,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="conexiones" android:host="control" />
             </intent-filter>
+            <!-- App Link: el QR (https://presentacion-56.onrender.com/celular.html) abre la app directo,
+                 sin preguntar; Android lo verifica con /.well-known/assetlinks.json del servidor -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="presentacion-56.onrender.com" android:path="/celular.html" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

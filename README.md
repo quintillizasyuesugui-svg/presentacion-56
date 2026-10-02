@@ -55,8 +55,10 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
   `aplicacion-celular/clave-android/`, que no va a git: sin esa misma clave el celular no
   puede actualizar la app sin desinstalarla). El APK listo para bajar está en
   `publico/descargas/conexiones-control.apk`.
-- **QR de la pantalla** (`/celular.html`): en Android, si la app está instalada la abre; si no,
-  descarga el APK y explica cómo instalarlo. En iPhone (o fuera de Render) va a `control.html`.
+- **QR de la pantalla** (`/celular.html`): en Android, si la app está instalada se abre directo, sin
+  preguntar (App Link verificado con `/.well-known/assetlinks.json`, que lleva la huella de la clave
+  de firma). Si no está, el APK se descarga solo y sólo hay que tocar «Instalar» (Android no deja
+  instalar sin ese toque). En iPhone (o fuera de Render) va a `control.html`.
 
 ## 📄 Subir documento (Modo avanzado)
 
