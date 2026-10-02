@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Conexiones Control</title>
+  <link rel="stylesheet" href="estilos/estilos.css">
+  <style>
+    .celular-app { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; gap: 18px; max-width: 420px; margin: 0 auto; padding: 24px 20px; text-align: center; }
+    .celular-app img { width: 88px; height: 88px; margin: 0 auto; border-radius: 22px; }
+    .celular-app h1 { font-size: 1.5rem; }
+    .celular-app p { color: var(--text-muted); line-height: 1.5; }
+    .celular-app .btn { width: 100%; justify-content: center; }
+    .celular-pasos { text-align: left; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; padding-left: 20px; }
+    .celular-web { color: var(--primary-300); font-size: 0.95rem; }
+  </style>
+</head>
+<body class="control">
+  <main class="celular-app">
+    <img src="descargas/icono-control.png" alt="">
+    <h1>Conexiones Control</h1>
+    <p id="celularEstado">Abriendo la app…</p>
+    <a class="btn primary" id="celularAbrir" href="control.html">Abrir la app</a>
+    <a class="btn" id="celularDescargar" href="descargas/conexiones-control.apk" download hidden>Descargar la app (Android)</a>
+    <ol class="celular-pasos" id="celularPasos" hidden>
+      <li>Abrí el archivo descargado <b>conexiones-control.apk</b>.</li>
+      <li>Si Android pregunta, permití instalar apps de este navegador.</li>
+      <li>Tocá <b>Instalar</b> y después <b>Abrir</b>.</li>
+    </ol>
+    <a class="celular-web" href="control.html">Usar el control sin app, en el navegador</a>
+  </main>
+  <script>
+    // El QR de la pantalla trae acá. En Android: si la app está instalada, Android la abre;
+    // si no, Chrome descarga el APK (browser_fallback_url). En iPhone o en la PC, el control web.
+    (function () {
+      const SERVIDOR_APP = 'presentacion-56.onrender.com'; // la app sólo abre este servidor
+      const esAndroid = /Android/i.test(navigator.userAgent);
+      if (!esAndroid || location.host !== SERVIDOR_APP) {
+        location.replace('control.html');
+        return;
+      }
+      const apk = location.origin + '/descargas/conexiones-control.apk';
+      const intento = 'intent://control#Intent;scheme=conexiones;package=com.conexiones.control;S.browser_fallback_url=' + encodeURIComponent(apk) + ';end';
+      const abrir = document.getElementById('celularAbrir');
+      abrir.href = intento;
+
+      // Si después de un rato la página sigue a la vista, la app no se abrió: ofrecer descargarla.
+      let seFue = false;
+      document.addEventListener('visibilitychange', () => { if (document.hidden) seFue = true; });
+      setTimeout(() => {
+        if (seFue) return;
+        document.getElementById('celularEstado').textContent = '¿No tenés la app? Descargala e instalala, es una sola vez.';
+        const descargar = document.getElementById('celularDescargar');
+        descargar.hidden = false;
+        descargar.classList.add('primary');
+        abrir.classList.remove('primary');
+        abrir.before(descargar);
+        document.getElementById('celularPasos').hidden = false;
+        abrir.textContent = 'Ya la instalé: abrir la app';
+      }, 2500);
+
+      location.href = intento;
+    })();
+  </script>
+</body>
+</html>

@@ -42,7 +42,21 @@ Para que con muchos usuarios no se atore el servidor gratis:
   (`CUPO_NUBE_POR_HORA`, 400) y explica por qué cuando a alguien no le alcanza.
 - **📺 Pantallas**: la música y los videos de cada persona van sólo a su pantalla y frena a
   quien manda más de 30 mensajes por segundo.
-El admin los ve en Modo avanzado → Personas, con sus últimas decisiones y el motivo.
+Trabajan solos en el servidor; ya no se muestran en el celular.
+
+## 📲 Apps de PC y celular
+- **Conexiones Pantalla** (`aplicacion-pantalla/`, Windows): abre `pantalla.html` de Render en
+  su propia ventana. F11 pantalla completa, F5 recargar; si no hay internet muestra un aviso y
+  reintenta solo. El instalador pregunta para qué usuarios y en qué carpeta o disco instalar.
+  Compilar: `npm install` y `npm run compilar` dentro de la carpeta (sale en `instalador/`).
+- **Conexiones Control** (`aplicacion-celular/`, Android): abre `control.html` de Render;
+  permite subir archivos, el botón atrás vuelve de página y YouTube se abre en el navegador.
+  Compilar: `gradlew assembleRelease` (necesita el SDK de Android y la clave de firma en
+  `aplicacion-celular/clave-android/`, que no va a git: sin esa misma clave el celular no
+  puede actualizar la app sin desinstalarla). El APK listo para bajar está en
+  `publico/descargas/conexiones-control.apk`.
+- **QR de la pantalla** (`/celular.html`): en Android, si la app está instalada la abre; si no,
+  descarga el APK y explica cómo instalarlo. En iPhone (o fuera de Render) va a `control.html`.
 
 ## 📄 Subir documento (Modo avanzado)
 
@@ -92,7 +106,8 @@ servidor/                 Todo lo que corre en el servidor (Node)
   guardian.js             Los 4 guardianes: filas con empleados, turnos, espacio y mensajes de más
 publico/                  Lo único que ve el navegador
   pantalla.html, control.html, gestionar.html, multimedia.html, subir-multimedia.html,
-  avanzado.html, index.html
+  avanzado.html, index.html, celular.html (a donde lleva el QR)
+  descargas/              APK de Conexiones Control y su ícono
   estilos/estilos.css     Estilos de todas las páginas
   estilos/multimedia.css  Estilos de la música y los videos
   vendor/                 Mediabunny (achica los videos en el navegador; licencia MPL-2.0)
@@ -102,6 +117,8 @@ publico/                  Lo único que ve el navegador
   diapositivas/           Imágenes opcionales que viajan con el código
 datos/                    Lo que genera la app (no va a git): orden-imagenes.json, personas.json,
                           frases-finales.json, avance-automatico.json
+aplicacion-pantalla/      App de Windows (Electron) que abre la pantalla de Render
+aplicacion-celular/       App de Android que abre el control de Render
 pruebas/                  Pruebas automáticas (npm test) y prueba de carga (npm run carga)
 Dockerfile                Imagen para Render con LibreOffice (Word/Excel/PowerPoint)
 server.js                 Sólo compatibilidad: si Render arranca con «node server.js», llama a servidor/

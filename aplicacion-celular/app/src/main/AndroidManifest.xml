@@ -20,6 +20,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- El QR de la pantalla abre conexiones://control: si la app está instalada, Android la abre -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="conexiones" android:host="control" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

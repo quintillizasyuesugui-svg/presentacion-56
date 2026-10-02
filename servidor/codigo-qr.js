@@ -1,13 +1,13 @@
 // ---- Código QR para entrar al control desde el celular ----
-// pantalla.html muestra este QR: se escanea con la cámara y abre control.html en el celular,
-// sin tener que escribir la dirección. Se arma con la dirección con la que se abrió la
-// pantalla, así funciona igual en Render, en la PC o en la red de la casa.
+// pantalla.html muestra este QR: se escanea con la cámara y abre celular.html, que abre la app
+// Conexiones Control si está instalada, la descarga si no (Android) o va a control.html (iPhone).
+// Se arma con la dirección con la que se abrió la pantalla, así funciona igual en Render, en la PC o en la red de la casa.
 const QRCode = require('qrcode');
 
 function direccionDelControl(req) {
   // En Render la app está detrás de un proxy: el protocolo real viene en X-Forwarded-Proto.
   const protocolo = String(req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
-  return `${protocolo}://${req.get('host')}/control.html`;
+  return `${protocolo}://${req.get('host')}/celular.html`;
 }
 
 function registrarRutasCodigoQr(app) {
