@@ -3,6 +3,7 @@ package com.conexiones.control;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -102,6 +103,7 @@ public class Principal extends Activity {
         web.setWebChromeClient(navegador);
 
         web.addJavascriptInterface(new Reintento(), "App");
+        web.addJavascriptInterface(new Memoria(), "Memoria");
 
         if (guardado != null) web.restoreState(guardado);
         else web.loadUrl(CONTROL);
@@ -111,6 +113,29 @@ public class Principal extends Activity {
         @JavascriptInterface
         public void reintentar() {
             web.post(() -> web.loadUrl(ultimaDireccion));
+        }
+    }
+
+    // Guarda el PIN (con «Recordarme» marcado) en la memoria de la app: el localStorage del
+    // WebView se escribe tarde y se perdía si la app se cerraba enseguida. commit() lo escribe ya.
+    private class Memoria {
+        private SharedPreferences datos() {
+            return getSharedPreferences("sesion", MODE_PRIVATE);
+        }
+
+        @JavascriptInterface
+        public String leer() {
+            return datos().getString("auth", null);
+        }
+
+        @JavascriptInterface
+        public void guardar(String texto) {
+            datos().edit().putString("auth", texto).commit();
+        }
+
+        @JavascriptInterface
+        public void borrar() {
+            datos().edit().remove("auth").commit();
         }
     }
 

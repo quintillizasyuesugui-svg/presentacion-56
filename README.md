@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.0.exe) — instalador, 89 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.2.apk) — APK, 26 KB
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.3.apk) — APK, 26 KB
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:

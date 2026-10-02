@@ -12,6 +12,8 @@
   const identityCorner = document.getElementById('identityCorner');
   const authBadge = document.getElementById('authBadge');
   const logoutBtn = document.getElementById('logoutBtn');
+  const iniciarSesionBtn = document.getElementById('iniciarSesionBtn');
+  const loginCorner = document.getElementById('loginCorner');
   const progressFill = document.getElementById('progressFill');
   const waiting = document.getElementById('waiting');
   const waitingHint = document.getElementById('waitingHint');
@@ -515,8 +517,32 @@
   }
 
   // Acá no se da de alta gente nueva — eso se hace desde el celular
-  // (control.html/gestionar.html). Esta pantalla sólo pide el PIN ya asignado.
-  ensureAuthed({ allowRegister: false }).then((auth) => {
+  // (control.html/gestionar.html). Esta pantalla sólo pide el PIN ya asignado,
+  // y recién cuando se aprieta «Iniciar sesión» o «Pantalla completa»: el QR
+  // anda sin sesión. Si el PIN ya quedó guardado, entra sola sin preguntar.
+  // multimedia-pantalla.js espera esta misma sesión (window.esperarSesionPantalla).
+  let avisarSesion;
+  const sesionLista = new Promise((resolve) => { avisarSesion = resolve; });
+  window.esperarSesionPantalla = () => sesionLista;
+  let conSesion = false;
+
+  function iniciarSesion() {
+    return ensureAuthed({ allowRegister: false, cancelable: true })
+      .then((auth) => { avisarSesion(auth); return auth; })
+      .catch((err) => {
+        if (!err.cancelado) console.error(err);
+        if (!conSesion) loginCorner.hidden = false; // PIN guardado que ya no sirve: queda el botón para probar de nuevo
+        return null;
+      });
+  }
+  iniciarSesionBtn.addEventListener('click', iniciarSesion);
+  if (getAuth()) iniciarSesion();
+  else loginCorner.hidden = false;
+
+  sesionLista.then((auth) => {
+    conSesion = true;
+    loginCorner.hidden = true;
+    waitingHint.textContent = 'Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).';
     identityCorner.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
     logoutBtn.addEventListener('click', () => logoutAuth());
@@ -609,6 +635,8 @@
 
   fullscreenButton.addEventListener('click', () => {
     requestFullscreenNow();
+    // Sin sesión el celular no puede manejar esta pantalla: se pide el PIN ahí mismo.
+    if (!conSesion) { iniciarSesion(); return; }
     waitingHint.textContent = 'Pantalla completa activada';
   });
 
@@ -616,7 +644,9 @@
     const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
     document.body.classList.toggle('cinema-mode', !!isFs);
     if (!isFs) {
-      waitingHint.textContent = 'Presiona el botón para ir a pantalla completa';
+      waitingHint.textContent = conSesion
+        ? 'Presiona el botón para ir a pantalla completa'
+        : 'Iniciá sesión cuando quieras mostrar tu presentación. El QR funciona sin sesión.';
     }
   });
 

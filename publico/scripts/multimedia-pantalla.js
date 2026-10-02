@@ -497,7 +497,7 @@
       .catch(err => console.error('No se pudo cargar la música y los videos:', err));
   }
 
-  ensureAuthed({ allowRegister: false }).then(() => {
+  window.esperarSesionPantalla().then(() => {
     cargarLista();
     socket.on('multimediaActualizada', cargarLista);
     socket.on('connect', () => setTimeout(() => { cargarLista(); }, 300));

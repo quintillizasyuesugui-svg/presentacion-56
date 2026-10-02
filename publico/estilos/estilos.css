@@ -1666,6 +1666,37 @@ body.dragging-active { user-select: none; }
 
 .auth-gate input::placeholder { color: var(--text-muted); }
 
+/* Usuario fijo del formulario de PIN: sólo para que Google guarde «Conexiones» + PIN, no se ve. */
+.auth-gate .auth-usuario {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-gate .auth-recordar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.auth-gate .auth-recordar input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary-400);
+  cursor: pointer;
+}
+
 .auth-gate #authOld:last-child { margin-bottom: 0; }
 
 /* #authChoice también es .btn-row (display:flex), que le gana a [hidden]
@@ -1928,6 +1959,16 @@ body.dragging-active { user-select: none; }
   color: var(--text-muted);
   font-size: clamp(0.8rem, 1.4vw, 0.95rem);
 }
+
+/* «Iniciar sesión» en la esquina de pantalla.html: misma pastilla que el nombre, pero tocable. */
+.login-pill {
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+  border-color: var(--primary-600);
+}
+.login-pill:hover { border-color: var(--primary-300); }
+.login-pill:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
 
 .identity-corner .logout-btn {
   padding: 0.3rem 0.6rem;

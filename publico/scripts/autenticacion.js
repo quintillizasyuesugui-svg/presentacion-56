@@ -4,14 +4,40 @@
 (function () {
   const STORAGE_KEY = 'presentacionAuth';
 
-  function getStored() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+  // Con «Recordarme» marcado va a localStorage y, dentro de la app del celular, también a
+  // la memoria propia de Android (window.Memoria): el localStorage del WebView se escribe
+  // tarde y se perdía si la app se cerraba enseguida. Desmarcado, va a sessionStorage y se
+  // olvida al cerrar la app o la pestaña (celular prestado).
+  const memoriaApp = window.Memoria || null;
+
+  function leerTexto() {
+    try { const t = localStorage.getItem(STORAGE_KEY); if (t) return t; } catch { /* privado/bloqueado */ }
+    try { const t = memoriaApp && memoriaApp.leer(); if (t) return t; } catch { /* sin app */ }
+    try { return sessionStorage.getItem(STORAGE_KEY); } catch { return null; }
   }
-  function setStored(auth) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(auth)); } catch { /* privado/bloqueado */ }
+  function soloEnSesion() {
+    try { return !localStorage.getItem(STORAGE_KEY) && !(memoriaApp && memoriaApp.leer()) && !!sessionStorage.getItem(STORAGE_KEY); }
+    catch { return false; }
+  }
+  function getStored() {
+    try { return JSON.parse(leerTexto()); } catch { return null; }
+  }
+  // recordar sin pasar = se guarda donde ya estaba (para refrescar el nombre sin cambiar la elección).
+  function setStored(auth, recordar) {
+    if (recordar === undefined) recordar = !soloEnSesion();
+    const texto = JSON.stringify(auth);
+    clearStored();
+    if (recordar) {
+      try { localStorage.setItem(STORAGE_KEY, texto); } catch { /* privado/bloqueado */ }
+      try { if (memoriaApp) memoriaApp.guardar(texto); } catch { /* sin app */ }
+    } else {
+      try { sessionStorage.setItem(STORAGE_KEY, texto); } catch { /* privado/bloqueado */ }
+    }
   }
   function clearStored() {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* privado/bloqueado */ }
+    try { if (memoriaApp) memoriaApp.borrar(); } catch { /* sin app */ }
   }
 
   async function callAuth(path, body) {
@@ -37,7 +63,9 @@
   // camino — antes se mostraban los 2 formularios apilados (nombre arriba,
   // "—o—" en el medio, PIN abajo) todo junto, y así entraban de una todos
   // los datos aunque sólo hicieran falta unos pocos.
-  function buildGate(allowRegister) {
+  // cancelable=true agrega «Cancelar»: en pantalla.html el PIN se pide recién al apretar
+  // «Iniciar sesión» o «Pantalla completa», y si fue sin querer hay que poder cerrarlo.
+  function buildGate(allowRegister, cancelable) {
     const el = document.createElement('div');
     el.className = 'modal-overlay auth-gate';
     el.innerHTML = `
@@ -61,12 +89,19 @@
         ` : ''}
 
         <div id="authOld" ${allowRegister ? 'hidden' : ''}>
-          <input type="password" id="authPin" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
-          <p class="auth-lock-msg" id="authLockMsg" hidden></p>
-          <div class="btn-row">
-            <button type="button" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
-          </div>
+          <!-- Formulario de contraseña de verdad (usuario fijo «Conexiones» + PIN) para que
+               Google ofrezca guardarlo y después lo sugiera al tocar la cajita. -->
+          <form id="authOldForm" autocomplete="on">
+            <input type="text" name="username" autocomplete="username" value="Conexiones" class="auth-usuario" tabindex="-1" aria-hidden="true" readonly>
+            <input type="password" id="authPin" name="password" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password">
+            <label class="auth-recordar"><input type="checkbox" id="authRecordar" checked> Recordarme en ${allowRegister ? 'este celular' : 'esta pantalla'}</label>
+            <p class="auth-lock-msg" id="authLockMsg" hidden></p>
+            <div class="btn-row">
+              <button type="submit" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
+            </div>
+          </form>
           ${allowRegister ? '<button type="button" class="auth-back" id="authBackFromOld">← Volver</button>' : ''}
+          ${cancelable ? '<button type="button" class="auth-back" id="authCancel">✕ Cancelar</button>' : ''}
         </div>
       </div>`;
     return el;
@@ -121,8 +156,8 @@
 
   function showGate(opts = {}) {
     const allowRegister = opts.allowRegister !== false;
-    return new Promise((resolve) => {
-      const gate = buildGate(allowRegister);
+    return new Promise((resolve, reject) => {
+      const gate = buildGate(allowRegister, !!opts.cancelable);
       document.body.appendChild(gate);
       const errorEl = gate.querySelector('#authError');
       const nameInput = gate.querySelector('#authName'); // null si allowRegister es false
@@ -205,13 +240,34 @@
         }
         return true;
       }
-      applyLockState(); // por si authOld ya está visible de arranque (pantalla.html)
+      // por si authOld ya está visible de arranque (pantalla.html): ahí se escribe directo, sin tocar la cajita
+      if (!applyLockState() && !allowRegister) setTimeout(() => pinInput.focus(), 50);
 
-      function finish(auth) {
-        setStored(auth);
+      function finish(auth, recordar = true) {
+        setStored(auth, recordar);
         gate.classList.remove('show');
         setTimeout(() => gate.remove(), 200);
+        document.removeEventListener('keydown', escCancela);
         resolve(auth);
+      }
+
+      // Cancelar (y Esc) cierra la caja sin entrar; no se puede mientras se está comprobando el PIN.
+      const cancelBtn = gate.querySelector('#authCancel');
+      let comprobando = false;
+      function cancelar() {
+        if (comprobando) return;
+        if (lockInterval) clearInterval(lockInterval);
+        gate.classList.remove('show');
+        setTimeout(() => gate.remove(), 200);
+        document.removeEventListener('keydown', escCancela);
+        const error = new Error('Inicio de sesión cancelado.');
+        error.cancelado = true;
+        reject(error);
+      }
+      function escCancela(e) { if (e.key === 'Escape') cancelar(); }
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelar);
+        document.addEventListener('keydown', escCancela);
       }
 
       function showPinOnce(auth) {
@@ -242,13 +298,16 @@
         nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerBtn.click(); });
       }
 
-      loginBtn.addEventListener('click', async () => {
+      const recordarBox = gate.querySelector('#authRecordar');
+      gate.querySelector('#authOldForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
         if (applyLockState()) return; // ya debería estar disabled, esto es por las dudas
         const pin = pinInput.value.trim();
         if (!pin) { errorEl.textContent = 'Escribí tu PIN.'; return; }
         if (pin.length < 4) { errorEl.textContent = 'El PIN tiene 4 dígitos.'; return; }
         loginBtn.disabled = true;
         pinInput.disabled = true;
+        comprobando = true;
         const spinnerDone = showActionSpinner('blue', 'Entrando…');
         let auth, error;
         try {
@@ -260,10 +319,11 @@
           error = err;
         }
         await spinnerDone; // el spinner tarda sus 5s igual, sea rápido o lento el pedido real
+        comprobando = false;
 
         if (!error) {
           clearLock();
-          finish(Object.assign({}, auth, { pin }));
+          finish(Object.assign({}, auth, { pin }), recordarBox.checked);
           return;
         }
 
@@ -291,7 +351,6 @@
         }
       });
 
-      pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginBtn.click(); });
     });
   }
 
@@ -320,6 +379,7 @@
       }
       return showGate(lastGateOpts);
     })();
+    authPromise.catch(() => { authPromise = null; });
     return authPromise;
   };
 
