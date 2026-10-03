@@ -286,7 +286,7 @@
         try {
           const res = await fetch('/api/invitacion/' + encodeURIComponent(codigo));
           const datos = await res.json().catch(() => ({}));
-          invitacionEl.textContent = res.ok ? '🎟️ Invitación de ' + datos.de : '⚠️ ' + (datos.error || 'Ese código no sirve.');
+          invitacionEl.textContent = res.ok ? '🎟️ Invitación de ' + datos.de + ' · te registrás sin esperar' : '⚠️ ' + (datos.error || 'Ese código no sirve.');
           invitacionEl.classList.toggle('mal', !res.ok);
           invitacionEl.hidden = false;
         } catch { /* sin conexión: se revisa al registrarse */ }

@@ -2207,8 +2207,8 @@ body.con-banda-invitacion .hud { top: calc(max(16px, env(safe-area-inset-top)) +
 .qr-invitacion[hidden] { display: none; }
 .qr-invitacion-codigo {
   flex: none;
-  width: clamp(80px, min(12vw, 14vh), 150px);
-  height: clamp(80px, min(12vw, 14vh), 150px);
+  width: clamp(76px, min(11vw, 12vh), 140px);
+  height: clamp(76px, min(11vw, 12vh), 140px);
   padding: 6px;
   background: #fff;
   border-radius: 10px;
@@ -2223,7 +2223,23 @@ body.con-banda-invitacion .hud { top: calc(max(16px, env(safe-area-inset-top)) +
   letter-spacing: 0.1em;
   color: var(--primary-200);
 }
-.qr-invitacion-info { color: var(--text-muted); font-size: 0.8rem; }
+.qr-invitacion-info { color: var(--text-muted); font-size: 0.78rem; }
+.qr-invitacion-info .qr-invitacion-clave { font-size: clamp(0.95rem, 1.6vw, 1.15rem); }
+.qr-invitacion-por { color: #e9dcb0; font-size: 0.8rem; line-height: 1.35; }
+.qr-invitacion-tiempo { margin-top: 4px; min-width: 220px; }
+.qr-invitacion-horas { display: flex; justify-content: space-between; gap: 10px; color: var(--text-muted); font-size: 0.74rem; font-weight: 700; }
+.qr-invitacion-horas b { color: var(--text); }
+.qr-invitacion-barra { height: 9px; margin: 4px 0; border-radius: 99px; background: var(--gray-700); overflow: hidden; }
+.qr-invitacion-barra i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #ffd76a, #e0a400); transition: width 1s linear; }
+.qr-invitacion-quedan { color: #e9dcb0; font-size: 0.78rem; font-weight: 700; }
+/* Últimos 15 minutos: en rojo, para que se note que se va a apagar solo. */
+.qr-invitacion.por-vencer .qr-invitacion-barra i { background: linear-gradient(90deg, #ff9d9d, #f0393f); }
+.qr-invitacion.por-vencer .qr-invitacion-quedan { color: var(--red-400); }
+.nota-invitacion { color: var(--text-muted); font-size: 0.74rem; padding-left: 6px; }
+/* Con el QR de registro rápido abajo a la derecha, el contenido del centro sube un poco para
+   que el cuadro no tape los botones en pantallas bajas (720-768 px). */
+body.con-qr-invitacion .waiting { padding-bottom: calc(2rem + 170px); transition: padding var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out), visibility var(--dur-base) var(--ease-out); }
+.nota-invitacion[hidden] { display: none; }
 
 .identity-corner .logout-btn {
   padding: 0.3rem 0.6rem;

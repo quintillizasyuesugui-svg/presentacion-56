@@ -97,8 +97,8 @@ function tiempo(ms) {
 
 function mensajeRegistro({ espera, general }) {
   if (general) {
-    return `Ahora hay demasiados registros y está en pausa (unos ${tiempo(espera)}). ` +
-      'Si estás en el aula, conectate al mismo WiFi que la pantalla de la presentación y probá de nuevo.';
+    return `⏳ Hay muchas personas registrándose ahora. Esperá unos ${tiempo(espera)}, ` +
+      'o escaneá el QR de registro rápido de la pantalla del aula para entrar ya.';
   }
   return `Se crearon muchas cuentas desde esta conexión. Esperá ${tiempo(espera)} y probá de nuevo.`;
 }

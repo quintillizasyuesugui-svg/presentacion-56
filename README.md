@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.0.exe) — instalador, 89 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.4.apk) — APK, 29 KB
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.5.apk) — APK, 29 KB
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:
@@ -252,13 +252,16 @@ usuarios a mano:
 
 ## 🎟️ Invitación de clase y porteros (muchas escuelas a la vez)
 
-- **Invitación de clase:** al iniciar sesión en la pantalla, una banda dorada pregunta
-  «¿Invitar alumnos nuevos?». Con «Sí» aparece un QR abajo a la derecha con un código (por
-  ejemplo `TIGRE-4821`) y cuántos se registraron. Quien lo escanea (o escribe el código en
-  «Soy nuevo/a») se registra sin esperar a los porteros. Vence a las 3 horas; el interruptor
-  bajo el nombre lo apaga (el código deja de servir) o lo vuelve a prender con un código nuevo.
-  Sólo puede invitar el admin o una cuenta con alguna foto subida. Se esconde al tocar
-  «Mostrar». Con la app del celular instalada, el QR abre la app y el código se escribe a mano.
+- **Registro rápido (invitación de clase):** al iniciar sesión en la pantalla, una banda dorada
+  pregunta «¿Tu clase se va a registrar ahora? Mostrá este QR: evita esperas y bloqueos cuando se
+  registran todos juntos». Con «Sí» aparece abajo a la derecha el QR «Registrate acá sin
+  esperar», con un código (por ejemplo `TIGRE-4821`), cuántos se registraron y una barra de
+  tiempo (hora de inicio, hora en que vence en formato «6:44 p. m.» y cuánto queda; en los
+  últimos 15 minutos se pone roja). Quien lo escanea (o escribe el código en «Soy nuevo/a») se
+  registra sin esperar a los porteros. Dura **2 horas** y después se apaga solo; el interruptor
+  «Registro rápido» bajo el nombre lo apaga (el código deja de servir) o lo vuelve a prender con
+  un código nuevo. Sólo puede invitar el admin o una cuenta con alguna foto subida. Se esconde
+  al tocar «Mostrar».
 - **Sala de espera:** si miles se registran a la vez, el servidor los guarda en tandas y el
   celular muestra un anillo con cuántos tiene adelante hasta darle su PIN.
 - **Portero de registros** (`servidor/limite-registros.js`), sin invitación: por conexión,

@@ -24,6 +24,13 @@
   const invitacionQrCodigo = document.getElementById('invitacionQrCodigo');
   const invitacionClave = document.getElementById('invitacionClave');
   const invitacionInfo = document.getElementById('invitacionInfo');
+  const invitacionNota = document.getElementById('invitacionNota');
+  const invitacionDesde = document.getElementById('invitacionDesde');
+  const invitacionVence = document.getElementById('invitacionVence');
+  const invitacionBarra = document.getElementById('invitacionBarra');
+  const invitacionQuedan = document.getElementById('invitacionQuedan');
+  const ULTIMOS_MINUTOS_MS = 15 * 60 * 1000;
+  const VENCE_GUARDADO = 'pantallaInvitacionVence';
   const progressFill = document.getElementById('progressFill');
   const waiting = document.getElementById('waiting');
   const waitingHint = document.getElementById('waitingHint');
@@ -566,16 +573,46 @@
     try { sessionStorage.setItem(PREFERENCIA_INVITACION, valor); } catch { /* privado/bloqueado */ }
   }
 
+  // Hora de 12 horas, como se dice: «6:44 p. m.» (no «18:44»), con la hora de esta PC.
   function horaDe(ms) {
-    return new Date(ms).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    return new Date(ms).toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit', hour12: true });
   }
+  function cuantoFalta(ms) {
+    const minutos = Math.max(0, Math.ceil(ms / 60000));
+    const h = Math.floor(minutos / 60);
+    const m = minutos % 60;
+    return h ? h + ' h ' + String(m).padStart(2, '0') + ' min' : m + ' min';
+  }
+
+  // Barra de tiempo: se llena de la hora en que se prendió hasta la que vence (cada segundo).
+  // Al vencer se apaga solo: el QR se va y el interruptor queda en «apagado».
+  function pintarTiempo() {
+    if (!invitacion.activa || !invitacion.vence) return;
+    const ahora = Date.now();
+    const resta = invitacion.vence - ahora;
+    if (resta <= 0) {
+      invitacion = { activa: false, puede: invitacion.puede };
+      guardarPreferencia('vencida');
+      pintarInvitacion();
+      return;
+    }
+    const total = invitacion.vence - invitacion.desde;
+    invitacionBarra.style.width = Math.min(100, Math.max(0, (ahora - invitacion.desde) / total * 100)) + '%';
+    const final = resta <= ULTIMOS_MINUTOS_MS;
+    invitacionQr.classList.toggle('por-vencer', final);
+    invitacionQuedan.textContent = (final ? '⚠️ Quedan ' : '⏳ Quedan ') + cuantoFalta(resta) + (final ? ' · después se apaga solo' : '');
+  }
+  setInterval(pintarTiempo, 1000);
 
   function pintarInvitacion() {
     const activa = invitacion.activa && !started;
     invitacionInterruptor.hidden = started;
     invitacionInterruptor.setAttribute('aria-checked', String(!!invitacion.activa));
-    invitacionInterruptorTexto.textContent = '🎟️ Invitación: ' + (invitacion.activa ? 'activada' : 'apagada');
+    invitacionInterruptorTexto.textContent = '🎟️ Registro rápido: ' + (invitacion.activa ? 'prendido' : 'apagado');
+    invitacionNota.hidden = started || !invitacion.puede;
+    invitacionNota.textContent = invitacion.activa ? 'Tus alumnos se registran sin bloqueos.' : 'Prendelo cuando tu clase se vaya a registrar.';
     invitacionQr.hidden = !activa;
+    document.body.classList.toggle('con-qr-invitacion', activa);
     if (invitacion.activa) {
       if (invitacion.svg && invitacionQrCodigo.dataset.codigo !== invitacion.codigo) {
         invitacionQrCodigo.innerHTML = invitacion.svg; // SVG armado por el servidor (librería qrcode)
@@ -583,7 +620,11 @@
       }
       invitacionClave.textContent = invitacion.codigo;
       const n = invitacion.registrados || 0;
-      invitacionInfo.textContent = n + (n === 1 ? ' registrado' : ' registrados') + ' · vence ' + horaDe(invitacion.vence);
+      invitacionInfo.textContent = n + (n === 1 ? ' registrado' : ' registrados');
+      invitacionDesde.textContent = horaDe(invitacion.desde);
+      invitacionVence.textContent = horaDe(invitacion.vence);
+      try { sessionStorage.setItem(VENCE_GUARDADO, String(invitacion.vence)); } catch { /* privado/bloqueado */ }
+      pintarTiempo();
     }
   }
 
@@ -638,7 +679,7 @@
       if (started || leerPreferencia() !== 'si') return;
       try {
         const datos = await pedirInvitacion('GET');
-        if (!datos.activa && datos.puede) await pedirInvitacion('POST');
+        if (!datos.activa && datos.puede && vencimientoGuardado() > Date.now()) await pedirInvitacion('POST');
       } catch (err) { console.error(err); }
     }, 15000);
   }
@@ -652,11 +693,16 @@
     else avisarSinFotos();
   });
 
+  function vencimientoGuardado() {
+    try { return Number(sessionStorage.getItem(VENCE_GUARDADO)) || 0; } catch { return 0; }
+  }
+
   async function empezarInvitacion() {
     try {
       const datos = await pedirInvitacion('GET');
       const preferencia = leerPreferencia();
-      if (datos.activa || (preferencia === 'si' && datos.puede)) {
+      // Prendida antes de recargar la página y todavía no venció: sigue (si el servidor la perdió, otra).
+      if (datos.activa || (preferencia === 'si' && datos.puede && vencimientoGuardado() > Date.now())) {
         if (!datos.activa) await pedirInvitacion('POST');
         guardarPreferencia('si');
         seguirInvitacion();

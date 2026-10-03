@@ -4,13 +4,13 @@
 // código no pasa por los topes de registros por conexión ni por el tope general: así entran
 // miles de alumnos a la vez, desde cualquier escuela o con datos del celular. Los bots no ven la
 // pantalla del aula, y probar códigos al azar cuenta para el portero igual que un registro.
-// Cada invitación vence a las 3 horas y acepta como mucho POR_HORA registros por hora, por si
+// Cada invitación vence a las 2 horas y acepta como mucho POR_HORA registros por hora, por si
 // alguien publica el código en internet: si el contador de la pantalla sube raro, el profesor
 // apaga y prende el interruptor y sale un código nuevo. Viven en memoria: si el servidor se
 // reinicia, la pantalla vuelve a pedir una sola (ver pantalla.js).
 const crypto = require('crypto');
 
-const DURACION_MS = 3 * 60 * 60 * 1000;
+const DURACION_MS = 2 * 60 * 60 * 1000;
 const HORA = 60 * 60 * 1000;
 const POR_HORA = Number(process.env.INVITACION_POR_HORA) || 2000;
 const PALABRAS = [
@@ -80,7 +80,9 @@ function anotarUso(inv) {
 
 // Lo que ve la pantalla: código, cuándo vence y cuántos se registraron.
 function resumen(inv) {
-  return inv ? { activa: true, codigo: inv.codigo, vence: inv.vence, registrados: inv.registrados } : { activa: false };
+  return inv
+    ? { activa: true, codigo: inv.codigo, desde: inv.vence - DURACION_MS, vence: inv.vence, registrados: inv.registrados }
+    : { activa: false };
 }
 
 setInterval(() => {

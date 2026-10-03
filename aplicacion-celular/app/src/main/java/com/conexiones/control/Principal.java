@@ -3,6 +3,7 @@ package com.conexiones.control;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -264,11 +265,26 @@ public class Principal extends Activity {
     @Override
     protected void onActivityResult(int pedido, int resultado, Intent datos) {
         if (pedido == ELEGIR_ARCHIVO && archivosPedidos != null) {
-            archivosPedidos.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultado, datos));
+            archivosPedidos.onReceiveValue(archivosElegidos(resultado, datos));
             archivosPedidos = null;
             return;
         }
         super.onActivityResult(pedido, resultado, datos);
+    }
+
+    // Cuando se pide «varias», la galería de los Android nuevos devuelve los archivos en un
+    // ClipData aunque se elija uno solo; parseResult sólo lee el archivo suelto (getData) y
+    // devolvía null, así que no se subía nada. Se leen los dos casos.
+    private static Uri[] archivosElegidos(int resultado, Intent datos) {
+        if (resultado != RESULT_OK || datos == null) return null;
+        ClipData varios = datos.getClipData();
+        if (varios != null && varios.getItemCount() > 0) {
+            Uri[] uris = new Uri[varios.getItemCount()];
+            for (int i = 0; i < uris.length; i++) uris[i] = varios.getItemAt(i).getUri();
+            return uris;
+        }
+        Uri uno = datos.getData();
+        return uno != null ? new Uri[] { uno } : null;
     }
 
     @Override

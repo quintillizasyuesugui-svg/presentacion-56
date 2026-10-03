@@ -32,16 +32,17 @@
   <button type="button" class="logout-btn" id="logoutBtn">Cerrar sesión</button>
   <!-- Invitación de clase: el QR de abajo a la derecha deja registrarse a los alumnos nuevos. -->
   <button type="button" class="interruptor-invitacion" id="invitacionInterruptor" role="switch" aria-checked="false" hidden>
-    <span class="riel" aria-hidden="true"></span><span id="invitacionInterruptorTexto">🎟️ Invitación: apagada</span>
+    <span class="riel" aria-hidden="true"></span><span id="invitacionInterruptorTexto">🎟️ Registro rápido: apagado</span>
   </button>
+  <span class="nota-invitacion" id="invitacionNota" hidden></span>
 </div>
 
 <!-- Pregunta al iniciar sesión (y aviso si la cuenta todavía no puede invitar). -->
 <div class="banda-invitacion" id="invitacionBanda" role="dialog" aria-live="polite" hidden>
-  <p id="invitacionBandaTexto">🎟️ <strong>¿Invitar alumnos nuevos?</strong> Se muestra un QR en la esquina para que se registren. Vence en 3 horas.</p>
+  <p id="invitacionBandaTexto">🎟️ <strong>¿Tu clase se va a registrar ahora?</strong> Mostrá este QR: evita esperas y bloqueos cuando se registran todos juntos.</p>
   <div class="banda-botones" id="invitacionBandaBotones">
     <button type="button" class="btn" id="invitacionNo">No</button>
-    <button type="button" class="btn oro" id="invitacionSi">Sí, mostrar</button>
+    <button type="button" class="btn oro" id="invitacionSi">Sí, mostrar QR</button>
   </div>
   <button type="button" class="btn" id="invitacionEntendido" hidden>Entendido</button>
 </div>
@@ -49,9 +50,14 @@
 <div class="qr-invitacion" id="invitacionQr" hidden>
   <div class="qr-invitacion-codigo" id="invitacionQrCodigo" aria-label="Código QR para que los alumnos nuevos se registren"></div>
   <div class="qr-invitacion-textos">
-    <strong>🎟️ Alumnos nuevos: escaneen</strong>
-    <span class="qr-invitacion-clave" id="invitacionClave"></span>
-    <span class="qr-invitacion-info" id="invitacionInfo"></span>
+    <strong>🎟️ Registrate acá sin esperar</strong>
+    <span class="qr-invitacion-por">Aunque se estén registrando muchos a la vez, no te va a bloquear.</span>
+    <span class="qr-invitacion-info">Código: <span class="qr-invitacion-clave" id="invitacionClave"></span> · <span id="invitacionInfo"></span></span>
+    <div class="qr-invitacion-tiempo" id="invitacionTiempo">
+      <div class="qr-invitacion-horas"><span id="invitacionDesde"></span><span>vence <b id="invitacionVence"></b></span></div>
+      <div class="qr-invitacion-barra"><i id="invitacionBarra"></i></div>
+      <span class="qr-invitacion-quedan" id="invitacionQuedan"></span>
+    </div>
   </div>
 </div>
 
