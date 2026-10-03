@@ -529,6 +529,7 @@
         if (index > diapositivas.length - 1) index = Math.max(0, diapositivas.length - 1);
         updateHud();
         updateProgress();
+        if (diapositivas.length) precargar(started ? index + 1 : 0);
       })
       .catch(err => console.error('Error loading images:', err));
   }
@@ -841,6 +842,63 @@
   // tanto el socket (control remoto compartido) como el temporizador local
   // de avance automático (con opts.auto = true). Así ambos caminos comparten
   // toda la lógica de la frase final, el confetti, etc. sin duplicar nada.
+  // Termina el show del avance automático: se desactiva (y avisa al servidor, para que no vuelva
+  // a prenderse solo si se recarga la página) y le avisa al celular.
+  function terminarAvanceAutomatico() {
+    if (!autoAdvance || !autoAdvance.enabled) return;
+    autoAdvance.enabled = false;
+    scheduleAutoAdvance();
+    authFetch('/api/avance-automatico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false, seconds: autoAdvance.seconds })
+    }).catch(err => console.error('No se pudo desactivar el avance automático:', err));
+    socket.emit('avanceAutoAviso', { tipo: 'terminamos' });
+  }
+
+  // ---- Fotos livianas y descargadas por adelantado ----
+  // Las fotos de cámara pesan varios MB y la pantalla quedaba negra unos segundos la primera
+  // vez que mostraba cada una. A Cloudinary se le pide la foto ya achicada al tamaño de la
+  // pantalla (1920×1080 como mucho, formato y calidad automáticos: la diferencia no se ve en
+  // un proyector), mientras se muestra una se bajan las siguientes, y la foto anterior queda
+  // hasta que la nueva está lista.
+  const ADELANTE = 3;
+  const precargadas = new Map(); // dirección → Image (se guardan para que el navegador no las suelte)
+  let cambioNumero = 0;
+
+  function direccionParaPantalla(src) {
+    if (!/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(src)) return src;
+    if (/\/upload\/[^/]*[,_](w|q|f)_/.test(src) || /\/upload\/(w|q|f|c)_/.test(src)) return src; // ya tiene ajustes
+    return src.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_limit,w_1920,h_1080/');
+  }
+
+  function precargar(desde) {
+    for (let i = 0; i <= ADELANTE && i < diapositivas.length; i++) {
+      const slide = diapositivas[(desde + i) % diapositivas.length];
+      const dir = direccionParaPantalla(slide.src);
+      if (precargadas.has(dir)) continue;
+      const imagen = new Image();
+      imagen.decoding = 'async';
+      imagen.src = dir;
+      precargadas.set(dir, imagen);
+    }
+    // No se guardan para siempre: con cientos de fotos ocuparía mucha memoria.
+    while (precargadas.size > 12) precargadas.delete(precargadas.keys().next().value);
+  }
+
+  // Carga la foto (si la liviana falla, prueba la original) y recién ahí la muestra.
+  function cuandoEsteLista(dir, original, listo) {
+    const prueba = new Image();
+    prueba.onload = () => listo(dir);
+    prueba.onerror = () => {
+      if (dir === original) return listo(original);
+      const otra = new Image();
+      otra.onload = otra.onerror = () => listo(original);
+      otra.src = original;
+    };
+    prueba.src = dir;
+  }
+
   function aplicarCambio(accion, opts = {}) {
     const fromAuto = !!opts.auto;
     // Mientras hay un video en pantalla no se mueven las diapositivas: al terminarlo se
@@ -899,20 +957,14 @@
         showFinalPhrase(fraseFinal);
         updateHud();
         updateProgress();
-        // Si fue el avance automático el que llegó hasta acá, termina el show
-        // solo — se desactiva (y avisa al servidor, para que no vuelva a
-        // prenderse solo si se recarga la página) en vez de seguir en loop.
-        if (fromAuto && autoAdvance && autoAdvance.enabled) {
-          autoAdvance.enabled = false;
-          scheduleAutoAdvance();
-          authFetch('/api/avance-automatico', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: false, seconds: autoAdvance.seconds })
-          }).catch(err => console.error('No se pudo desactivar el avance automático:', err));
-          socket.emit('avanceAutoAviso', { tipo: 'terminamos' });
-        }
+        // Si fue el avance automático el que llegó hasta acá, termina el show solo.
+        if (fromAuto) terminarAvanceAutomatico();
         return; // no tocar #img/#imgBg mientras se muestra la frase
+      } else if (fromAuto && autoAdvance && autoAdvance.enabled && diapositivas.length && index >= diapositivas.length - 1) {
+        // Última diapositiva sin frase final: el avance automático también termina acá (antes
+        // volvía a la 1 y seguía en loop para siempre). Se queda en la última.
+        terminarAvanceAutomatico();
+        return;
       } else {
         index++;
         if (index >= diapositivas.length) index = 0;
@@ -945,21 +997,27 @@
     updateHud();
     updateProgress();
 
-    img.classList.remove('show');
-    imgBg.classList.remove('show');
-    img.onload = () => {
-      img.classList.add('show');
-      imgBg.classList.add('show');
-      if (index === diapositivas.length - 1) confetti();
-    };
     const slide = diapositivas[index];
-    img.src = slide.src;
-    imgBg.src = slide.src;
-    // Ajuste de tamaño/posición del Modo avanzado (celular) — sin transición
-    // propia: el crossfade de #img ya tapa el salto al cambiar de diapositiva.
-    imgFrame.style.transform = slide.transform
-      ? `translate(${slide.transform.x}%, ${slide.transform.y}%) scale(${slide.transform.scale})`
-      : 'none';
+    const numero = ++cambioNumero;
+    const esUltima = index === diapositivas.length - 1;
+    cuandoEsteLista(direccionParaPantalla(slide.src), slide.src, (dir) => {
+      if (numero !== cambioNumero) return; // mientras cargaba se pasó a otra
+      img.classList.remove('show');
+      imgBg.classList.remove('show');
+      img.onload = () => {
+        img.classList.add('show');
+        imgBg.classList.add('show');
+        if (esUltima) confetti();
+      };
+      img.src = dir;
+      imgBg.src = dir;
+      // Ajuste de tamaño/posición del Modo avanzado (celular) — sin transición
+      // propia: el crossfade de #img ya tapa el salto al cambiar de diapositiva.
+      imgFrame.style.transform = slide.transform
+        ? `translate(${slide.transform.x}%, ${slide.transform.y}%) scale(${slide.transform.scale})`
+        : 'none';
+    });
+    precargar(index + 1);
 
     scheduleAutoAdvance();
   }

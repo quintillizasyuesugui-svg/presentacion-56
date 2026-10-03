@@ -210,14 +210,63 @@
 
   uploadBtn.addEventListener('click', () => fileInput.click());
 
+  // Las fotos de cámara pesan varios MB: subían lento con datos del celular y la pantalla
+  // tardaba en mostrarlas. Antes de subir, se achican a 1920 px del lado más largo (de sobra para
+  // un proyector o una tele) y se comprimen. Si no se puede (formato que el navegador no abre,
+  // como HEIC) o no ahorra nada, se sube la original.
+  const LADO_MAXIMO = 1920;
+
+  async function abrirImagen(archivo) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(archivo, { imageOrientation: 'from-image' }); } catch { /* sigue abajo */ }
+    }
+    const url = URL.createObjectURL(archivo);
+    try {
+      const imagen = new Image();
+      imagen.src = url;
+      await imagen.decode();
+      return imagen;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function achicarFoto(archivo) {
+    if (!/^image\/(jpeg|png|webp)$/.test(archivo.type)) return archivo;
+    let imagen;
+    try { imagen = await abrirImagen(archivo); } catch { return archivo; }
+    const ancho = imagen.width;
+    const alto = imagen.height;
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(ancho, alto));
+    if (escala === 1 && archivo.size < 1.5 * 1024 * 1024) return archivo; // ya es liviana
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.round(ancho * escala);
+    lienzo.height = Math.round(alto * escala);
+    const ctx = lienzo.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+    if (imagen.close) imagen.close();
+    // PNG puede tener partes transparentes: va a WebP, que las conserva. Las fotos, a JPEG.
+    const tipo = archivo.type === 'image/png' ? 'image/webp' : 'image/jpeg';
+    const blob = await new Promise(r => lienzo.toBlob(r, tipo, tipo === 'image/jpeg' ? 0.85 : 0.9));
+    if (!blob || blob.size >= archivo.size) return archivo;
+    const nombre = archivo.name.replace(/\.[^.]+$/, '') + (tipo === 'image/jpeg' ? '.jpg' : '.webp');
+    return new File([blob], nombre, { type: tipo, lastModified: archivo.lastModified });
+  }
+
   fileInput.addEventListener('change', async () => {
     if (!fileInput.files.length) return;
+    const elegidas = Array.from(fileInput.files);
     const formData = new FormData();
-    Array.from(fileInput.files).forEach(f => formData.append('images', f));
 
     uploadBtn.disabled = true;
-    uploadBtn.textContent = '⏳ Subiendo…';
+    uploadBtn.textContent = '⏳ Preparando fotos…';
     try {
+      for (let i = 0; i < elegidas.length; i++) {
+        if (elegidas.length > 1) uploadBtn.textContent = `⏳ Preparando fotos… ${i + 1}/${elegidas.length}`;
+        formData.append('images', await achicarFoto(elegidas[i]));
+      }
+      uploadBtn.textContent = '⏳ Subiendo…';
       const res = await authFetch('/api/images/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al subir');
