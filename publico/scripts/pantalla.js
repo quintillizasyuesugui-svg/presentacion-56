@@ -530,6 +530,7 @@
         updateHud();
         updateProgress();
         if (diapositivas.length) precargar(started ? index + 1 : 0);
+        if (started) contarEstado();
       })
       .catch(err => console.error('Error loading images:', err));
   }
@@ -999,6 +1000,8 @@
 
     const slide = diapositivas[index];
     const numero = ++cambioNumero;
+    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 });
+    contarEstado();
     const esUltima = index === diapositivas.length - 1;
     cuandoEsteLista(direccionParaPantalla(slide.src), slide.src, (dir) => {
       if (numero !== cambioNumero) return; // mientras cargaba se pasó a otra
@@ -1026,10 +1029,34 @@
 
   // El control pregunta «¿ya estás mostrando?» al abrirse o al volver de Gestionar: se le contesta
   // en qué foto va, así no hay que tocar «Mostrar» de nuevo (que volvería a la foto 1).
+  // También se cuenta cada vez que cambia de foto: el control muestra «3/10» y la foto para el zoom.
   function contarEstado() {
-    socket.emit('pantallaEstado', { mostrando: started, foto: started ? index + 1 : 0, total: diapositivas.length });
+    const slide = started ? diapositivas[index] : null;
+    socket.emit('pantallaEstado', {
+      mostrando: started,
+      foto: started ? index + 1 : 0,
+      total: diapositivas.length,
+      src: slide ? slide.src : '',
+      zoom: zoomActual
+    });
   }
   socket.on('pantallaPedirEstado', contarEstado);
+
+  // ---- Zoom desde el celular ----
+  // El control manda cuánto agrandar (z: 1 a 4) y qué punto de la foto queda en el centro
+  // (cx, cy: de 0 a 1). Al pasar de foto vuelve a la foto entera.
+  const zoomCapa = document.getElementById('zoomCapa');
+  let zoomActual = { z: 1, cx: 0.5, cy: 0.5 };
+  function aplicarZoom(z) {
+    zoomActual = z;
+    zoomCapa.style.transform = z.z > 1.01
+      ? `scale(${z.z}) translate(${(0.5 - z.cx) * 100}%, ${(0.5 - z.cy) * 100}%)`
+      : '';
+  }
+  socket.on('zoom', (z) => {
+    if (!started || !z) return;
+    aplicarZoom(z);
+  });
 
   // Estrella de 5 puntas centrada en (0,0) — usada por particleRain('stars').
   function drawStar(ctx, size) {

@@ -44,21 +44,39 @@
        en vivo que la pantalla — arrancan sincronizados al mismo instante. -->
   <p class="auto-countdown-inline" id="autoCountdownInline" hidden></p>
 
-  <!-- Se usa una sola vez, al arrancar — no necesita ser el botón más grande -->
-  <div class="btn-row">
-    <button class="btn ghost" id="mostrarBtn" onclick="enviar('mostrar')">▶️ Mostrar</button>
+  <!-- Cuatro cuadritos: cada uno avisa si está pasando algo («Mostrar» late hasta que se toca y
+       después dice en qué foto va; Escribir en vivo con punto rojo; música sonando con punto violeta). -->
+  <div class="cuadritos" role="group" aria-label="Acciones en la pantalla">
+    <button type="button" class="cuadrito cuadrito-mostrar listo" id="mostrarBtn" onclick="enviar('mostrar')">
+      <span class="cuadrito-play" id="mostrarPlay" aria-hidden="true"></span>
+      <span class="cuadrito-numero" id="mostrarNumero" hidden><b id="mostrarFoto">1</b>/<span id="mostrarTotal">1</span></span>
+      <span class="cuadrito-nombre" id="mostrarNombre">Mostrar</span>
+      <span class="cuadrito-avance" id="mostrarAvance" hidden><i id="mostrarBarra"></i></span>
+    </button>
+    <button type="button" class="cuadrito" id="liveWriteBtn">
+      <span class="cuadrito-icono" aria-hidden="true">✍️</span><span class="cuadrito-nombre">Escribir</span>
+      <i class="cuadrito-punto rojo" id="liveWritePunto" hidden></i>
+    </button>
+    <!-- Música y videos en tu pantalla (scripts/reproductor-celular.js) -->
+    <button type="button" class="cuadrito" id="musicaBtn">
+      <span class="cuadrito-icono" aria-hidden="true">🎵</span><span class="cuadrito-nombre">Música</span>
+      <i class="cuadrito-punto violeta" id="musicaPunto" hidden></i>
+    </button>
+    <button type="button" class="cuadrito" id="videoBtn">
+      <span class="cuadrito-icono" aria-hidden="true">🎬</span><span class="cuadrito-nombre">Video</span>
+    </button>
   </div>
-
-  <div class="btn-row">
-    <button type="button" class="btn ghost" id="liveWriteBtn">✍️ Escribir en vivo</button>
-  </div>
-
-  <!-- Música y videos en tu pantalla (scripts/reproductor-celular.js) -->
-  <div class="btn-row medios-row">
-    <button type="button" class="btn ghost medio" id="musicaBtn">🎵 Música</button>
-    <button type="button" class="btn ghost medio" id="videoBtn">🎬 Video</button>
-  </div>
-
+  <!-- Zoom: la foto que se ve en la pantalla; con dos dedos se agranda y con uno se mueve, y la
+       pantalla hace lo mismo al instante. Doble toque: vuelve a la foto entera. -->
+  <section class="zoom-control" aria-label="Zoom en la pantalla">
+    <div class="zoom-mini" id="zoomMini">
+      <img id="zoomFoto" alt="" hidden>
+      <div class="zoom-visor" id="zoomVisor" hidden></div>
+      <span class="zoom-tag" id="zoomTag" hidden>🔍 Normal</span>
+      <p class="zoom-apagado" id="zoomApagado">🔍 Cuando toques «Mostrar», acá vas a ver la foto de la pantalla para hacer zoom.</p>
+    </div>
+    <p class="zoom-ayuda" id="zoomAyuda" hidden>Dos dedos: agrandar · Un dedo: mover · Doble toque: normal</p>
+  </section>
   <div class="spacer"></div>
 
   <div id="lugarMiniReproductor"></div>

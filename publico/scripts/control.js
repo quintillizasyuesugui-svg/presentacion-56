@@ -28,6 +28,7 @@
         return;
       }
       showStarted = true;
+      if (!fotoPantalla.foto) fotoPantalla = { foto: 1, total: totalSlides || 1 };
       updateNavButtonsState();
       pintarPasos();
     }
@@ -59,6 +60,31 @@
   let autoAdvanceEndAt = null;
   let autoAdvanceOn = false;
   let showStarted = false; // recién true al apretar "Mostrar" — antes, pantalla.html no tiene nada que recorrer
+  let fotoPantalla = { foto: 0, total: 0 }; // en qué foto va la pantalla (lo cuenta ella, ver «pantallaEstado»)
+
+  // Cuadrito «Mostrar»: celeste que late hasta que se toca; después verde con «3/10» y una barrita.
+  function pintarMostrar() {
+    const encendido = showStarted;
+    mostrarBtn.classList.toggle('listo', !encendido);
+    mostrarBtn.classList.toggle('mostrando', encendido);
+    document.getElementById('mostrarPlay').hidden = encendido;
+    document.getElementById('mostrarNumero').hidden = !encendido;
+    document.getElementById('mostrarAvance').hidden = !encendido;
+    document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : 'Mostrar';
+    if (encendido) {
+      const total = Math.max(1, fotoPantalla.total || totalSlidesSeguro());
+      const foto = Math.min(total, Math.max(1, fotoPantalla.foto || 1));
+      document.getElementById('mostrarFoto').textContent = foto;
+      document.getElementById('mostrarTotal').textContent = total;
+      document.getElementById('mostrarBarra').style.width = (foto / total * 100) + '%';
+      mostrarBtn.setAttribute('aria-label', `En pantalla: foto ${foto} de ${total}. Tocá para volver a empezar desde la primera.`);
+    } else {
+      mostrarBtn.removeAttribute('aria-label');
+    }
+  }
+  function totalSlidesSeguro() {
+    try { return totalSlides; } catch { return 0; } // totalSlides se declara más abajo
+  }
 
   // Mientras "Escribir en vivo" está mostrándose, NINGÚN botón de navegación
   // hace nada en pantalla.html (ver aplicarCambio ahí) — ni Mostrar, ni
@@ -74,6 +100,13 @@
     anteriorBtn.disabled = autoAdvanceOn || lwActive;
     siguienteBtn.disabled = autoAdvanceOn || lwActive;
     mostrarBtn.disabled = lwActive;
+    // Cuadrito «Escribir» con punto rojo mientras se ve en la pantalla.
+    const lw = document.getElementById('liveWriteBtn');
+    if (lw) {
+      lw.classList.toggle('en-vivo', !!lwActive);
+      document.getElementById('liveWritePunto').hidden = !lwActive;
+    }
+    pintarMostrar();
     anteriorBtn.classList.toggle('is-off', !showStarted);
     siguienteBtn.classList.toggle('is-off', !showStarted);
   }
@@ -165,7 +198,142 @@
       setTimeout(ocultarPasos, 4000);
     }
   }
-  socket.on('mediosEstado', () => { if (!pantallaVista) { pantallaVista = true; pintarPasos(); } });
+  socket.on('mediosEstado', (estado) => {
+    if (!pantallaVista) { pantallaVista = true; pintarPasos(); }
+    const sonando = !!(estado && estado.musica && estado.musica.sonando);
+    const musicaBtn = document.getElementById('musicaBtn');
+    if (musicaBtn) {
+      musicaBtn.classList.toggle('sonando', sonando);
+      document.getElementById('musicaPunto').hidden = !sonando;
+    }
+  });
+
+  // ---- Zoom: la foto de la pantalla en el celular ----
+  // Con dos dedos se agranda (hasta ×4), con uno se mueve, con doble toque vuelve a la foto
+  // entera; en la PC, la rueda del mouse agranda. La pantalla hace lo mismo al instante. Se
+  // mandan como mucho unos 12 avisos por segundo (el guardián de pantallas corta en 30).
+  const zoomMini = document.getElementById('zoomMini');
+  const zoomFoto = document.getElementById('zoomFoto');
+  const zoomVisor = document.getElementById('zoomVisor');
+  const zoomTag = document.getElementById('zoomTag');
+  let zoom = { z: 1, cx: 0.5, cy: 0.5 };
+  let zoomSrc = '';
+  let zoomUltimoEnvio = 0;
+  let zoomPendiente = null;
+
+  // Para la foto chica del celular alcanza una versión liviana (Cloudinary la achica).
+  function fotoChica(src) {
+    if (!/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(src)) return src;
+    if (/\/upload\/(w|q|f|c)_/.test(src)) return src;
+    return src.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_limit,w_800/');
+  }
+
+  function zoomMostrarFoto(src, z) {
+    if (!src) return;
+    if (src !== zoomSrc) {
+      zoomSrc = src;
+      zoomFoto.src = fotoChica(src);
+    }
+    zoomFoto.hidden = false;
+    document.getElementById('zoomApagado').hidden = true;
+    document.getElementById('zoomAyuda').hidden = false;
+    zoomTag.hidden = false;
+    zoom = z && Number.isFinite(z.z) ? { z: z.z, cx: z.cx, cy: z.cy } : { z: 1, cx: 0.5, cy: 0.5 };
+    pintarZoom();
+  }
+
+  function acotarZoom() {
+    zoom.z = Math.min(4, Math.max(1, zoom.z));
+    const m = 0.5 / zoom.z;
+    zoom.cx = Math.min(1 - m, Math.max(m, zoom.cx));
+    zoom.cy = Math.min(1 - m, Math.max(m, zoom.cy));
+  }
+
+  function pintarZoom() {
+    const lado = 100 / zoom.z;
+    zoomVisor.hidden = zoom.z <= 1.01;
+    zoomVisor.style.width = lado + '%';
+    zoomVisor.style.height = lado + '%';
+    zoomVisor.style.left = (zoom.cx * 100 - lado / 2) + '%';
+    zoomVisor.style.top = (zoom.cy * 100 - lado / 2) + '%';
+    zoomTag.textContent = zoom.z > 1.01 ? '🔍 ×' + zoom.z.toFixed(1) : '🔍 Normal';
+  }
+
+  function mandarZoom(alFinal) {
+    const ahora = Date.now();
+    clearTimeout(zoomPendiente);
+    if (alFinal || ahora - zoomUltimoEnvio >= 80) {
+      zoomUltimoEnvio = ahora;
+      socket.emit('zoom', { z: zoom.z, cx: zoom.cx, cy: zoom.cy });
+    } else {
+      zoomPendiente = setTimeout(() => mandarZoom(true), 80 - (ahora - zoomUltimoEnvio));
+    }
+  }
+
+  function cambiarZoom(nuevo, alFinal) {
+    if (!showStarted || zoomFoto.hidden) return;
+    Object.assign(zoom, nuevo);
+    acotarZoom();
+    pintarZoom();
+    mandarZoom(alFinal);
+  }
+
+  // Otro celular de la misma persona hizo zoom: se ve acá también.
+  socket.on('zoom', (z) => {
+    if (!z) return;
+    zoom = { z: z.z, cx: z.cx, cy: z.cy };
+    pintarZoom();
+  });
+
+  const dedos = new Map();
+  let gesto = null;
+  let ultimoToque = 0;
+  function distancia(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function centro(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+  function empezarGesto() {
+    const lista = [...dedos.values()];
+    gesto = { z: zoom.z, cx: zoom.cx, cy: zoom.cy, lista: lista.map(p => ({ ...p })) };
+  }
+  zoomMini.addEventListener('pointerdown', (e) => {
+    try { zoomMini.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
+    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    empezarGesto();
+  });
+  zoomMini.addEventListener('pointermove', (e) => {
+    if (!dedos.has(e.pointerId) || !gesto) return;
+    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const r = zoomMini.getBoundingClientRect();
+    const ahora = [...dedos.values()];
+    if (ahora.length >= 2 && gesto.lista.length >= 2) {
+      const antes = gesto.lista;
+      const escala = distancia(ahora[0], ahora[1]) / Math.max(1, distancia(antes[0], antes[1]));
+      const c0 = centro(antes[0], antes[1]);
+      const c1 = centro(ahora[0], ahora[1]);
+      const z = gesto.z * escala;
+      cambiarZoom({ z, cx: gesto.cx - (c1.x - c0.x) / r.width / z, cy: gesto.cy - (c1.y - c0.y) / r.height / z });
+    } else if (ahora.length === 1 && gesto.lista.length === 1) {
+      const a = gesto.lista[0];
+      cambiarZoom({ cx: gesto.cx - (ahora[0].x - a.x) / r.width / gesto.z, cy: gesto.cy - (ahora[0].y - a.y) / r.height / gesto.z });
+    }
+  });
+  function soltar(e) {
+    if (!dedos.has(e.pointerId)) return;
+    const quieto = gesto && gesto.lista.length === 1 && dedos.size === 1 &&
+      Math.abs(e.clientX - gesto.lista[0].x) < 8 && Math.abs(e.clientY - gesto.lista[0].y) < 8;
+    dedos.delete(e.pointerId);
+    if (quieto) {
+      const ahora = Date.now();
+      if (ahora - ultimoToque < 320) { cambiarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true); ultimoToque = 0; }
+      else ultimoToque = ahora;
+    }
+    if (dedos.size) empezarGesto(); else { gesto = null; mandarZoom(true); }
+  }
+  zoomMini.addEventListener('pointerup', soltar);
+  zoomMini.addEventListener('pointercancel', soltar);
+  zoomMini.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cambiarZoom({ z: zoom.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12) }, true);
+  }, { passive: false });
 
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
@@ -187,10 +355,13 @@
     // Recién identificado (al abrir o al volver de Gestionar): ¿la pantalla ya está mostrando?
     socket.on('identificado', () => socket.emit('pantallaPedirEstado'));
     socket.on('pantallaEstado', (estado) => {
-      if (!estado || !estado.mostrando || showStarted) return;
-      showStarted = true;
-      updateNavButtonsState();
-      pintarPasos();
+      if (!estado) return;
+      if (estado.mostrando) {
+        fotoPantalla = { foto: estado.foto, total: estado.total };
+        if (!showStarted) { showStarted = true; pintarPasos(); }
+        updateNavButtonsState();
+        zoomMostrarFoto(estado.src, estado.zoom);
+      }
     });
     identificarSocket();
     socket.on('connect', identificarSocket);

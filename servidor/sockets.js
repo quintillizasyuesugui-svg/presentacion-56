@@ -101,12 +101,30 @@ function registrarSockets(io) {
     });
     socket.on('pantallaEstado', (datos) => {
       if (!socket.ownerName || !datos || typeof datos !== 'object') return;
+      const z = datos.zoom && typeof datos.zoom === 'object' ? datos.zoom : {};
       const limpio = {
         mostrando: datos.mostrando === true,
         foto: Number.isInteger(datos.foto) ? datos.foto : 0,
-        total: Number.isInteger(datos.total) ? datos.total : 0
+        total: Number.isInteger(datos.total) ? datos.total : 0,
+        src: typeof datos.src === 'string' ? datos.src.slice(0, 600) : '',
+        zoom: {
+          z: Number.isFinite(z.z) ? Math.min(4, Math.max(1, z.z)) : 1,
+          cx: Number.isFinite(z.cx) ? Math.min(1, Math.max(0, z.cx)) : 0.5,
+          cy: Number.isFinite(z.cy) ? Math.min(1, Math.max(0, z.cy)) : 0.5
+        }
       };
       socket.to('owner:' + socket.ownerName).emit('pantallaEstado', limpio);
+    });
+
+    // Zoom desde el celular: sólo números acotados, a la sala de la misma persona.
+    socket.on('zoom', (datos) => {
+      if (!socket.ownerName || !datos || typeof datos !== 'object') return;
+      const numero = (v, min, max, siNo) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : siNo);
+      socket.to('owner:' + socket.ownerName).emit('zoom', {
+        z: numero(datos.z, 1, 4, 1),
+        cx: numero(datos.cx, 0, 1, 0.5),
+        cy: numero(datos.cy, 0, 1, 0.5)
+      });
     });
 
     socket.on('mediosPedirEstado', () => {

@@ -957,6 +957,88 @@ body.control {
   min-height: 16px;
 }
 
+/* ---- Control: cuatro cuadritos arriba ---- */
+.cuadritos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cuadrito {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 74px;
+  padding: 6px 4px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--primary-700);
+  background: linear-gradient(180deg, var(--gray-700), var(--gray-800));
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+}
+.cuadrito:active { transform: scale(0.95); }
+.cuadrito:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
+.cuadrito:disabled { opacity: 0.4; cursor: not-allowed; }
+.cuadrito-icono { font-size: 1.4rem; line-height: 1; }
+.cuadrito-nombre { font-size: 0.68rem; font-weight: 800; color: var(--gray-200); line-height: 1.1; text-align: center; }
+.cuadrito-punto { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 50%; animation: cuadrito-late 1s ease-in-out infinite; }
+.cuadrito-punto[hidden] { display: none; }
+.cuadrito-punto.rojo { background: var(--red-400); }
+.cuadrito-punto.violeta { background: #a78bfa; }
+.cuadrito.en-vivo { border-color: var(--red-400); }
+.cuadrito.sonando { border-color: #a78bfa; }
+@keyframes cuadrito-late { 50% { opacity: 0.3; } }
+
+/* «Mostrar»: celeste que late hasta que se toca; después verde con «3/10» y barrita. */
+.cuadrito-play { width: 26px; height: 26px; border-radius: 50%; background: var(--gray-950); display: grid; place-items: center; }
+.cuadrito-play::after { content: ""; margin-left: 3px; border-left: 10px solid var(--primary-300); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.cuadrito-play[hidden] { display: none; }
+.cuadrito-mostrar.listo { background: linear-gradient(180deg, var(--primary-400), var(--primary-600)); border-color: var(--primary-200); animation: cuadrito-invita 1.8s ease-in-out infinite; }
+.cuadrito-mostrar.listo .cuadrito-nombre { color: var(--gray-950); }
+@keyframes cuadrito-invita { 50% { box-shadow: 0 0 0 6px rgba(52, 205, 250, 0.25); } }
+.cuadrito-mostrar.mostrando { background: linear-gradient(180deg, #1f4d33, #163a27); border-color: var(--green-400); }
+.cuadrito-mostrar.mostrando .cuadrito-nombre { color: #bbf7d0; }
+.cuadrito-numero { font-size: 1.15rem; font-weight: 900; line-height: 1; color: #fff; }
+.cuadrito-numero span { font-size: 0.72rem; color: #bbf7d0; }
+.cuadrito-numero[hidden] { display: none; }
+.cuadrito-avance { position: absolute; left: 8px; right: 8px; bottom: 7px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.cuadrito-avance[hidden] { display: none; }
+.cuadrito-avance i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--green-400); transition: width 400ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .cuadrito-mostrar.listo, .cuadrito-punto { animation: none; }
+}
+
+/* ---- Control: foto para hacer zoom en la pantalla ---- */
+.zoom-control { display: flex; flex-direction: column; gap: 6px; }
+.zoom-mini {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 34vh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--primary-700);
+  background: #000;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.zoom-mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.zoom-mini img[hidden] { display: none; }
+.zoom-visor { position: absolute; border: 2px solid var(--amber-400); border-radius: 6px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.45); pointer-events: none; }
+.zoom-visor[hidden] { display: none; }
+.zoom-tag { position: absolute; top: 8px; left: 8px; padding: 0.2rem 0.55rem; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: var(--amber-400); font-size: 0.72rem; font-weight: 800; }
+.zoom-tag[hidden] { display: none; }
+.zoom-apagado { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; background: var(--gray-900); }
+.zoom-apagado[hidden] { display: none; }
+.zoom-ayuda { color: var(--text-muted); font-size: 0.74rem; text-align: center; }
+.zoom-ayuda[hidden] { display: none; }
+
+/* Pantalla: capa que recibe el zoom que se hace desde el celular. */
+.zoom-capa { position: absolute; inset: 0; z-index: 2; transform-origin: 50% 50%; transition: transform 140ms linear; }
+
 .app-header {
   display: flex;
   align-items: center;
