@@ -48,6 +48,8 @@ function registrarSockets(io) {
             conectar(persona.name);
           }
           socket.ownerName = persona.name; // para poder re-emitir avisos del avance automático a esta misma sala
+          // Ya está en su sala: el control recién ahí le pregunta a la pantalla si ya está mostrando.
+          socket.emit('identificado');
         }
       } catch (err) {
         console.error('No se pudo identificar el socket:', err.message);
@@ -92,6 +94,21 @@ function registrarSockets(io) {
       const estado = limpiarEstadoMedios(datos);
       if (estado) socket.to('owner:' + socket.ownerName).emit('mediosEstado', estado);
     });
+    // «¿Ya estás mostrando?»: el control que se abre (o vuelve de Gestionar) le pregunta a la
+    // pantalla de la misma persona; ella contesta en qué foto va. Así «Mostrar» se toca una vez.
+    socket.on('pantallaPedirEstado', () => {
+      if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('pantallaPedirEstado');
+    });
+    socket.on('pantallaEstado', (datos) => {
+      if (!socket.ownerName || !datos || typeof datos !== 'object') return;
+      const limpio = {
+        mostrando: datos.mostrando === true,
+        foto: Number.isInteger(datos.foto) ? datos.foto : 0,
+        total: Number.isInteger(datos.total) ? datos.total : 0
+      };
+      socket.to('owner:' + socket.ownerName).emit('pantallaEstado', limpio);
+    });
+
     socket.on('mediosPedirEstado', () => {
       if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('mediosPedirEstado');
     });

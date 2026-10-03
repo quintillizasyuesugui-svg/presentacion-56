@@ -1024,6 +1024,13 @@
 
   socket.on('cambiar', (accion) => aplicarCambio(accion));
 
+  // El control pregunta «¿ya estás mostrando?» al abrirse o al volver de Gestionar: se le contesta
+  // en qué foto va, así no hay que tocar «Mostrar» de nuevo (que volvería a la foto 1).
+  function contarEstado() {
+    socket.emit('pantallaEstado', { mostrando: started, foto: started ? index + 1 : 0, total: diapositivas.length });
+  }
+  socket.on('pantallaPedirEstado', contarEstado);
+
   // Estrella de 5 puntas centrada en (0,0) — usada por particleRain('stars').
   function drawStar(ctx, size) {
     const outer = size;

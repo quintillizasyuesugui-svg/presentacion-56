@@ -184,6 +184,14 @@
     // avisos del avance automático de SU PROPIA pantalla.html — nunca los de
     // otra persona. Se repite en cada reconexión, igual que en pantalla.html.
     function identificarSocket() { socket.emit('identificar', auth.pin); }
+    // Recién identificado (al abrir o al volver de Gestionar): ¿la pantalla ya está mostrando?
+    socket.on('identificado', () => socket.emit('pantallaPedirEstado'));
+    socket.on('pantallaEstado', (estado) => {
+      if (!estado || !estado.mostrando || showStarted) return;
+      showStarted = true;
+      updateNavButtonsState();
+      pintarPasos();
+    });
     identificarSocket();
     socket.on('connect', identificarSocket);
   });
