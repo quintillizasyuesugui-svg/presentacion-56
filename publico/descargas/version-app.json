@@ -1,12 +1,12 @@
 {
-  "codigo": 7,
-  "version": "1.0.6",
-  "peso": "29 KB",
+  "codigo": 8,
+  "version": "1.0.7",
+  "peso": "32 KB",
   "apk": "descargas/conexiones-control.apk",
   "apkExterno": "https://presentacion-56.onrender.com/descargas/conexiones-control.apk",
   "novedades": [
+    { "icono": "🎤", "texto": "Órdenes por voz en la app: diapositivas, música, video y volumen" },
     { "icono": "🔐", "texto": "Tu PIN guardado queda más protegido" },
-    { "icono": "🔢", "texto": "Los PIN nuevos ahora tienen 6 dígitos" },
     { "icono": "💬", "texto": "Avisos de error más claros" }
   ]
 }

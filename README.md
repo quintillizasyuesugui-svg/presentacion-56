@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.1.exe) — instalador, 105 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 29 KB (siempre la última versión)
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:
