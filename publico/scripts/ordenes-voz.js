@@ -144,7 +144,8 @@
     // Adelantar o atrasar lo que suena: «adelanta la música», «adelanta 30 segundos»,
     // «retrocede la canción». Sin nombrar la música, el video ni los segundos, «adelante» y
     // «atrás» siguen siendo las diapositivas.
-    const conTiempo = dice(palabras, 'segundos') || dice(palabras, 'minutos');
+    // Con un número («adelanta 10», «retrocede 20») también: son segundos de lo que suena.
+    const conTiempo = dice(palabras, 'segundos') || dice(palabras, 'minutos') || (numero !== null && !deImagen);
     if (para || conTiempo) {
       const enMinutos = dice(palabras, 'minutos');
       const cuanto = numero === null ? (enMinutos ? 60 : 10) : Math.min(600, numero * (enMinutos ? 60 : 1));
