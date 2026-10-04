@@ -367,50 +367,32 @@
     socket.on('connect', identificarSocket);
   });
 
-  // Sinónimos aceptados por comando — cubre variaciones comunes al hablar
-  const VOICE_COMMANDS = {
-    mostrar: ['mostrar', 'empezar', 'comenzar', 'iniciar', 'arrancar', 'arranca', 'inicio'],
-    siguiente: ['siguiente', 'adelante', 'avanza', 'avanzar', 'proximo', 'proxima', 'sigue'],
-    anterior: ['anterior', 'atras', 'regresa', 'regresar', 'retrocede', 'retroceder', 'vuelve']
-  };
-
-  const NUMBER_WORDS = {
-    uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
-    seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
-    once: 11, doce: 12, trece: 13, catorce: 14, quince: 15,
-    dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20
-  };
-
-  // Busca un número dicho como dígito ("3") o como palabra ("tres") entre las palabras oídas
-  function extractNumber(words) {
-    for (const w of words) {
-      if (/^[0-9]{1,2}$/.test(w)) return parseInt(w, 10);
-      if (NUMBER_WORDS[w] !== undefined) return NUMBER_WORDS[w];
+  // Qué quiso decir la persona lo decide ordenes-voz.js (diapositivas, música, video y
+  // volumen). Acá sólo se hace lo que entendió y se muestra en el control.
+  // «alternativas»: las versiones de lo oído, de la más probable a la menos.
+  function hacerOrdenDeVoz(alternativas) {
+    const oido = String(alternativas[0] || '').trim();
+    const orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+    if (!orden) {
+      // Una frase corta que no se entendió se muestra, para saber qué oyó; una larga es
+      // alguien hablando y no hace falta avisar nada.
+      if (oido && oido.split(/\s+/).length <= 4) showHeard(oido, 'no entendí esa orden');
+      return;
     }
-    return null;
+    if (orden.tipo === 'diapositiva') {
+      socket.emit('cambiar', orden.accion);
+      showHeard(oido);
+      return;
+    }
+    const hecho = typeof window.ordenDeVozMedios === 'function' ? window.ordenDeVozMedios(orden) : null;
+    showHeard(oido, hecho);
   }
 
-  // Quita acentos y normaliza para que "atrás"/"atras", "próximo"/"proximo", etc. matcheen igual
-  function normalize(text) {
-    return text
-      .toLowerCase()
-      .trim()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-  }
-
-  function matchCommand(alternatives) {
-    for (const phrase of alternatives) {
-      const words = phrase.split(/\s+/).filter(Boolean);
-
-      for (const [accion, keywords] of Object.entries(VOICE_COMMANDS)) {
-        if (keywords.some(k => words.includes(k))) return accion;
-      }
-
-      const num = extractNumber(words);
-      if (num !== null && num >= 1 && num <= totalSlides) return String(num);
-    }
-    return null;
+  // El español del celular (es-AR, es-MX, es-PE…) entiende mejor el acento de la persona que
+  // el de España fijo; si el celular está en otro idioma, se usa español igual.
+  function idiomaDeVoz() {
+    const idioma = navigator.language || '';
+    return /^es\b/i.test(idioma) ? idioma : 'es-ES';
   }
 
   const voiceBtn = document.getElementById('voiceBtn');
@@ -424,9 +406,9 @@
     if (!active) voiceHeard.hidden = true;
   }
 
-  // Muestra en verde lo último que se reconoció por voz
-  function showHeard(text) {
-    voiceHeard.textContent = '🎙️ "' + text + '"';
+  // Muestra en verde lo último que se reconoció por voz y, si hay, lo que se hizo con eso
+  function showHeard(text, hecho) {
+    voiceHeard.textContent = '🎙️ "' + text + '"' + (hecho ? ' · ' + hecho : '');
     voiceHeard.hidden = false;
     voiceHeard.classList.remove('pulse');
     void voiceHeard.offsetWidth; // fuerza reflow para poder repetir la animación
@@ -438,22 +420,15 @@
       recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
       recognition.continuous = true;
       recognition.interimResults = false;
-      recognition.maxAlternatives = 3;
-      recognition.lang = 'es-ES';
+      recognition.maxAlternatives = 5;
+      recognition.lang = idiomaDeVoz();
       recognition.onresult = (event) => {
         // Solo procesar los resultados nuevos desde resultIndex — leer siempre
         // results[0] hacía que, en modo continuo, sólo se escuchara la primera frase de la sesión.
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (!result.isFinal) continue;
-          const alternatives = Array.from(result).map(alt => normalize(alt.transcript));
-          console.log('Heard:', alternatives);
-          const accion = matchCommand(alternatives);
-          if (accion) {
-            socket.emit('cambiar', accion);
-            showHeard(result[0].transcript.trim());
-            break;
-          }
+          hacerOrdenDeVoz(Array.from(result).map(alt => alt.transcript));
         }
       };
       recognition.onerror = (event) => {
@@ -480,13 +455,40 @@
           }, 250);
         }
       };
-    } else {
-      alert('Speech Recognition no soportado en este navegador.');
     }
   }
 
+  // En la app Conexiones Control escucha el reconocedor de voz del propio celular (el navegador
+  // que lleva la app adentro no tiene uno). La app avisa acá lo que oyó.
+  const vozDeLaApp = (() => {
+    try { return window.Voz && window.Voz.disponible() ? window.Voz : null; } catch { return null; }
+  })();
+  window.vozNativa = {
+    resultado(alternativas) {
+      if (voiceActive && Array.isArray(alternativas) && alternativas.length) hacerOrdenDeVoz(alternativas);
+    },
+    aviso(motivo) {
+      voiceActive = false;
+      setVoiceUI(false);
+      alert(motivo === 'sin-permiso'
+        ? 'Para darle órdenes por voz, la app necesita permiso para usar el micrófono. Tocá «🎤 Voz» de nuevo y elegí «Permitir».'
+        : 'Este celular no tiene reconocimiento de voz disponible. Instalá o activá la app «Google» y probá de nuevo.');
+    }
+  };
+
   function toggleVoice() {
+    if (vozDeLaApp) {
+      voiceActive = !voiceActive;
+      if (voiceActive) vozDeLaApp.empezar(idiomaDeVoz(), JSON.stringify(window.OrdenesVoz.FRASES_DE_AYUDA));
+      else vozDeLaApp.detener();
+      setVoiceUI(voiceActive);
+      return;
+    }
     if (!recognition) initVoice();
+    if (!recognition) {
+      alert('Este navegador no puede escuchar órdenes por voz. Probá con Chrome o con la app Conexiones Control.');
+      return;
+    }
     if (voiceActive) {
       voiceActive = false;
       recognition.stop();

@@ -14,6 +14,26 @@ Controla diapositivas en tiempo real:
 - **Modo avanzado** (`/avanzado.html`): tamaño y posición, unir imágenes, subir documento, frase final y avance automático
 - **Música y videos** (`/multimedia.html`, pestañas en Gestionar): subir canciones y videos o guardar enlaces de YouTube, y manejarlos desde el celular mientras presentás
 
+## 🎤 Órdenes por voz
+En el control, «🎤 Voz» deja manejar la presentación hablando. Qué quiso decir cada frase lo
+decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
+`pruebas/ordenes-voz.test.js`):
+
+| Se dice | Hace |
+|---|---|
+| «mostrar», «siguiente», «atrás», «diapositiva 3» | Maneja las diapositivas |
+| «pon música», «música 2», «siguiente canción», «canción anterior» | Música |
+| «pon video 1», «siguiente video», «quita el video» | Video |
+| «pausa», «reproducir» | Pausa o sigue lo que esté en la pantalla |
+| «sube el volumen», «baja el volumen», «volumen a la mitad», «volumen al máximo», «volumen 30», «silencio» | Volumen |
+
+- «Siguiente» solo es la diapositiva; para música o video hay que nombrarlos.
+- Acepta una letra mal oída («sigiente») y usa el español del celular, no sólo el de España.
+- Una orden suelta («bajale», «pausa») vale si la frase es corta; en una frase larga hace falta
+  nombrar el volumen, la música o el video, así no obedece a quien está explicando algo.
+- El control muestra lo que oyó y lo que hizo; si no entendió una frase corta, lo dice.
+- En el navegador escucha Chrome; en la app, el reconocedor del celular.
+
 ## 🎵 Música y videos
 - **Subir** (`/subir-multimedia.html`, botón «➕ Subir» en Gestionar → 🎵 Música o 🎬 Videos). Música MP3/M4A/OGG/WAV hasta 15 MB; video
   MP4/WEBM/MOV hasta 100 MB. Los videos se achican a 720p **en el celular** antes de subir
@@ -72,6 +92,9 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
     (`codigo`, `version`, `peso`, `apkExterno` y las novedades). Las apps de antes de la 1.0.4
     abren `apkExterno` en el navegador.
   - **Invitación:** el QR de una invitación abre la app con el código ya puesto.
+  - **Órdenes por voz (desde la 1.0.7):** en la app escucha el reconocedor de voz del propio
+    celular (`Voz.empezar` / `Voz.detener`; lo oído llega a la página por
+    `window.vozNativa.resultado`). Pide permiso de micrófono recién al tocar «🎤 Voz».
   - **Cuidados (1.0.6):** el PIN guardado no entra en las copias de seguridad del celular, y lo que
     la app le presta a la página (leer el PIN guardado, bajar e instalar la versión nueva) sólo
     contesta mientras se está viendo una página de Conexiones.

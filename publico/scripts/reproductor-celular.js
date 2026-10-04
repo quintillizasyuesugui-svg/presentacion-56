@@ -330,6 +330,49 @@
     pintarListas();
   });
 
+  // ---------- órdenes por voz ----------
+  // control.js entiende lo que se dijo (ordenes-voz.js) y le pasa acá la orden de música o
+  // video. Devuelve un texto corto con lo que hizo, para mostrarlo en el control.
+  window.ordenDeVozMedios = function ordenDeVozMedios(orden) {
+    const v = estado && estado.video;
+    const m = estado && estado.musica;
+    // Sin decir «música» ni «video», la orden va a lo que está en la pantalla ahora.
+    const para = orden.para || (v ? 'video' : 'musica');
+    const lista = para === 'video' ? videos : musicas;
+    const cual = para === 'video' ? 'video' : 'canción';
+    const actual = para === 'video' ? v : m;
+
+    if (orden.accion === 'volumen' || orden.accion === 'subirVolumen' || orden.accion === 'bajarVolumen') {
+      const ahoraVolumen = actual ? actual.volumen : 70;
+      const nuevo = orden.accion === 'volumen' ? orden.valor : ahoraVolumen + (orden.accion === 'subirVolumen' ? 20 : -20);
+      const volumen = Math.max(0, Math.min(100, Math.round(nuevo)));
+      mandar(para, 'volumen', volumen);
+      return `🔊 Volumen ${volumen} %`;
+    }
+    if (orden.accion === 'pausar') { mandar(para, 'pausar'); return '⏸ Pausa'; }
+    if (orden.accion === 'terminar') { mandar('video', 'terminar'); return '⏹ Video terminado'; }
+
+    const poner = (elemento) => {
+      mandar(para, para === 'video' ? 'mandar' : 'elegir', elemento.id);
+      return (para === 'video' ? '🎬 ' : '🎵 ') + elemento.nombre;
+    };
+    if (orden.accion === 'elegir') {
+      const elemento = lista[orden.numero - 1];
+      return elemento ? poner(elemento) : `No tenés ${cual} ${orden.numero} (hay ${lista.length}).`;
+    }
+    if (!lista.length) return para === 'video' ? 'Todavía no tenés videos.' : 'Todavía no tenés música.';
+    if (orden.accion === 'siguiente' || orden.accion === 'anterior') {
+      if (para === 'musica') { mandar('musica', orden.accion); return orden.accion === 'siguiente' ? '⏭ Siguiente canción' : '⏮ Canción anterior'; }
+      const paso = orden.accion === 'siguiente' ? 1 : -1;
+      const donde = v ? lista.findIndex(e => e.id === v.id) : -1;
+      return poner(lista[donde === -1 ? 0 : (donde + paso + lista.length) % lista.length]);
+    }
+    // «reproducir»: sigue lo que estaba; un video que todavía no está en pantalla se manda.
+    if (para === 'video' && !v) return poner(lista[0]);
+    mandar(para, 'reproducir');
+    return '▶ Reproduciendo';
+  };
+
   function cargarLista() {
     return authFetch('/api/multimedia')
       .then(r => r.json())

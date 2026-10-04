@@ -15,7 +15,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.Manifest;
+import android.media.AudioManager;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import java.io.File;
+import java.util.ArrayList;
+import org.json.JSONArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -34,6 +41,14 @@ public class Principal extends Activity {
     private static final String SERVIDOR = Uri.parse(DIRECCION).getHost();
     private static final String CONTROL = DIRECCION + "/control.html";
     private static final int ELEGIR_ARCHIVO = 1;
+    private static final int PEDIR_MICROFONO = 2;
+
+    // Órdenes por voz: escucha el reconocedor del propio celular y le avisa a la página lo que oyó.
+    private SpeechRecognizer reconocedor;
+    private boolean vozActiva = false;
+    private boolean vozSilencio = false;
+    private String vozIdioma = "es-ES";
+    private final ArrayList<String> vozFrases = new ArrayList<>();
 
     private WebView web;
     private FrameLayout raiz;
@@ -72,6 +87,8 @@ public class Principal extends Activity {
             @Override
             public void onPageStarted(WebView vista, String direccion, android.graphics.Bitmap icono) {
                 paginaPropia = esDeConexiones(direccion);
+                // Una página nueva arranca con la voz apagada: se deja de escuchar la anterior.
+                if (vozActiva) dejarDeEscuchar();
                 super.onPageStarted(vista, direccion, icono);
             }
 
@@ -132,6 +149,7 @@ public class Principal extends Activity {
         web.addJavascriptInterface(new Reintento(), "App");
         web.addJavascriptInterface(new Memoria(), "Memoria");
         web.addJavascriptInterface(new Actualizador(), "Actualizador");
+        web.addJavascriptInterface(new Voz(), "Voz");
 
         if (guardado != null) web.restoreState(guardado);
         else web.loadUrl(direccionDe(getIntent()));
@@ -273,6 +291,128 @@ public class Principal extends Activity {
         }
     }
 
+    // La página llama a Voz.empezar() al tocar «🎤 Voz» y a Voz.detener() al apagarla. Lo que se
+    // oye vuelve a la página por window.vozNativa.resultado([...]), de lo más probable a lo menos.
+    private class Voz {
+        @JavascriptInterface
+        public boolean disponible() {
+            return SpeechRecognizer.isRecognitionAvailable(Principal.this);
+        }
+
+        @JavascriptInterface
+        public void empezar(String idioma, String frasesJson) {
+            if (!paginaPropia) return;
+            runOnUiThread(() -> {
+                if (idioma != null && !idioma.isEmpty()) vozIdioma = idioma;
+                vozFrases.clear();
+                try {
+                    JSONArray frases = new JSONArray(frasesJson);
+                    for (int i = 0; i < frases.length() && i < 100; i++) vozFrases.add(frases.getString(i));
+                } catch (Exception ignorado) { }
+                vozActiva = true;
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, PEDIR_MICROFONO);
+                    return;
+                }
+                escuchar();
+            });
+        }
+
+        @JavascriptInterface
+        public void detener() {
+            runOnUiThread(Principal.this::dejarDeEscuchar);
+        }
+    }
+
+    // El reconocedor de Android escucha una frase y se detiene: mientras la voz esté prendida se
+    // lo vuelve a poner a escuchar después de cada frase, de cada silencio y de cada error.
+    private void escuchar() {
+        if (!vozActiva) return;
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { avisarVoz("no-disponible"); return; }
+        if (reconocedor == null) {
+            reconocedor = SpeechRecognizer.createSpeechRecognizer(this);
+            reconocedor.setRecognitionListener(new Oyente());
+        }
+        silenciarAvisos(true);
+        Intent pedido = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        pedido.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        pedido.putExtra(RecognizerIntent.EXTRA_LANGUAGE, vozIdioma);
+        pedido.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
+        pedido.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        // Android 13 o más: se le dice qué frases esperar, así las prefiere al oír algo parecido.
+        if (Build.VERSION.SDK_INT >= 33 && !vozFrases.isEmpty()) {
+            pedido.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, vozFrases);
+        }
+        try {
+            reconocedor.startListening(pedido);
+        } catch (Exception e) {
+            web.postDelayed(this::escuchar, 1000);
+        }
+    }
+
+    private void dejarDeEscuchar() {
+        vozActiva = false;
+        if (reconocedor != null) reconocedor.cancel();
+        silenciarAvisos(false);
+    }
+
+    // En muchos celulares el reconocedor hace «bip» cada vez que empieza a escuchar, y acá
+    // empieza cada pocos segundos. Mientras la voz está prendida se silencia ese sonido (el
+    // celular no reproduce nada: la música y los videos suenan en la pantalla); al apagarla
+    // vuelve a como estaba.
+    private void silenciarAvisos(boolean silenciar) {
+        if (silenciar == vozSilencio) return;
+        vozSilencio = silenciar;
+        try {
+            AudioManager audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            int accion = silenciar ? AudioManager.ADJUST_MUTE : AudioManager.ADJUST_UNMUTE;
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, accion, 0);
+            audio.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, accion, 0);
+        } catch (Exception ignorado) { }
+    }
+
+    private void avisarVoz(String motivo) {
+        dejarDeEscuchar();
+        web.evaluateJavascript("window.vozNativa&&window.vozNativa.aviso('" + motivo + "')", null);
+    }
+
+    private class Oyente implements RecognitionListener {
+        @Override
+        public void onResults(Bundle resultados) {
+            ArrayList<String> oido = resultados.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            if (vozActiva && paginaPropia && oido != null && !oido.isEmpty()) {
+                web.evaluateJavascript("window.vozNativa&&window.vozNativa.resultado(" + new JSONArray(oido) + ")", null);
+            }
+            web.postDelayed(Principal.this::escuchar, 150);
+        }
+
+        @Override
+        public void onError(int error) {
+            if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { avisarVoz("sin-permiso"); return; }
+            // No se oyó nada o no se entendió: se sigue escuchando enseguida. Si el reconocedor
+            // está ocupado o falló la conexión, se espera un poco más antes de volver a probar.
+            boolean enseguida = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
+            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && reconocedor != null) reconocedor.cancel();
+            web.postDelayed(Principal.this::escuchar, enseguida ? 150 : 1500);
+        }
+
+        @Override public void onReadyForSpeech(Bundle parametros) { }
+        @Override public void onBeginningOfSpeech() { }
+        @Override public void onRmsChanged(float nivel) { }
+        @Override public void onBufferReceived(byte[] datos) { }
+        @Override public void onEndOfSpeech() { }
+        @Override public void onPartialResults(Bundle parciales) { }
+        @Override public void onEvent(int tipo, Bundle datos) { }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int pedido, String[] permisos, int[] respuestas) {
+        super.onRequestPermissionsResult(pedido, permisos, respuestas);
+        if (pedido != PEDIR_MICROFONO) return;
+        if (respuestas.length > 0 && respuestas[0] == PackageManager.PERMISSION_GRANTED) escuchar();
+        else avisarVoz("sin-permiso");
+    }
+
     private String paginaSinConexion() {
         return "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
             + "<style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#000;color:#f2f2f2;font-family:sans-serif;text-align:center;padding:0 24px}"
@@ -320,9 +460,27 @@ public class Principal extends Activity {
         web.saveState(estado);
     }
 
+    // Al salir de la app se deja de escuchar (y vuelve el sonido del celular); al volver, si la
+    // voz seguía prendida en la página, se escucha de nuevo.
     @Override
-    protected void onPause() { super.onPause(); web.onPause(); }
+    protected void onPause() {
+        super.onPause();
+        web.onPause();
+        if (reconocedor != null) reconocedor.cancel();
+        silenciarAvisos(false);
+    }
 
     @Override
-    protected void onResume() { super.onResume(); web.onResume(); }
+    protected void onResume() {
+        super.onResume();
+        web.onResume();
+        if (vozActiva) escuchar();
+    }
+
+    @Override
+    protected void onDestroy() {
+        silenciarAvisos(false);
+        if (reconocedor != null) { reconocedor.destroy(); reconocedor = null; }
+        super.onDestroy();
+    }
 }
