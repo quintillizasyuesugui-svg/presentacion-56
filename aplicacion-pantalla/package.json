@@ -1,7 +1,7 @@
 {
   "name": "conexiones-pantalla",
   "productName": "Conexiones Pantalla",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pantalla de Conexiones como aplicación de Windows",
   "main": "principal.js",
   "author": "Conexiones",
@@ -11,7 +11,7 @@
     "compilar": "electron-builder --win --x64"
   },
   "devDependencies": {
-    "electron": "^38.0.0",
+    "electron": "^44.5.1",
     "electron-builder": "^26.0.0"
   },
   "build": {

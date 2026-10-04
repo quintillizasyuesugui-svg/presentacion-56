@@ -317,7 +317,7 @@ function registrarRutasMultimedia(app, io) {
     try {
       res.json(resumenPara(req.person));
     } catch (err) {
-      responderError(res, err, 'Error en servidor');
+      responderError(res, err, 'Algo salió mal en el servidor. Probá de nuevo en un momento.');
     }
   });
 

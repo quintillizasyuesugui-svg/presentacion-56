@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.0.exe) — instalador, 89 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.5.apk) — APK, 29 KB
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 29 KB (siempre la última versión)
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:
@@ -72,6 +72,12 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
     (`codigo`, `version`, `peso`, `apkExterno` y las novedades). Las apps de antes de la 1.0.4
     abren `apkExterno` en el navegador.
   - **Invitación:** el QR de una invitación abre la app con el código ya puesto.
+  - **Cuidados (1.0.6):** el PIN guardado no entra en las copias de seguridad del celular, y lo que
+    la app le presta a la página (leer el PIN guardado, bajar e instalar la versión nueva) sólo
+    contesta mientras se está viendo una página de Conexiones.
+- **Cuidados de Conexiones Pantalla (1.0.1):** la ventana sólo navega dentro de Conexiones (un
+  enlace a otro sitio se abre en el navegador) y las páginas no reciben permisos de cámara,
+  micrófono ni ubicación: sólo pueden ponerse en pantalla completa.
 - **QR de la pantalla** (`/celular.html`): en Android, si la app está instalada se abre directo, sin
   preguntar (App Link verificado con `/.well-known/assetlinks.json`, que lleva la huella de la clave
   de firma). Si no está, el APK se descarga solo y sólo hay que tocar «Instalar» (Android no deja
@@ -221,8 +227,10 @@ borrar o reordenar nada. El sistema se encarga solo, no hay que configurar
 usuarios a mano:
 
 - La primera vez, cada uno escribe su nombre y toca "Soy nuevo/a" — el
-  servidor le genera un PIN de 4 dígitos único (nadie lo elige) y se lo
-  muestra una vez en pantalla.
+  servidor le genera un PIN de 6 dígitos único (nadie lo elige) y se lo
+  muestra una vez en pantalla. Antes eran de 4: con cientos de cuentas, probar PIN al azar
+  daba con el de alguien en pocos intentos. **Las cuentas de antes siguen entrando con su PIN
+  de 4 dígitos**; sólo las nuevas reciben 6.
 - Ese PIN queda guardado en el celular (no lo vuelve a pedir en ese mismo
   dispositivo). Para entrar desde otro celular, escribe el mismo PIN en
   "Ya tengo PIN".
@@ -239,6 +247,20 @@ usuarios a mano:
   en un celular cuenta una sola vez, así un aula entera con la misma conexión no queda afuera.
 - Como el PIN ya no se puede leer, el admin tampoco puede ver el PIN de nadie: si alguien lo
   olvida, se borra su cuenta y se registra de nuevo.
+- **`ADMIN_PIN` puede tener hasta 12 dígitos.** Conviene uno largo (8 o más): es la cuenta que ve
+  y borra lo de todos. Se cambia en Render → Environment.
+- **Nada se ve sin cuenta**: todas las direcciones que entregan fotos, música, videos o
+  documentos piden PIN y devuelven sólo lo de esa persona. Sin cuenta sólo funciona lo necesario
+  para entrar: registrarse, iniciar sesión, la sala de espera, revisar una invitación y el QR.
+- **Si llegan demasiados pedidos, esperan**: además del portero de pedidos (3000 por minuto por
+  conexión), cada conexión puede tener hasta 600 celulares y pantallas conectados a la vez
+  (`CONEXIONES_POR_IP`; las conexiones VIP, diez veces más). A quien se pasa se le pide esperar y
+  la página reintenta sola, así el servidor no se cae.
+- **Avisos claros**: cuando algo falla, la persona lee qué pasó y qué hacer, en español; ya no
+  aparecen los textos técnicos del navegador en inglés.
+- **Otros cuidados del servidor**: los pedidos aceptan hasta 1 MB (sólo armar un collage admite
+  20 MB), así nadie lo deja sin memoria mandando pedidos enormes sin PIN; y las respuestas llevan
+  las cabeceras `X-Content-Type-Options: nosniff` y `Referrer-Policy`.
 - Opcional: `ADMIN_PIN` en las variables de entorno da un PIN que ve y
   controla las imágenes de todos (para vos, como organizador).
 - **Borrar cuentas (sólo admin):** en Modo avanzado, con el PIN de admin aparece

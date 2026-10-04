@@ -47,7 +47,7 @@ function registrarRutasAvanceAutomatico(app, io) {
       res.json(propio ? { enabled: propio.enabled, seconds: propio.seconds } : AVANCE_POR_DEFECTO);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Error en servidor' });
+      res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
     }
   });
 

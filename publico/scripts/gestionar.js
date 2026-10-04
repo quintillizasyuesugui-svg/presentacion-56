@@ -200,7 +200,7 @@
     try {
       const res = await authFetch('/api/images/' + id, { method: 'DELETE' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+      if (!res.ok) throw new Error(data.error || 'No se pudo eliminar la imagen. Probá de nuevo.');
       images = data;
       render();
     } catch (err) {
@@ -269,7 +269,7 @@
       uploadBtn.textContent = '⏳ Subiendo…';
       const res = await authFetch('/api/images/upload', { method: 'POST', body: formData });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al subir');
+      if (!res.ok) throw new Error(data.error || 'No se pudieron subir las imágenes. Probá de nuevo.');
       images = data;
       render();
     } catch (err) {

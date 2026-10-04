@@ -28,4 +28,34 @@ function porteroDePedidos(req, res, next) {
   res.status(429).json({ error: `Demasiados pedidos desde esta conexión. Esperá ${segundos} segundos.` });
 }
 
-module.exports = { porteroDePedidos, POR_MINUTO };
+// ---- Conexiones en tiempo real (Socket.IO) ----
+// Esas conexiones no pasan por el portero de arriba (las atiende Socket.IO antes que Express),
+// así que sin tope alguien podía abrir miles y dejar al servidor sin memoria. Cada conexión (IP)
+// puede tener CONEXIONES_POR_IP abiertas a la vez; las VIP, VECES_VIP veces más. A la que se
+// pasa se le dice que espere: el celular o la pantalla reintentan solos cada pocos segundos.
+const CONEXIONES_POR_IP = Number(process.env.CONEXIONES_POR_IP) || 600;
+const abiertas = new Map(); // ip → cuántas conexiones tiene abiertas ahora
+
+function entrarConexion(ip) {
+  const cuenta = abiertas.get(ip) || 0;
+  const tope = conexionConfiable(ip) ? CONEXIONES_POR_IP * VECES_VIP : CONEXIONES_POR_IP;
+  if (cuenta >= tope) return false;
+  abiertas.set(ip, cuenta + 1);
+  return true;
+}
+
+function salirConexion(ip) {
+  const cuenta = (abiertas.get(ip) || 0) - 1;
+  if (cuenta > 0) abiertas.set(ip, cuenta); else abiertas.delete(ip);
+}
+
+function porteroDeConexiones(io) {
+  io.use((socket, next) => {
+    const ip = ipDe(socket.handshake.headers, socket.handshake.address);
+    if (!entrarConexion(ip)) return next(new Error('Hay demasiadas conexiones desde esta red. Esperá un momento: se vuelve a intentar solo.'));
+    socket.on('disconnect', () => salirConexion(ip));
+    next();
+  });
+}
+
+module.exports = { porteroDePedidos, porteroDeConexiones, entrarConexion, salirConexion, POR_MINUTO, CONEXIONES_POR_IP };

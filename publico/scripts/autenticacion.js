@@ -1,5 +1,5 @@
 // autenticacion.js — PIN por persona para gestionar.html, avanzado.html, control.html y pantalla.html.
-// El sistema da el PIN solo (registro con nombre, 4 dígitos únicos) y el
+// El sistema da el PIN solo (registro con nombre, 6 dígitos únicos) y el
 // celular lo recuerda (localStorage) — no hay que pedirlo cada vez.
 (function () {
   const STORAGE_KEY = 'presentacionAuth';
@@ -82,15 +82,49 @@
     try { if (memoriaApp) memoriaApp.borrar(); } catch { /* sin app */ }
   }
 
+  // Cuando el pedido no llega, o el servidor contesta sin un mensaje propio (se está iniciando,
+  // está ocupado), la persona veía el aviso del navegador en inglés («Failed to fetch»,
+  // «Unexpected token»). pedir() es fetch con esos casos pasados a un mensaje claro.
+  const SIN_CONEXION = 'No hay conexión con el servidor. Revisá tu internet y probá de nuevo.';
+  function mensajeDeEstado(estado) {
+    if (estado === 413) return 'Eso pesa demasiado para enviarlo.';
+    if (estado === 429) return 'Hay demasiados pedidos desde esta conexión. Esperá un momento y probá de nuevo.';
+    if (estado === 502 || estado === 503 || estado === 504) return 'El servidor se está iniciando o está ocupado. Esperá unos segundos y probá de nuevo.';
+    return 'Algo salió mal. Probá de nuevo.';
+  }
+  async function pedir(url, opciones) {
+    let res;
+    try {
+      res = await fetch(url, opciones);
+      // Si el servidor pide esperar porque llegaron demasiados pedidos juntos, se espera lo que
+      // diga (hasta un minuto) y se intenta una vez más, sin molestar a la persona. Sólo con los
+      // pedidos que leen datos: repetir uno que guarda o borra podría hacerlo dos veces.
+      const espera = Number(res.headers.get('Retry-After'));
+      const soloLee = !opciones || !opciones.method || opciones.method === 'GET';
+      if (res.status === 429 && soloLee && espera > 0 && espera <= 60) {
+        await new Promise(listo => setTimeout(listo, espera * 1000));
+        res = await fetch(url, opciones);
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') throw err;
+      throw new Error(SIN_CONEXION);
+    }
+    if (!res.ok) {
+      const leer = res.json.bind(res);
+      res.json = async () => { try { return await leer(); } catch { return { error: mensajeDeEstado(res.status) }; } };
+    }
+    return res;
+  }
+
   async function callAuth(path, body) {
-    const res = await fetch(path, {
+    const res = await pedir(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const error = new Error(data.error || 'Error de autenticación.');
+      const error = new Error(data.error || 'No se pudo entrar. Probá de nuevo.');
       error.estado = res.status; // 401 = PIN incorrecto; 429 = el servidor bloqueó por muchos intentos
       throw error;
     }
@@ -164,7 +198,7 @@
                Google ofrezca guardarlo y después lo sugiera al tocar la cajita. -->
           <form id="authOldForm" autocomplete="on">
             <input type="text" name="username" autocomplete="username" value="Conexiones" class="auth-usuario" tabindex="-1" aria-hidden="true" readonly>
-            <input type="password" id="authPin" name="password" placeholder="PIN (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password">
+            <input type="password" id="authPin" name="password" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="current-password">
             ${enApp ? '' : `<label class="auth-recordar"><input type="checkbox" id="authRecordar" checked> Recordarme en ${allowRegister ? 'este celular' : 'esta pantalla'}</label>`}
             <p class="auth-lock-msg" id="authLockMsg" hidden></p>
             <div class="btn-row">
@@ -254,11 +288,12 @@
           nameInput.value = nameInput.value.replace(/[^a-zA-ZÀ-ÿñÑ\s]/g, '');
         });
       }
-      // PIN: sólo dígitos, 4 como máximo. El pattern/inputmode del HTML sólo
+      // PIN: sólo dígitos. Los PIN nuevos tienen 6, los de cuentas de antes 4 y el del admin
+      // puede ser más largo: por eso el tope es 12. El pattern/inputmode del HTML sólo
       // sugieren el teclado numérico en el celular, no bloquean un teclado
       // físico — el filtro real va acá.
       pinInput.addEventListener('input', () => {
-        pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 4);
+        pinInput.value = pinInput.value.replace(/[^0-9]/g, '').slice(0, 12);
       });
 
       // Arranca mostrando sólo los 2 botones de elección; el formulario
@@ -320,7 +355,7 @@
           numero.textContent = adelante.toLocaleString('es');
           anillo.style.strokeDashoffset = String(largo * Math.min(1, adelante / total));
           await new Promise(r => setTimeout(r, 1000));
-          const res = await fetch('/api/auth/turno/' + encodeURIComponent(turno));
+          const res = await pedir('/api/auth/turno/' + encodeURIComponent(turno));
           const datos = await res.json().catch(() => ({}));
           if (res.status === 202) { adelante = datos.adelante || 0; continue; }
           esperaBox.hidden = true;
@@ -472,7 +507,7 @@
         if (applyLockState()) return; // ya debería estar disabled, esto es por las dudas
         const pin = pinInput.value.trim();
         if (!pin) { errorEl.textContent = 'Escribí tu PIN.'; return; }
-        if (pin.length < 4) { errorEl.textContent = 'El PIN tiene 4 dígitos.'; return; }
+        if (pin.length < 4) { errorEl.textContent = 'El PIN tiene 6 dígitos (4 si tu cuenta es de antes).'; return; }
         loginBtn.disabled = true;
         pinInput.disabled = true;
         comprobando = true;
@@ -624,7 +659,7 @@
   window.authFetch = async function authFetch(url, options = {}) {
     const auth = getStored();
     const headers = Object.assign({}, options.headers, auth ? { 'x-pin': auth.pin } : {});
-    let res = await fetch(url, Object.assign({}, options, { headers }));
+    let res = await pedir(url, Object.assign({}, options, { headers }));
     if (res.status === 401) {
       clearStored();
       const guardada = enApp ? leerGuardada() : null;
@@ -632,7 +667,7 @@
       authPromise = null;
       const fresh = await window.ensureAuthed();
       const retryHeaders = Object.assign({}, options.headers, fresh ? { 'x-pin': fresh.pin } : {});
-      res = await fetch(url, Object.assign({}, options, { headers: retryHeaders }));
+      res = await pedir(url, Object.assign({}, options, { headers: retryHeaders }));
     }
     return res;
   };

@@ -22,12 +22,12 @@
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.100",
+    "@napi-rs/canvas": "^1.0.10",
     "cloudinary": "^2.11.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "multer": "^2.3.0",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.4.299",
     "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3"

@@ -1,10 +1,21 @@
 // Abre la pantalla de Conexiones (la misma de Render) en una ventana propia de Windows.
 // Los celulares siguen manejándola con el control, como en el navegador.
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
 
 const DIRECCION = process.env.CONEXIONES_DIRECCION || 'https://presentacion-56.onrender.com';
 const PANTALLA = DIRECCION.replace(/\/$/, '') + '/pantalla.html';
+const ORIGEN = new URL(DIRECCION).origin;
+
+// La ventana sólo muestra páginas de Conexiones (y la propia de «sin conexión»).
+function esDeConexiones(url) {
+  try {
+    const u = new URL(url);
+    return u.origin === ORIGEN || u.protocol === 'file:';
+  } catch {
+    return false;
+  }
+}
 
 // Que la música y los videos suenen sin tener que tocar «Permitir sonido».
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -42,6 +53,12 @@ function crearVentana() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+  // Lo mismo si la página intenta irse a otro sitio dentro de la misma ventana.
+  ventana.webContents.on('will-navigate', (evento, url) => {
+    if (esDeConexiones(url)) return;
+    evento.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url);
+  });
 
   // F11: pantalla completa. F5: recargar.
   ventana.webContents.on('before-input-event', (evento, tecla) => {
@@ -59,5 +76,13 @@ app.on('second-instance', () => {
   ventana.focus();
 });
 
-app.whenReady().then(crearVentana);
+app.whenReady().then(() => {
+  // Electron concede solo cualquier permiso que pida una página (cámara, micrófono, ubicación,
+  // avisos). La pantalla sólo necesita ponerse en pantalla completa: lo demás se niega, también
+  // a los videos de YouTube que se muestran dentro.
+  session.defaultSession.setPermissionRequestHandler((_contenido, permiso, responder) => {
+    responder(permiso === 'fullscreen');
+  });
+  crearVentana();
+});
 app.on('window-all-closed', () => app.quit());

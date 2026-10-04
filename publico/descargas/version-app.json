@@ -1,12 +1,12 @@
 {
-  "codigo": 6,
-  "version": "1.0.5",
+  "codigo": 7,
+  "version": "1.0.6",
   "peso": "29 KB",
   "apk": "descargas/conexiones-control.apk",
-  "apkExterno": "https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Control-1.0.5.apk",
+  "apkExterno": "https://presentacion-56.onrender.com/descargas/conexiones-control.apk",
   "novedades": [
-    { "icono": "📷", "texto": "Arreglado: ya se pueden subir fotos y archivos desde la app" },
-    { "icono": "🎟️", "texto": "El código de invitación del QR llega solo" },
-    { "icono": "🔐", "texto": "Te pregunta si guardar tu PIN" }
+    { "icono": "🔐", "texto": "Tu PIN guardado queda más protegido" },
+    { "icono": "🔢", "texto": "Los PIN nuevos ahora tienen 6 dígitos" },
+    { "icono": "💬", "texto": "Avisos de error más claros" }
   ]
 }

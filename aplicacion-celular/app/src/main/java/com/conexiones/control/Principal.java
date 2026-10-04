@@ -43,6 +43,16 @@ public class Principal extends Activity {
     private ValueCallback<Uri[]> archivosPedidos;
     private String ultimaDireccion = CONTROL;
     private long descargaId = -1;
+    // true sólo mientras lo que se ve es una página de Conexiones. Las funciones que la app le
+    // presta a la página (el PIN guardado, bajar e instalar la versión nueva) no contestan si se
+    // está mostrando otra cosa: así ningún otro sitio puede leer el PIN ni pedir una descarga.
+    private volatile boolean paginaPropia = false;
+
+    private static boolean esDeConexiones(String direccion) {
+        if (direccion == null) return false;
+        Uri uri = Uri.parse(direccion);
+        return "https".equals(uri.getScheme()) && SERVIDOR.equals(uri.getHost());
+    }
 
     @Override
     protected void onCreate(Bundle guardado) {
@@ -59,6 +69,12 @@ public class Principal extends Activity {
         ajustes.setAllowFileAccess(false);
 
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView vista, String direccion, android.graphics.Bitmap icono) {
+                paginaPropia = esDeConexiones(direccion);
+                super.onPageStarted(vista, direccion, icono);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView vista, WebResourceRequest pedido) {
                 Uri uri = pedido.getUrl();
@@ -141,7 +157,7 @@ public class Principal extends Activity {
     private class Reintento {
         @JavascriptInterface
         public void reintentar() {
-            web.post(() -> web.loadUrl(ultimaDireccion));
+            web.post(() -> web.loadUrl(esDeConexiones(ultimaDireccion) ? ultimaDireccion : CONTROL));
         }
     }
 
@@ -154,16 +170,19 @@ public class Principal extends Activity {
 
         @JavascriptInterface
         public String leer() {
+            if (!paginaPropia) return null;
             return datos().getString("auth", null);
         }
 
         @JavascriptInterface
         public void guardar(String texto) {
+            if (!paginaPropia) return;
             datos().edit().putString("auth", texto).commit();
         }
 
         @JavascriptInterface
         public void borrar() {
+            if (!paginaPropia) return;
             datos().edit().remove("auth").commit();
         }
     }
@@ -201,8 +220,8 @@ public class Principal extends Activity {
         // Sólo baja APK del propio servidor de Conexiones.
         @JavascriptInterface
         public boolean descargar(String direccion) {
+            if (!paginaPropia || !esDeConexiones(direccion)) return false;
             Uri uri = Uri.parse(direccion);
-            if (!"https".equals(uri.getScheme()) || !SERVIDOR.equals(uri.getHost())) return false;
             File viejo = archivo();
             if (viejo.exists()) viejo.delete();
             DownloadManager.Request pedido = new DownloadManager.Request(uri)
@@ -234,6 +253,7 @@ public class Principal extends Activity {
         // se abre esa pantalla y devuelve false (al volver, se toca «Instalar» de nuevo).
         @JavascriptInterface
         public boolean instalar() {
+            if (!paginaPropia) return false;
             if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
                 Intent permiso = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
                 runOnUiThread(() -> {

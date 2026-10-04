@@ -805,7 +805,7 @@
     try {
       const res = await fetch('/api/qr-control');
       const datos = await res.json();
-      if (!res.ok) throw new Error(datos.error);
+      if (!res.ok) throw new Error(datos.error || 'No se pudo armar el código QR. Probá de nuevo.');
       qrCodigo.innerHTML = datos.svg; // SVG armado por el servidor (librería qrcode), no texto del usuario
       qrDireccion.textContent = datos.direccion.replace(/^https?:\/\//, '');
     } catch (err) {

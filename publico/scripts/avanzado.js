@@ -165,7 +165,7 @@
     try {
       const res = await authFetch('/api/images/' + id + '/uncombine', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al separar.');
+      if (!res.ok) throw new Error(data.error || 'No se pudieron separar las imágenes. Probá de nuevo.');
       advancedImages = data;
       renderPickerList();
       showToast('Imágenes separadas.');
@@ -395,7 +395,7 @@
           body: JSON.stringify(editorStates[0])
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al guardar el ajuste.');
+        if (!res.ok) throw new Error(data.error || 'No se pudo guardar el ajuste. Probá de nuevo.');
         showToast('Ajuste guardado.');
       } else {
         editorConfirm.textContent = '⏳ Uniendo…';
@@ -411,7 +411,7 @@
           body: JSON.stringify({ ids: editorRecords.map(r => r.id), dataUri })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al unir las imágenes.');
+        if (!res.ok) throw new Error(data.error || 'No se pudieron unir las imágenes. Probá de nuevo.');
         showToast('Imágenes unidas.');
       }
       closeOverlay(editorOverlay);
@@ -867,7 +867,7 @@
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al guardar la frase.');
+      if (!res.ok) throw new Error(data.error || 'No se pudo guardar la frase. Probá de nuevo.');
       showToast('Frase final guardada.');
       closeFinalPhraseEditor();
     } catch (err) {
@@ -888,7 +888,7 @@
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al enviar.');
+      if (!res.ok) throw new Error(data.error || 'No se pudo enviar. Probá de nuevo.');
       showToast('Enviada a tu pantalla.');
     } catch (err) {
       showToast(err.message);
@@ -958,7 +958,7 @@
         body: JSON.stringify({ enabled: autoState.enabled, seconds })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al guardar.');
+      if (!res.ok) throw new Error(data.error || 'No se pudo guardar. Probá de nuevo.');
       showToast('Avance automático guardado.');
       closeOverlay(autoOverlay);
     } catch (err) {

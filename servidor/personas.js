@@ -1,6 +1,6 @@
 // ---- Personas y PIN (para /gestionar.html y /avanzado.html) ----
 // El sistema se encarga solo: cada persona se registra una vez con su nombre,
-// el servidor le da un PIN único de 4 dígitos (nadie lo elige a mano), y desde
+// el servidor le da un PIN único de 6 dígitos (nadie lo elige a mano), y desde
 // ahí ese PIN identifica sus imágenes.
 // El PIN no se guarda escrito: sólo su huella (HMAC-SHA256 con PIN_SECRETO), así
 // quien llegara a ver los datos guardados no ve el PIN de nadie.
@@ -13,7 +13,10 @@ const { revisarRegistro, anotarRegistro, mensajeRegistro, anotarIngreso } = requ
 const invitaciones = require('./invitaciones');
 
 const NOMBRE_ADMIN = 'admin';
-const DIGITOS_PIN = 4;
+// Las cuentas nuevas reciben 6 dígitos (900.000 PIN posibles): con 4 había 9.000 y, con
+// cientos de cuentas, probar PIN al azar daba con el de alguien en pocos intentos. Las cuentas
+// de antes siguen entrando con su PIN de 4: identificar() no mira el largo, sólo la huella.
+const DIGITOS_PIN = 6;
 // Con PIN_SECRETO (en Render: Environment), ni teniendo los datos se puede averiguar un PIN.
 // Nunca cambiarlo después: las huellas guardadas dejarían de coincidir y nadie podría entrar.
 const SECRETO = process.env.PIN_SECRETO || null;
@@ -56,9 +59,9 @@ function pinEnUso(pin) {
   return (ADMIN_PIN && pin === ADMIN_PIN) || Boolean(SECRETO && buscarPorHuella(huella(pin, true))) || Boolean(buscarPorHuella(huella(pin, false)));
 }
 
-// PIN al azar (criptográfico) de 4 dígitos que no choque con otro ni con el ADMIN_PIN
+// PIN al azar (criptográfico) de 6 dígitos que no choque con otro ni con el ADMIN_PIN
 // (antes podía tocar el mismo que el admin, y esa persona entraba como admin).
-// Hay 9.000 PIN posibles: si casi todos están usados, se corta en vez de probar para siempre.
+// Si casi todos los PIN están usados, se corta en vez de probar para siempre.
 // «tomados»: los PIN que ya se dieron en esta misma tanda y todavía no están en la lista.
 function generarPin(tomados = new Set()) {
   for (let intento = 0; intento < 50000; intento++) {
@@ -134,12 +137,12 @@ function ipDelPedido(req) {
 async function requierePersona(req, res, next) {
   try {
     const r = await identificarDesde(ipDelPedido(req), req.get('x-pin'));
-    if (!r.persona) return res.status(r.estado).json({ error: r.error || 'PIN inválido o faltante.' });
+    if (!r.persona) return res.status(r.estado).json({ error: r.error || 'Para seguir tenés que entrar con tu PIN.' });
     req.person = r.persona;
     next();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error en servidor' });
+    res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
   }
 }
 
@@ -308,7 +311,7 @@ function registrarRutasPersonas(app) {
       res.json(r.persona);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Error en servidor' });
+      res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
     }
   });
 }

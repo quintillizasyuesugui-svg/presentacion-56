@@ -58,7 +58,7 @@ function registrarRutasAdministracion(app) {
       res.json(personas);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Error en servidor' });
+      res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
     }
   });
 

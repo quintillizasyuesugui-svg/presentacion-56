@@ -181,14 +181,15 @@ function registrarRutasDiapositivas(app, io) {
 
   // GET /images — { src, transform } por diapositiva, para pantalla.html y control.html
   // (transform es el ajuste de tamaño/posición del Modo avanzado; null si nunca se tocó).
-  // Sin PIN — es la pantalla pública/el control, muestra el show combinado de todos.
+  // Pide PIN, como todo lo demás: cada persona recibe sólo sus fotos (el admin, todas). Antes
+  // contestaba sin cuenta y con las fotos de todos: cualquiera que supiera la dirección las veía.
   // Antes cada pedido leía el disco y volvía a subir el respaldo a Cloudinary; ahora sale de memoria.
-  app.get('/images', (req, res) => {
+  app.get('/images', requierePersona, (req, res) => {
     try {
-      res.json(almacenOrden.actual().map(r => ({ src: r.src, transform: r.transform || null })));
+      res.json(visiblePara(req.person, almacenOrden.actual()).map(r => ({ src: r.src, transform: r.transform || null })));
     } catch (err) {
       console.error(err);
-      res.status(500).send('Error en servidor');
+      res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
     }
   });
 
@@ -199,7 +200,7 @@ function registrarRutasDiapositivas(app, io) {
       res.json(visiblePara(req.person, almacenOrden.actual()));
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Error en servidor' });
+      res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
     }
   });
 

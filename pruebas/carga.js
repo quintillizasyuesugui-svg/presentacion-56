@@ -59,7 +59,7 @@ const todos = (n, tarea) => Promise.all(Array.from({ length: n }, (_, i) => tare
   })).then(r => { fallas += informe('Conectar celular (Socket.IO)', r); });
   const msSockets = Math.round(performance.now() - inicioSockets);
 
-  fallas += informe('Pantalla: GET /images', await todos(personas.length, () => pedir('/images')));
+  fallas += informe('Pantalla: GET /images', await todos(personas.length, i => pedir('/images', { pin: personas[i].pin })));
   fallas += informe('Gestionar: GET /api/images', await todos(personas.length, i => pedir('/api/images', { pin: personas[i].pin })));
   fallas += informe('Entrar con PIN', await todos(personas.length, i => pedir('/api/auth/login', { metodo: 'POST', json: { pin: personas[i].pin } })));
   fallas += informe('Guardar frase final', await todos(personas.length, i => pedir('/api/frase-final', { pin: personas[i].pin, metodo: 'POST',
@@ -93,7 +93,7 @@ const todos = (n, tarea) => Promise.all(Array.from({ length: n }, (_, i) => tare
   const tiempos = subidos.filter(s => s.listoEn).map(s => s.listoEn).sort((a, b) => a - b);
   console.log(`Documentos con las páginas detectadas: ${subidos.filter(s => s.fase === 'eligiendo').length}/${subidos.length} · el primero a los ${(tiempos[0] / 1000).toFixed(1)} s · el último a los ${(tiempos[tiempos.length - 1] / 1000).toFixed(1)} s`);
 
-  const memoria = await pedir('/images');
+  const memoria = await pedir('/images', { pin: personas[0] && personas[0].pin });
   console.log(`\n${conectados.length} celulares conectados a la vez (en ${msSockets} ms). La pantalla sigue respondiendo: ${memoria.estado === 200 ? 'sí' : 'NO'}.`);
   conectados.forEach(s => s.close());
   const perdidos = (personas.length - frasesBien) + (personas.length - avancesBien) + (personas.length - cuentasBien);
