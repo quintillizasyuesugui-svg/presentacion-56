@@ -33,7 +33,15 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
 | «música desde el inicio», «reiniciar» | Vuelve a empezar la canción o el video |
 | «bucle», «repetir la canción» / «quita el bucle» | Repite la misma canción al terminar, o deja de repetir |
 | «un poco más», «más», «otro poco» | Repite lo último: subir, bajar, adelantar, agrandar, correr |
+| «vete al final del video», «casi al final», «vete a la mitad», «vete al inicio» | Lleva la canción o el video a ese punto |
+| «vete arriba al tope», «hasta el final abajo», «a la derecha del todo» | Corre la imagen agrandada hasta ese borde |
+| «centra», «al centro» | Centra la imagen sin cambiarle el tamaño |
+| «cierra la pantalla», «cierra», «cerrar sesión» | Pregunta y, al decir «sí», cierra la sesión de la pantalla |
 
+- **Cerrar la pantalla al terminar:** con la presentación en marcha, tocar «Mostrar» de nuevo (o
+  decir «cierra la pantalla») sube la pregunta «¿Cerrar tu pantalla?». Al confirmar, la pantalla de
+  la PC cierra la sesión y queda libre, con «🔑 Iniciar sesión», para la siguiente persona. La orden
+  va sólo a las pantallas de quien la da.
 - «Siguiente» solo es la diapositiva; para música o video hay que nombrarlos.
 - Acepta una letra mal oída («sigiente») y usa el español del celular, no sólo el de España.
 - Una orden suelta («bajale», «pausa») vale si la frase es corta; en una frase larga hace falta

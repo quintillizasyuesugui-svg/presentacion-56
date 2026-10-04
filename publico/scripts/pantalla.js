@@ -1027,6 +1027,10 @@
 
   socket.on('cambiar', (accion) => aplicarCambio(accion));
 
+  // «Cerrar pantalla» desde el celular: esta pantalla cierra la sesión y queda libre (con
+  // «🔑 Iniciar sesión») para la siguiente persona.
+  socket.on('cerrarPantalla', () => logoutAuth());
+
   // El control pregunta «¿ya estás mostrando?» al abrirse o al volver de Gestionar: se le contesta
   // en qué foto va, así no hay que tocar «Mostrar» de nuevo (que volvería a la foto 1).
   // También se cuenta cada vez que cambia de foto: el control muestra «3/10» y la foto para el zoom.

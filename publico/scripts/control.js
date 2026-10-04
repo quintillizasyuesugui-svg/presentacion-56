@@ -21,6 +21,11 @@
       showToast('Apretá "Mostrar" para encender');
       return;
     }
+    if (accion === 'mostrar' && showStarted) {
+      // Ya está mostrando: tocar «Mostrar» de nuevo es para terminar. Se pregunta antes de cerrar.
+      preguntarCerrarPantalla();
+      return;
+    }
     if (accion === 'mostrar') {
       // Sin imágenes la pantalla no tiene qué mostrar: se avisa acá en vez de no hacer nada.
       if (imagenesCargadas && totalSlides === 0) {
@@ -77,11 +82,73 @@
       document.getElementById('mostrarFoto').textContent = foto;
       document.getElementById('mostrarTotal').textContent = total;
       document.getElementById('mostrarBarra').style.width = (foto / total * 100) + '%';
-      mostrarBtn.setAttribute('aria-label', `En pantalla: foto ${foto} de ${total}. Tocá para volver a empezar desde la primera.`);
+      mostrarBtn.setAttribute('aria-label', `En pantalla: foto ${foto} de ${total}. Tocá para cerrar tu pantalla al terminar.`);
     } else {
       mostrarBtn.removeAttribute('aria-label');
     }
   }
+  // ---- Cerrar la pantalla al terminar ----
+  // Una hoja pregunta antes de cerrar, para que un toque sin querer no corte la presentación.
+  // Al confirmar, la pantalla de la PC cierra la sesión y queda libre para la siguiente persona.
+  let hojaCerrar = null;
+  function armarHojaCerrar() {
+    const velo = document.createElement('div');
+    velo.className = 'hoja-velo';
+    velo.hidden = true;
+    const hoja = document.createElement('section');
+    hoja.className = 'hoja-medios';
+    hoja.hidden = true;
+    hoja.setAttribute('role', 'dialog');
+    hoja.setAttribute('aria-label', '¿Cerrar tu pantalla?');
+    const asa = document.createElement('div');
+    asa.className = 'hoja-asa';
+    const titulo = document.createElement('h2');
+    titulo.textContent = '¿Cerrar tu pantalla?';
+    const nota = document.createElement('p');
+    nota.className = 'hoja-nota';
+    nota.textContent = 'La pantalla de la PC cierra tu sesión y queda libre para la siguiente persona. Tus fotos no se borran.';
+    const cerrar = document.createElement('button');
+    cerrar.type = 'button';
+    cerrar.className = 'btn danger-solid';
+    cerrar.textContent = 'Cerrar pantalla';
+    cerrar.addEventListener('click', cerrarPantalla);
+    const seguir = document.createElement('button');
+    seguir.type = 'button';
+    seguir.className = 'btn secondary';
+    seguir.textContent = 'Seguir mostrando';
+    seguir.addEventListener('click', ocultarHojaCerrar);
+    velo.addEventListener('click', ocultarHojaCerrar);
+    hoja.append(asa, titulo, nota, cerrar, seguir);
+    document.body.append(velo, hoja);
+    return { velo, hoja, seguir };
+  }
+  function preguntarCerrarPantalla() {
+    if (!hojaCerrar) hojaCerrar = armarHojaCerrar();
+    hojaCerrar.velo.hidden = false;
+    hojaCerrar.hoja.hidden = false;
+    requestAnimationFrame(() => { hojaCerrar.velo.classList.add('abierta'); hojaCerrar.hoja.classList.add('abierta'); });
+    setTimeout(() => hojaCerrar.seguir.focus(), 50);
+  }
+  function hojaCerrarAbierta() {
+    return Boolean(hojaCerrar && !hojaCerrar.hoja.hidden);
+  }
+  function ocultarHojaCerrar() {
+    if (!hojaCerrar) return;
+    hojaCerrar.velo.classList.remove('abierta');
+    hojaCerrar.hoja.classList.remove('abierta');
+    setTimeout(() => { hojaCerrar.velo.hidden = true; hojaCerrar.hoja.hidden = true; }, 320);
+  }
+  function cerrarPantalla() {
+    ocultarHojaCerrar();
+    socket.emit('cerrarPantalla');
+    showStarted = false;
+    fotoPantalla = { foto: 0, total: 0 };
+    updateNavButtonsState();
+    pintarPasos();
+    showToast('✅ Pantalla cerrada. Ya puede entrar la siguiente persona.');
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && hojaCerrarAbierta()) ocultarHojaCerrar(); });
+
   function totalSlidesSeguro() {
     try { return totalSlides; } catch { return 0; } // totalSlides se declara más abajo
   }
@@ -377,6 +444,19 @@
 
   function hacerOrdenDeVoz(alternativas) {
     const oido = String(alternativas[0] || '').trim();
+    // Con la pregunta «¿Cerrar tu pantalla?» abierta sólo se escucha la respuesta: «sí» (o
+    // «cerrar») cierra, «no» (o «seguir») la deja como está.
+    if (hojaCerrarAbierta()) {
+      const dichas = alternativas.flatMap(a => window.OrdenesVoz.normalizar(a).split(/\s+/));
+      if (['si', 'confirmar', 'confirmo', 'cerrar', 'cierra', 'cerrala'].some(p => dichas.includes(p))) {
+        cerrarPantalla();
+        showHeard(oido, '✅ pantalla cerrada');
+      } else if (['no', 'seguir', 'sigue', 'cancelar', 'cancela'].some(p => dichas.includes(p))) {
+        ocultarHojaCerrar();
+        showHeard(oido, 'seguís mostrando');
+      }
+      return;
+    }
     let orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
     if (!orden) {
       // Una frase corta que no se entendió se muestra, para saber qué oyó; una larga es
@@ -389,6 +469,12 @@
       orden = ultimaOrdenDeVoz;
     }
     ultimaOrdenDeVoz = SE_REPITE.includes(orden.accion) ? orden : null;
+    if (orden.tipo === 'cerrar') {
+      if (!showStarted) { showHeard(oido, 'no hay nada en pantalla para cerrar'); return; }
+      preguntarCerrarPantalla();
+      showHeard(oido, 'decí «sí» para cerrar o «no» para seguir');
+      return;
+    }
     if (orden.tipo === 'diapositiva') {
       socket.emit('cambiar', orden.accion);
       showHeard(oido);
@@ -397,6 +483,20 @@
     if (orden.tipo === 'zoom') {
       // Agrandar o achicar la imagen de la pantalla, igual que con los dos dedos.
       if (!showStarted || zoomFoto.hidden) { showHeard(oido, 'primero tocá «Mostrar»'); return; }
+      if (orden.accion === 'centrar') {
+        // Sólo centra: el tamaño queda como estaba.
+        cambiarZoom({ cx: 0.5, cy: 0.5 }, true);
+        showHeard(oido, zoom.z > 1.01 ? '🎯 Centrada' : '🎯 Ya está entera y centrada');
+        return;
+      }
+      const BORDE = { 'borde-arriba': [{ cy: 0 }, '⤒ Arriba del todo'], 'borde-abajo': [{ cy: 1 }, '⤓ Abajo del todo'], 'borde-izquierda': [{ cx: 0 }, '⇤ A la izquierda del todo'], 'borde-derecha': [{ cx: 1 }, '⇥ A la derecha del todo'] };
+      const borde = BORDE[orden.accion];
+      if (borde) {
+        // Hasta el borde de la imagen (cambiarZoom no deja pasarse); entera, primero al doble.
+        cambiarZoom(Object.assign({ z: zoom.z > 1.01 ? zoom.z : 2 }, borde[0]), true);
+        showHeard(oido, borde[1]);
+        return;
+      }
       const MOVER = { derecha: [1, 0, '➡️ Derecha'], izquierda: [-1, 0, '⬅️ Izquierda'], arriba: [0, -1, '⬆️ Arriba'], abajo: [0, 1, '⬇️ Abajo'] };
       const mover = MOVER[orden.accion];
       if (mover) {

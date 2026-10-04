@@ -99,6 +99,12 @@ function registrarSockets(io) {
     socket.on('pantallaPedirEstado', () => {
       if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('pantallaPedirEstado');
     });
+    // «Cerrar pantalla»: quien terminó de presentar cierra, desde su celular, la sesión de sus
+    // propias pantallas; quedan libres para que entre la siguiente persona. Sólo va a la sala
+    // del dueño, así nadie puede cerrarle la pantalla a otro.
+    socket.on('cerrarPantalla', () => {
+      if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('cerrarPantalla');
+    });
     socket.on('pantallaEstado', (datos) => {
       if (!socket.ownerName || !datos || typeof datos !== 'object') return;
       const z = datos.zoom && typeof datos.zoom === 'object' ? datos.zoom : {};

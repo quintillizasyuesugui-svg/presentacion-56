@@ -363,6 +363,13 @@
       mandar(para, 'ir', Math.round(actual.duracion / 2));
       return '⏱ A la mitad';
     }
+    if (orden.accion === 'irFinal' || orden.accion === 'irCasiFinal') {
+      if (!actual || !actual.duracion) return para === 'video' ? 'No hay ningún video en la pantalla.' : 'No hay ninguna canción sonando.';
+      // «Al final» deja los últimos 5 segundos; «casi al final», el último tramo (90 %).
+      const destino = orden.accion === 'irFinal' ? Math.max(0, actual.duracion - 5) : actual.duracion * 0.9;
+      mandar(para, 'ir', Math.round(destino));
+      return orden.accion === 'irFinal' ? '⏭ Al final' : '⏩ Casi al final';
+    }
     if (orden.accion === 'reiniciar') {
       mandar(para, 'ir', 0);
       mandar(para, 'reproducir');

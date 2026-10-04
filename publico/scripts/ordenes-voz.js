@@ -28,9 +28,15 @@
     reiniciar: ['reiniciar', 'reinicia', 'reiniciala', 'reinicialo', 'principio', 'comienzo', 'inicio'],
     bucle: ['bucle', 'repetir', 'repite', 'repeti', 'repetila', 'repetilo', 'loop'],
     apagar: ['quita', 'quitar', 'saca', 'sacar', 'sin', 'apaga', 'apagar', 'desactiva', 'desactivar'],
-    irA: ['ve', 'ir', 'anda', 'andate', 'salta', 'saltar', 'lleva', 'llevala', 'llevalo'],
+    irA: ['ve', 'vete', 'va', 'vaya', 'ir', 'anda', 'andate', 'salta', 'saltar', 'lleva', 'llevala', 'llevalo'],
     segundos: ['segundo', 'segundos'],
     minutos: ['minuto', 'minutos'],
+    final: ['final', 'fin'],
+    casi: ['casi'],
+    tope: ['tope', 'todo', 'fondo', 'borde'],
+    centrar: ['centra', 'centrar', 'centro', 'centrala', 'centralo', 'centrame'],
+    cerrar: ['cierra', 'cerrar', 'cerra', 'cierre', 'cerrala'],
+    lugar: ['pantalla', 'sesion', 'cuenta'],
     derecha: ['derecha'],
     izquierda: ['izquierda'],
     arriba: ['arriba'],
@@ -89,6 +95,7 @@
   // { tipo: 'diapositiva', accion: 'mostrar' | 'siguiente' | 'anterior' | '3' }
   // { tipo: 'medios', para: 'musica' | 'video' | null, accion, numero?, valor? }
   // { tipo: 'repetir' } — «un poco más»: lo último otra vez
+  // { tipo: 'cerrar' } — «cierra la pantalla»: terminar y dejarla libre
   // { tipo: 'zoom', accion: 'acercar' | 'alejar' | 'normal' | 'derecha' | 'izquierda' | 'arriba' | 'abajo' }
   function entender(frase, totalDiapositivas) {
     const palabras = normalizar(frase).split(/\s+/).filter(Boolean);
@@ -108,10 +115,28 @@
     const mueve = dice(palabras, 'adelantar') || dice(palabras, 'atrasar') || dice(palabras, 'irA');
     if (!deVolumen && mueve && dice(palabras, 'mitad')) return { tipo: 'medios', para, accion: 'irMitad' };
 
+    const deImagen = dice(palabras, 'imagen');
+    const direccion = ['arriba', 'abajo', 'derecha', 'izquierda'].find(d => dice(palabras, d)) || null;
+
+    // «vete al final del video», «casi al final», «al final de la canción»: lleva lo que suena
+    // cerca del final. Con una dirección («al final abajo») o nombrando la imagen, es la imagen.
+    if (!deVolumen && !deImagen && !direccion && dice(palabras, 'final') && (para || mueve || palabras.length <= 4)) {
+      return { tipo: 'medios', para, accion: dice(palabras, 'casi') ? 'irCasiFinal' : 'irFinal' };
+    }
+    // «vete al inicio»: vuelve a empezar lo que suena.
+    if (!deImagen && mueve && palabras.includes('inicio')) return { tipo: 'medios', para, accion: 'reiniciar' };
+
+    // Imagen hasta el borde: «vete arriba al tope», «hasta el final abajo», «a la derecha del todo».
+    if (!deVolumen && para === null && direccion && (dice(palabras, 'tope') || dice(palabras, 'final')) && palabras.length <= 8) {
+      return { tipo: 'zoom', accion: 'borde-' + direccion };
+    }
+    if (!deVolumen && para === null && deImagen && dice(palabras, 'final')) return { tipo: 'zoom', accion: 'borde-abajo' };
+
     // Tamaño de la imagen: «agranda», «acerca la foto», «más chico», «tamaño normal».
     // Lo mismo: suelto vale en una frase corta; en una larga hay que nombrar la imagen.
-    const deImagen = dice(palabras, 'imagen');
     if (!deVolumen && para === null && (palabras.length <= 4 || deImagen)) {
+      // «centra», «al centro»: deja la imagen agrandada en el medio, sin cambiarle el tamaño.
+      if (dice(palabras, 'centrar')) return { tipo: 'zoom', accion: 'centrar' };
       if (dice(palabras, 'agrandar')) return { tipo: 'zoom', accion: 'acercar' };
       if (dice(palabras, 'achicar')) return { tipo: 'zoom', accion: 'alejar' };
       if (dice(palabras, 'normal')) return { tipo: 'zoom', accion: 'normal' };
@@ -169,6 +194,10 @@
       return null;
     }
     if (clara && dice(palabras, 'reproducir')) return { tipo: 'medios', para: null, accion: 'reproducir' };
+
+    // «cierra», «cierra la pantalla», «cerrar sesión»: terminar y dejar la pantalla libre. El
+    // control pregunta antes de cerrar.
+    if (dice(palabras, 'cerrar') && (palabras.length <= 4 || dice(palabras, 'lugar'))) return { tipo: 'cerrar' };
 
     // Diapositivas, como siempre.
     if (dice(palabras, 'mostrar')) return { tipo: 'diapositiva', accion: 'mostrar' };
