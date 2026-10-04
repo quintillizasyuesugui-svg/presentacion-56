@@ -2806,3 +2806,44 @@ body.con-qr-invitacion .waiting { padding-bottom: calc(2rem + 170px); transition
 .pasos-lista li.hecho { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--gray-600); }
 .pasos-lista li.hecho .paso-marca { background: var(--green-500); color: var(--gray-950); }
 .pasos-lista li.hecho .paso-marca::before { content: '✓'; }
+
+/* ---- Gestionar: elegir varias imágenes y eliminarlas juntas ---- */
+.barra-elegir { margin: 0 0 12px; }
+.barra-elegir .btn.activo { border-color: #38bdf8; background: rgba(56, 189, 248, 0.14); color: #7dd3fc; }
+.image-row.elegible { cursor: pointer; user-select: none; }
+.image-row.elegible:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 2px; }
+.image-row.elegida { outline: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.10); }
+.fila-casilla {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  font-weight: 800;
+  border: 2px solid var(--gray-600);
+  color: transparent;
+}
+.image-row.elegida .fila-casilla { background: #38bdf8; border-color: #38bdf8; color: #04121c; }
+.barra-eliminar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 14px;
+  z-index: 40;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: #161a23;
+  border: 1px solid #2c3342;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.barra-eliminar[hidden] { display: none; }
+.barra-eliminar .btn.danger-solid { flex: 1; }
+/* Lugar para que la barra fija no tape la última fila. */
+body.eligiendo-imagenes { padding-bottom: 104px; }

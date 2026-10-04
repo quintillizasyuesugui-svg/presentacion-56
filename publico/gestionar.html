@@ -34,11 +34,23 @@
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple hidden>
 
+    <!-- Elegir varias imágenes para eliminarlas juntas (igual que en Música y videos) -->
+    <div class="barra-seleccion barra-elegir" id="barraElegir" hidden>
+      <button type="button" class="btn chico" id="elegirBtn">☑️ Seleccionar</button>
+      <button type="button" class="btn chico secondary" id="marcarTodasBtn" hidden>Marcar todas</button>
+    </div>
+
     <div class="image-list" id="imageList"></div>
     <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Subí la primera.</p>
   </div>
 
   <div id="lugarMiniReproductor"></div>
+
+  <!-- Barra fija de abajo mientras se eligen imágenes -->
+  <div class="barra-eliminar" id="barraEliminar" hidden>
+    <button type="button" class="btn danger-solid" id="eliminarElegidasBtn" disabled>🗑️ Eliminar</button>
+    <button type="button" class="btn" id="cancelarElegirBtn">Cancelar</button>
+  </div>
 
   <div class="btn-row">
     <a class="btn" href="control.html">⬅️ Volver</a>

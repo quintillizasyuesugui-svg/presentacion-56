@@ -10,7 +10,7 @@ Apretá el enlace y se descarga:
 Controla diapositivas en tiempo real:
 - **Pantalla** (`/pantalla.html`): Muestra imágenes
 - **Control** (`/control.html`): Botones anterior/mostrar/siguiente/fullscreen/voz
-- **Gestionar imágenes** (`/gestionar.html`, antes `/manage.html` — el enlace viejo sigue funcionando): Subir, ordenar y borrar diapositivas desde el celular
+- **Gestionar imágenes** (`/gestionar.html`, antes `/manage.html` — el enlace viejo sigue funcionando): Subir, ordenar y borrar diapositivas desde el celular. «☑️ Seleccionar» pone una casilla en cada imagen para marcar varias (o «Marcar todas») y eliminarlas juntas; pregunta antes de borrar
 - **Modo avanzado** (`/avanzado.html`): tamaño y posición, unir imágenes, subir documento, frase final y avance automático
 - **Música y videos** (`/multimedia.html`, pestañas en Gestionar): subir canciones y videos o guardar enlaces de YouTube, y manejarlos desde el celular mientras presentás
 

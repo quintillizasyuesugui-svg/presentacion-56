@@ -30,9 +30,86 @@
     }
   }
 
+  // ---- Elegir varias imágenes y eliminarlas juntas ----
+  // «☑️ Seleccionar» pone una casilla en cada fila; abajo queda la barra con «Eliminar N» y
+  // «Cancelar». Mientras se elige no se arrastra ni se reordena: tocar una fila la marca.
+  let eligiendo = false;
+  const elegidas = new Set();
+  const barraElegir = document.getElementById('barraElegir');
+  const elegirBtn = document.getElementById('elegirBtn');
+  const marcarTodasBtn = document.getElementById('marcarTodasBtn');
+  const barraEliminar = document.getElementById('barraEliminar');
+  const eliminarElegidasBtn = document.getElementById('eliminarElegidasBtn');
+  const cancelarElegirBtn = document.getElementById('cancelarElegirBtn');
+
+  function pintarBarrasDeElegir() {
+    // Lo que ya no está en la lista (se borró desde otro celular) deja de estar elegido.
+    for (const id of [...elegidas]) if (!images.some(img => img.id === id)) elegidas.delete(id);
+    if (!images.length) eligiendo = false;
+    barraElegir.hidden = images.length === 0;
+    elegirBtn.textContent = eligiendo ? '☑️ Seleccionando' : '☑️ Seleccionar';
+    elegirBtn.classList.toggle('activo', eligiendo);
+    elegirBtn.setAttribute('aria-pressed', String(eligiendo));
+    marcarTodasBtn.hidden = !eligiendo;
+    marcarTodasBtn.textContent = elegidas.size === images.length ? 'Desmarcar todas' : 'Marcar todas';
+    barraEliminar.hidden = !eligiendo;
+    eliminarElegidasBtn.disabled = elegidas.size === 0;
+    eliminarElegidasBtn.textContent = elegidas.size ? `🗑️ Eliminar ${elegidas.size}` : '🗑️ Eliminar';
+    document.body.classList.toggle('eligiendo-imagenes', eligiendo);
+  }
+
+  function alternarElegida(id) {
+    if (elegidas.has(id)) elegidas.delete(id); else elegidas.add(id);
+    render();
+  }
+
+  function salirDeElegir() {
+    eligiendo = false;
+    elegidas.clear();
+    render();
+  }
+
+  elegirBtn.addEventListener('click', () => {
+    if (eligiendo) return salirDeElegir();
+    eligiendo = true;
+    render();
+  });
+  marcarTodasBtn.addEventListener('click', () => {
+    const todas = elegidas.size === images.length;
+    elegidas.clear();
+    if (!todas) images.forEach(img => elegidas.add(img.id));
+    render();
+  });
+  cancelarElegirBtn.addEventListener('click', salirDeElegir);
+  eliminarElegidasBtn.addEventListener('click', async () => {
+    const cuantas = elegidas.size;
+    if (!cuantas) return;
+    const ok = await askConfirm(cuantas === 1
+      ? '¿Eliminar 1 imagen? Esta acción no se puede deshacer.'
+      : `¿Eliminar ${cuantas} imágenes? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    eliminarElegidasBtn.disabled = true;
+    try {
+      const res = await authFetch('/api/images/borrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...elegidas] })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudieron eliminar las imágenes. Probá de nuevo.');
+      images = data.imagenes;
+      salirDeElegir();
+      showToast(data.borradas === 1 ? '🗑️ Se eliminó 1 imagen.' : `🗑️ Se eliminaron ${data.borradas} imágenes.`);
+    } catch (err) {
+      showToast(err.message);
+      pintarBarrasDeElegir();
+    }
+  });
+
   function render() {
     imageList.innerHTML = '';
     emptyHint.hidden = images.length > 0;
+    pintarBarrasDeElegir();
 
     images.forEach(({ id, src }, i) => {
       const row = document.createElement('div');
@@ -60,6 +137,28 @@
           </button>
         </div>
       `;
+      if (eligiendo) {
+        // La fila entera es la casilla: sin flechas, sin tacho y sin arrastrar.
+        const marcada = elegidas.has(id);
+        row.classList.add('elegible');
+        row.classList.toggle('elegida', marcada);
+        row.querySelector('.row-actions').style.display = 'none';
+        const casilla = document.createElement('span');
+        casilla.className = 'fila-casilla';
+        casilla.textContent = '✓';
+        casilla.setAttribute('aria-hidden', 'true');
+        row.prepend(casilla);
+        row.tabIndex = 0;
+        row.setAttribute('role', 'checkbox');
+        row.setAttribute('aria-checked', String(marcada));
+        row.setAttribute('aria-label', `Imagen ${i + 1}`);
+        row.addEventListener('click', () => alternarElegida(id));
+        row.addEventListener('keydown', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); alternarElegida(id); }
+        });
+        imageList.appendChild(row);
+        return;
+      }
       row.querySelector('[data-action="up"]').addEventListener('click', () => move(i, -1));
       row.querySelector('[data-action="down"]').addEventListener('click', () => move(i, 1));
       row.querySelector('[data-action="delete"]').addEventListener('click', () => remove(id));

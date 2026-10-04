@@ -229,6 +229,31 @@ function registrarRutasDiapositivas(app, io) {
     }
   });
 
+  // ---- Borrar varias imágenes juntas ----
+  // POST /api/images/borrar — { ids: [...] }. Cada persona borra sólo las suyas (el admin, las de
+  // cualquiera): un id ajeno o que ya no existe se saltea, no corta el borrado de las demás.
+  app.post('/api/images/borrar', requierePersona, async (req, res) => {
+    const ids = (req.body || {}).ids;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500 || !ids.every(i => typeof i === 'string' && i)) {
+      return res.status(400).json({ error: 'Elegí al menos una imagen para eliminar.' });
+    }
+    try {
+      const pedidas = new Set(ids);
+      let borradas = [];
+      const orden = await almacenOrden.modificar((o) => {
+        borradas = o.filter(r => pedidas.has(r.id) && (req.person.isAdmin || r.owner === req.person.name));
+        const fuera = new Set(borradas.map(r => r.id));
+        for (let i = o.length - 1; i >= 0; i--) if (fuera.has(o[i].id)) o.splice(i, 1);
+      });
+      // Una diapositiva combinada guarda también sus imágenes originales: se van con ella.
+      await Promise.all(borradas.flatMap(r => [r, ...(r.originals || [])]).map(borrarImagenSubida));
+      if (borradas.length) avisarCambio(req.person.isAdmin ? null : [req.person.name]);
+      res.json({ borradas: borradas.length, imagenes: visiblePara(req.person, orden) });
+    } catch (err) {
+      responderError(res, err, 'No se pudieron eliminar las imágenes. Probá de nuevo.');
+    }
+  });
+
   // ---- Borrar imagen ----
   app.delete('/api/images/*id', requierePersona, async (req, res) => {
     try {
