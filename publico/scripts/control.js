@@ -370,18 +370,46 @@
   // Qué quiso decir la persona lo decide ordenes-voz.js (diapositivas, música, video y
   // volumen). Acá sólo se hace lo que entendió y se muestra en el control.
   // «alternativas»: las versiones de lo oído, de la más probable a la menos.
+  // Lo último que se pidió y que tiene sentido repetir con «un poco más»: subir o bajar el
+  // volumen, adelantar o atrasar, agrandar, achicar o correr la imagen.
+  let ultimaOrdenDeVoz = null;
+  const SE_REPITE = ['subirVolumen', 'bajarVolumen', 'saltar', 'acercar', 'alejar', 'derecha', 'izquierda', 'arriba', 'abajo'];
+
   function hacerOrdenDeVoz(alternativas) {
     const oido = String(alternativas[0] || '').trim();
-    const orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+    let orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
     if (!orden) {
       // Una frase corta que no se entendió se muestra, para saber qué oyó; una larga es
       // alguien hablando y no hace falta avisar nada.
       if (oido && oido.split(/\s+/).length <= 4) showHeard(oido, 'no entendí esa orden');
       return;
     }
+    if (orden.tipo === 'repetir') {
+      if (!ultimaOrdenDeVoz) { showHeard(oido, 'decime primero qué: «sube el volumen», «agranda», «adelanta la música»…'); return; }
+      orden = ultimaOrdenDeVoz;
+    }
+    ultimaOrdenDeVoz = SE_REPITE.includes(orden.accion) ? orden : null;
     if (orden.tipo === 'diapositiva') {
       socket.emit('cambiar', orden.accion);
       showHeard(oido);
+      return;
+    }
+    if (orden.tipo === 'zoom') {
+      // Agrandar o achicar la imagen de la pantalla, igual que con los dos dedos.
+      if (!showStarted || zoomFoto.hidden) { showHeard(oido, 'primero tocá «Mostrar»'); return; }
+      const MOVER = { derecha: [1, 0, '➡️ Derecha'], izquierda: [-1, 0, '⬅️ Izquierda'], arriba: [0, -1, '⬆️ Arriba'], abajo: [0, 1, '⬇️ Abajo'] };
+      const mover = MOVER[orden.accion];
+      if (mover) {
+        // Sólo se puede correr una imagen agrandada: si está entera, primero se agranda al doble.
+        const z = zoom.z > 1.01 ? zoom.z : 2;
+        const paso = 0.5 / z; // media ventana de lo que se ve
+        cambiarZoom({ z, cx: zoom.cx + mover[0] * paso, cy: zoom.cy + mover[1] * paso }, true);
+        showHeard(oido, mover[2]);
+        return;
+      }
+      const nuevo = orden.accion === 'normal' ? { z: 1, cx: 0.5, cy: 0.5 } : { z: zoom.z * (orden.accion === 'acercar' ? 1.5 : 1 / 1.5) };
+      cambiarZoom(nuevo, true);
+      showHeard(oido, zoom.z > 1.01 ? '🔍 ×' + zoom.z.toFixed(1) : '🔍 Tamaño normal');
       return;
     }
     const hecho = typeof window.ordenDeVozMedios === 'function' ? window.ordenDeVozMedios(orden) : null;

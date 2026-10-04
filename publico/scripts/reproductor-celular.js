@@ -350,6 +350,24 @@
       return `🔊 Volumen ${volumen} %`;
     }
     if (orden.accion === 'pausar') { mandar(para, 'pausar'); return '⏸ Pausa'; }
+    if (orden.accion === 'bucle') {
+      mandar('musica', 'bucle', orden.valor);
+      return orden.valor ? '🔁 Bucle: se repite esta canción' : '➡️ Bucle quitado';
+    }
+    if (orden.accion === 'saltar') {
+      mandar(para, 'saltar', orden.valor);
+      return (orden.valor > 0 ? '⏩ Adelanté ' : '⏪ Retrocedí ') + Math.abs(orden.valor) + ' s';
+    }
+    if (orden.accion === 'irMitad') {
+      if (!actual || !actual.duracion) return para === 'video' ? 'No hay ningún video en la pantalla.' : 'No hay ninguna canción sonando.';
+      mandar(para, 'ir', Math.round(actual.duracion / 2));
+      return '⏱ A la mitad';
+    }
+    if (orden.accion === 'reiniciar') {
+      mandar(para, 'ir', 0);
+      mandar(para, 'reproducir');
+      return '⏮ Desde el inicio';
+    }
     if (orden.accion === 'terminar') { mandar('video', 'terminar'); return '⏹ Video terminado'; }
 
     const poner = (elemento) => {

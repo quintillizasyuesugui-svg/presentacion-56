@@ -3,7 +3,7 @@
 // va la reproducción («mediosEstado»). Todo pasa por acá antes de reenviarse, así nadie
 // puede mandar cualquier cosa a la pantalla de otro ni textos gigantes.
 
-const ACCIONES_MUSICA = ['reproducir', 'pausar', 'alternar', 'siguiente', 'anterior', 'ir', 'saltar', 'volumen', 'elegir'];
+const ACCIONES_MUSICA = ['reproducir', 'pausar', 'alternar', 'siguiente', 'anterior', 'ir', 'saltar', 'volumen', 'elegir', 'bucle'];
 const ACCIONES_VIDEO = ['mandar', 'reproducir', 'pausar', 'alternar', 'ir', 'saltar', 'volumen', 'terminar'];
 const LARGO_ID = 200;
 const LARGO_NOMBRE = 200;
@@ -30,6 +30,11 @@ function limpiarOrdenMedios(datos) {
   if (accion === 'volumen') {
     if (!esNumero(valor) || valor < 0 || valor > 100) return null;
     return { para, accion, valor: Math.round(valor) };
+  }
+  // «bucle»: true repite la misma canción al terminar; false vuelve a pasar a la siguiente.
+  if (accion === 'bucle') {
+    if (typeof valor !== 'boolean') return null;
+    return { para, accion, valor };
   }
   if (accion === 'elegir' || accion === 'mandar') {
     if (!esTexto(valor, LARGO_ID)) return null;

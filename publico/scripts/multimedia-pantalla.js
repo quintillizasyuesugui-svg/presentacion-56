@@ -218,7 +218,14 @@
     else { mostrarSello('♪ ' + musicas[siguienteI].nombre); publicarEstado(); }
   }
 
+  // Con el bucle prendido (orden «bucle» desde el celular), al terminar se repite la misma canción.
+  let bucleMusica = false;
   audio.addEventListener('ended', () => {
+    if (bucleMusica && !video) {
+      audio.currentTime = 0;
+      reproducirMusica();
+      return;
+    }
     // Terminó la canción: pasa a la siguiente (si hay un video, la deja lista sin sonar).
     if (video) { musicaAntesDelVideo = true; quiereSonar = false; }
     cambiarCancion(1);
@@ -233,6 +240,11 @@
     if (accion === 'reproducir') return reproducirMusica();
     if (accion === 'pausar') return pausarMusica();
     if (accion === 'alternar') return (audio.paused ? reproducirMusica() : pausarMusica());
+    if (accion === 'bucle') {
+      bucleMusica = valor === true;
+      mostrarSello(bucleMusica ? '🔁 Se repite esta canción' : '➡️ Sin repetir');
+      return publicarEstado();
+    }
     if (accion === 'siguiente') return cambiarCancion(1);
     if (accion === 'anterior') {
       // Como en cualquier reproductor: si ya avanzó, vuelve al principio de la misma.

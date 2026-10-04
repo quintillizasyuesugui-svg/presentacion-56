@@ -18,7 +18,23 @@
     bajar: ['baja', 'bajar', 'bajale', 'bajalo', 'bajala', 'disminuye', 'disminuir'],
     mitad: ['mitad'],
     maximo: ['maximo', 'tope'],
-    silencio: ['silencio', 'silenciar', 'silencia', 'mudo']
+    silencio: ['silencio', 'silenciar', 'silencia', 'mudo'],
+    imagen: ['imagen', 'foto', 'diapositiva', 'zoom'],
+    agrandar: ['agranda', 'agrandar', 'agrandala', 'agrandalo', 'acerca', 'acercar', 'acercala', 'acercalo', 'amplia', 'ampliar', 'grande'],
+    achicar: ['achica', 'achicar', 'achicala', 'achicalo', 'aleja', 'alejar', 'alejala', 'alejalo', 'reduce', 'reducir', 'chico', 'chica', 'pequeno', 'pequena'],
+    normal: ['normal', 'entera', 'completa', 'original'],
+    adelantar: ['adelanta', 'adelantar', 'adelantala', 'adelantalo', 'adelantale', 'adelante'],
+    atrasar: ['atrasa', 'atrasar', 'atrasala', 'atrasalo', 'rebobina', 'rebobinar', 'atras', 'retrocede', 'retroceder'],
+    reiniciar: ['reiniciar', 'reinicia', 'reiniciala', 'reinicialo', 'principio', 'comienzo', 'inicio'],
+    bucle: ['bucle', 'repetir', 'repite', 'repeti', 'repetila', 'repetilo', 'loop'],
+    apagar: ['quita', 'quitar', 'saca', 'sacar', 'sin', 'apaga', 'apagar', 'desactiva', 'desactivar'],
+    irA: ['ve', 'ir', 'anda', 'andate', 'salta', 'saltar', 'lleva', 'llevala', 'llevalo'],
+    segundos: ['segundo', 'segundos'],
+    minutos: ['minuto', 'minutos'],
+    derecha: ['derecha'],
+    izquierda: ['izquierda'],
+    arriba: ['arriba'],
+    abajo: ['abajo']
   };
 
   const NUMEROS = {
@@ -72,6 +88,8 @@
   // Lo que quiere decir UNA frase, o null si no es ninguna orden.
   // { tipo: 'diapositiva', accion: 'mostrar' | 'siguiente' | 'anterior' | '3' }
   // { tipo: 'medios', para: 'musica' | 'video' | null, accion, numero?, valor? }
+  // { tipo: 'repetir' } — «un poco más»: lo último otra vez
+  // { tipo: 'zoom', accion: 'acercar' | 'alejar' | 'normal' | 'derecha' | 'izquierda' | 'arriba' | 'abajo' }
   function entender(frase, totalDiapositivas) {
     const palabras = normalizar(frase).split(/\s+/).filter(Boolean);
     if (!palabras.length) return null;
@@ -85,6 +103,25 @@
     // temperatura baja…»), así que ahí hace falta nombrar el volumen, la música o el video.
     const clara = palabras.length <= 4 || deVolumen || para !== null;
 
+    // «retrocede a la mitad», «ve a la mitad de la canción»: lleva lo que suena a su mitad.
+    // («ponlo a la mitad», sin un verbo de moverse, es el volumen.)
+    const mueve = dice(palabras, 'adelantar') || dice(palabras, 'atrasar') || dice(palabras, 'irA');
+    if (!deVolumen && mueve && dice(palabras, 'mitad')) return { tipo: 'medios', para, accion: 'irMitad' };
+
+    // Tamaño de la imagen: «agranda», «acerca la foto», «más chico», «tamaño normal».
+    // Lo mismo: suelto vale en una frase corta; en una larga hay que nombrar la imagen.
+    const deImagen = dice(palabras, 'imagen');
+    if (!deVolumen && para === null && (palabras.length <= 4 || deImagen)) {
+      if (dice(palabras, 'agrandar')) return { tipo: 'zoom', accion: 'acercar' };
+      if (dice(palabras, 'achicar')) return { tipo: 'zoom', accion: 'alejar' };
+      if (dice(palabras, 'normal')) return { tipo: 'zoom', accion: 'normal' };
+      // Mover la imagen agrandada: «derecha», «a la izquierda», «arriba», «abajo», «sube la imagen».
+      if (dice(palabras, 'derecha')) return { tipo: 'zoom', accion: 'derecha' };
+      if (dice(palabras, 'izquierda')) return { tipo: 'zoom', accion: 'izquierda' };
+      if (dice(palabras, 'arriba') || (deImagen && dice(palabras, 'subir'))) return { tipo: 'zoom', accion: 'arriba' };
+      if (dice(palabras, 'abajo') || (deImagen && dice(palabras, 'bajar'))) return { tipo: 'zoom', accion: 'abajo' };
+    }
+
     // Volumen: «baja el volumen», «volumen a la mitad», «volumen 30», «silencio».
     if (clara && dice(palabras, 'silencio')) return { tipo: 'medios', para, accion: 'volumen', valor: 0 };
     if (clara && dice(palabras, 'mitad')) return { tipo: 'medios', para, accion: 'volumen', valor: 50 };
@@ -97,7 +134,28 @@
     }
 
     if (clara && dice(palabras, 'pausar')) return { tipo: 'medios', para, accion: 'pausar' };
+
+    // Bucle: «bucle», «repetir la canción» lo prenden; «quita el bucle», «sin repetir» lo apagan.
+    if (clara && !deVideo && dice(palabras, 'bucle')) {
+      return { tipo: 'medios', para: 'musica', accion: 'bucle', valor: !dice(palabras, 'apagar') };
+    }
     if (deVideo && dice(palabras, 'quitar')) return { tipo: 'medios', para: 'video', accion: 'terminar' };
+
+    // Adelantar o atrasar lo que suena: «adelanta la música», «adelanta 30 segundos»,
+    // «retrocede la canción». Sin nombrar la música, el video ni los segundos, «adelante» y
+    // «atrás» siguen siendo las diapositivas.
+    const conTiempo = dice(palabras, 'segundos') || dice(palabras, 'minutos');
+    if (para || conTiempo) {
+      const enMinutos = dice(palabras, 'minutos');
+      const cuanto = numero === null ? (enMinutos ? 60 : 10) : Math.min(600, numero * (enMinutos ? 60 : 1));
+      if (dice(palabras, 'adelantar')) return { tipo: 'medios', para, accion: 'saltar', valor: cuanto };
+      if (dice(palabras, 'atrasar')) return { tipo: 'medios', para, accion: 'saltar', valor: -cuanto };
+    }
+    // «desde el inicio», «reiniciar»: vuelve a empezar la canción o el video. «Inicio» solo, sin
+    // nombrarlos, sigue siendo empezar la presentación.
+    if (dice(palabras, 'reiniciar') && (para || (clara && !palabras.includes('inicio')))) {
+      return { tipo: 'medios', para, accion: 'reiniciar' };
+    }
 
     // Música y video: «pon música», «música 2», «siguiente canción», «siguiente video».
     if (para) {
@@ -118,6 +176,9 @@
     // Un número suelto («tres», «diapositiva 7») va a esa diapositiva; dentro de una frase larga
     // es parte de lo que se está contando («hay una razón…»), no una orden.
     if (palabras.length <= 4 && numero !== null && numero >= 1 && numero <= totalDiapositivas) return { tipo: 'diapositiva', accion: String(numero) };
+    // «un poco más», «más», «otro poco»: repite lo último que se pidió (subir, bajar, adelantar,
+    // agrandar, correr la imagen…). El control sabe cuál fue.
+    if (palabras.length <= 4 && ['mas', 'poco', 'poquito'].some(p => palabras.includes(p))) return { tipo: 'repetir' };
     return null;
   }
 
@@ -135,7 +196,9 @@
   const FRASES_DE_AYUDA = [
     'mostrar', 'siguiente', 'atrás', 'anterior', 'pon música', 'música uno', 'música dos', 'siguiente canción',
     'canción anterior', 'pausa', 'reproducir', 'sube el volumen', 'baja el volumen', 'volumen a la mitad',
-    'volumen al máximo', 'silencio', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video'
+    'volumen al máximo', 'silencio', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
+    'agranda la imagen', 'achica la imagen', 'más grande', 'más chico', 'tamaño normal',
+    'derecha', 'izquierda', 'arriba', 'abajo'
   ];
 
   const publico = { interpretarVoz, normalizar, FRASES_DE_AYUDA };

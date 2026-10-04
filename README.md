@@ -26,6 +26,13 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
 | «pon video 1», «siguiente video», «quita el video» | Video |
 | «pausa», «reproducir» | Pausa o sigue lo que esté en la pantalla |
 | «sube el volumen», «baja el volumen», «volumen a la mitad», «volumen al máximo», «volumen 30», «silencio» | Volumen |
+| «agranda la imagen», «más grande», «achica la imagen», «más chico», «tamaño normal» | Agranda o achica la imagen de la pantalla |
+| «derecha», «izquierda», «arriba», «abajo» | Corre la imagen agrandada (si está entera, la agranda al doble) |
+| «adelanta la música», «adelanta 30 segundos», «retrocede la canción» | Adelanta o atrasa lo que suena (10 segundos si no se dice cuánto) |
+| «retrocede a la mitad», «ve a la mitad de la canción» | Lleva la canción o el video a su mitad |
+| «música desde el inicio», «reiniciar» | Vuelve a empezar la canción o el video |
+| «bucle», «repetir la canción» / «quita el bucle» | Repite la misma canción al terminar, o deja de repetir |
+| «un poco más», «más», «otro poco» | Repite lo último: subir, bajar, adelantar, agrandar, correr |
 
 - «Siguiente» solo es la diapositiva; para música o video hay que nombrarlos.
 - Acepta una letra mal oída («sigiente») y usa el español del celular, no sólo el de España.
