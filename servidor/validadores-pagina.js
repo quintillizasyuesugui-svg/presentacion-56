@@ -78,4 +78,23 @@ function limpiarFotoWeb(datos) {
   };
 }
 
-module.exports = { limpiarDireccion, tituloDe, limpiarOrdenWeb, limpiarFotoWeb, LARGO_MAXIMO };
+const CAJAS_DEL_MENU = 12;
+
+// Menú de la página que abrió la app de PC, para mostrarlo como cajas en el celular.
+// null: todavía no se sabe (o la app no lo lee). Lista vacía: se buscó y la página no tiene.
+function limpiarMenuWeb(datos) {
+  if (!Array.isArray(datos)) return null;
+  const menu = [];
+  for (const caja of datos.slice(0, CAJAS_DEL_MENU)) {
+    if (!caja || typeof caja !== 'object' || typeof caja.texto !== 'string') continue;
+    // Sólo direcciones completas: «logo.png» a secas no se completa con https://.
+    const completa = (direccion) => (typeof direccion === 'string' && /^https?:\/\//i.test(direccion) ? limpiarDireccion(direccion) : null);
+    const url = completa(caja.url);
+    const texto = caja.texto.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 30);
+    if (!url || !texto) continue;
+    menu.push({ texto, url, icono: completa(caja.icono) || '', actual: caja.actual === true });
+  }
+  return menu;
+}
+
+module.exports = { limpiarDireccion, tituloDe, limpiarOrdenWeb, limpiarFotoWeb, limpiarMenuWeb, LARGO_MAXIMO };

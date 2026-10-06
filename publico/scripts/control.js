@@ -285,6 +285,7 @@
   const zoomTag = document.getElementById('zoomTag');
   let zoom = { z: 1, cx: 0.5, cy: 0.5 };
   let zoomSrc = '';
+  const ZOOM_PAUSA = 33; // unos 30 avisos por segundo mientras se mueve la foto
   let zoomUltimoEnvio = 0;
   let zoomPendiente = null;
 
@@ -329,11 +330,11 @@
   function mandarZoom(alFinal) {
     const ahora = Date.now();
     clearTimeout(zoomPendiente);
-    if (alFinal || ahora - zoomUltimoEnvio >= 80) {
+    if (alFinal || ahora - zoomUltimoEnvio >= ZOOM_PAUSA) {
       zoomUltimoEnvio = ahora;
       socket.emit('zoom', { z: zoom.z, cx: zoom.cx, cy: zoom.cy });
     } else {
-      zoomPendiente = setTimeout(() => mandarZoom(true), 80 - (ahora - zoomUltimoEnvio));
+      zoomPendiente = setTimeout(() => mandarZoom(true), ZOOM_PAUSA - (ahora - zoomUltimoEnvio));
     }
   }
 
@@ -473,10 +474,21 @@
   const vivoTexto = document.getElementById('vivoTexto');
   const vivoTeclado = document.getElementById('vivoTeclado');
   const AYUDA_VIVO = 'Tocá donde quieras hacer clic. Deslizá para subir o bajar.';
+  const AYUDA_SIN_MENU = 'No detecté cajas de menú en esta página. Tocá la foto para manejarla; deslizá para subir o bajar.';
   let enVivo = false;
 
+  // Cajas del menú que la app de PC le leyó a la página. Sin dato todavía (null) se deja lo que
+  // había, para que las cajas no parpadeen cada vez que la página cambia.
+  function vivoPintarMenu(menu) {
+    if (!Array.isArray(menu)) return;
+    const origen = menu.length ? origenDe(menu[0].url) : '';
+    espejoPintarMenu(menu, origen, (url) => vivoMandar({ accion: 'ir', url }));
+    espejoAyuda.textContent = menu.length ? AYUDA_VIVO : AYUDA_SIN_MENU;
+  }
+
   function vivoMostrar(estado) {
-    if (!enVivo || estado.pagina !== espejoBase) {
+    const nueva = !enVivo || estado.pagina !== espejoBase;
+    if (nueva) {
       enVivo = true;
       espejoBase = estado.pagina;
       espejoUrl = '';
@@ -491,7 +503,8 @@
     vivoCaja.style.aspectRatio = String(Math.min(2.5, Math.max(1, forma)));
     for (const [elemento, visto] of [[vivoCaja, true], [vivoBotones, true], [espejoCaja, false], [espejoAcercar, false],
       [document.getElementById('espejoAnterior').parentElement, false]]) elemento.hidden = !visto;
-    espejoAyuda.textContent = AYUDA_VIVO;
+    if (nueva) espejoAyuda.textContent = AYUDA_VIVO;
+    vivoPintarMenu(estado.paginaMenu);
   }
 
   function vivoOcultar() {
@@ -618,23 +631,25 @@
   // Botones del menú de la página: los detecta el puente y acá se muestran en una tira. Tocar
   // uno lleva el espejo a esa página, y la pantalla lo sigue.
   const espejoMenu = document.getElementById('espejoMenu');
-  function espejoPintarMenu(menu) {
+  // «origen»: de qué sitio tienen que ser las cajas. «alTocar»: qué hace cada una (en el espejo
+  // lleva el recuadro del celular a esa página; en vivo se lo pide a la app de PC).
+  function espejoPintarMenu(menu, origen = origenDe(espejoBase), alTocar = (url) => { if (url !== espejoUrl) espejoMarco.src = url; }) {
     espejoMenu.textContent = '';
-    const enlaces = Array.isArray(menu) ? menu.slice(0, 12).filter(e => e && typeof e.url === 'string' && typeof e.texto === 'string' && origenDe(e.url) === origenDe(espejoBase)) : [];
+    const enlaces = Array.isArray(menu) ? menu.slice(0, 12).filter(e => e && typeof e.url === 'string' && typeof e.texto === 'string' && origen && origenDe(e.url) === origen) : [];
     espejoMenu.hidden = enlaces.length === 0;
     for (const enlace of enlaces) {
       const boton = document.createElement('button');
       boton.type = 'button';
       boton.className = 'espejo-boton';
       if (enlace.actual === true) boton.setAttribute('aria-current', 'page');
-      if (typeof enlace.icono === 'string' && origenDe(enlace.icono) === origenDe(espejoBase)) {
+      if (typeof enlace.icono === 'string' && origenDe(enlace.icono) === origen) {
         const dibujo = document.createElement('img');
         dibujo.src = enlace.icono;
         dibujo.alt = '';
         boton.append(dibujo);
       }
       boton.append(enlace.texto.slice(0, 30));
-      boton.addEventListener('click', () => { if (enlace.url !== espejoUrl) espejoMarco.src = enlace.url; });
+      boton.addEventListener('click', () => alTocar(enlace.url));
       espejoMenu.append(boton);
     }
   }

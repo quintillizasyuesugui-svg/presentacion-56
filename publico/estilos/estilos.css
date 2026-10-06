@@ -1037,7 +1037,7 @@ body.control {
 .zoom-ayuda[hidden] { display: none; }
 
 /* Pantalla: capa que recibe el zoom que se hace desde el celular. */
-.zoom-capa { position: absolute; inset: 0; z-index: 2; transform-origin: 50% 50%; transition: transform 140ms linear; }
+.zoom-capa { position: absolute; inset: 0; z-index: 2; transform-origin: 50% 50%; }
 
 .app-header {
   display: flex;

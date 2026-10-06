@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.1.0.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.2.0.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -94,6 +94,17 @@ Lo que se toca en el espejo pasa también en la pantalla.
   botones ⬆ ⬇, «↩ Volver» y «⌨ Escribir». La página abierta así no tiene permisos (cámara,
   micrófono, avisos), no descarga archivos, no abre ventanas y usa una sesión aparte que se
   borra al cerrar la app (`aplicacion-pantalla/principal.js`).
+- **Cajas del menú en cualquier página (app de PC 1.2.0 o más nueva):** la app le lee el menú a
+  la página (los enlaces de `<nav>`, o si no los del encabezado) y el celular lo muestra como
+  cajas debajo de la foto; tocar una lleva la pantalla a esa parte. Si la página no tiene un
+  menú que se pueda leer, el celular avisa «No detecté cajas de menú en esta página» y se
+  maneja tocando la foto.
+- **Fluidez:** mientras se toca o se desliza, la foto en vivo se renueva unas 5 veces por
+  segundo (con la página quieta, una por segundo y sólo si cambió). Al mover una imagen
+  agrandada, el celular avisa unas 30 veces por segundo y la pantalla la sigue en cada cuadro.
+  Prueba y medida: `medir-fluidez.js` (antes y después: la foto nueva tras un toque pasó de
+  446 ms a 197 ms; al deslizar, de 0 a 4,8 fotos por segundo; la imagen agrandada, de 132 ms a
+  69 ms detrás del dedo; medido en una misma PC, sin internet de por medio).
 - «⬅️ Atrás» y «➡️ Siguiente» siguen pasando de diapositiva: así se sale de la página a la foto
   que sigue.
 - El servidor nunca abre la página: sólo guarda la dirección (`servidor/validadores-pagina.js`).

@@ -4,7 +4,7 @@ const { ipDe } = require('./limite-intentos');
 const { parseLiveWriteBody } = require('./validadores-frase');
 const { limpiarOrdenMedios, limpiarEstadoMedios } = require('./validadores-medios');
 const { vigilanteDeMensajes, conectar, desconectar, pantallaConSonido } = require('./guardian');
-const { limpiarDireccion, limpiarOrdenWeb, limpiarFotoWeb } = require('./validadores-pagina');
+const { limpiarDireccion, limpiarOrdenWeb, limpiarFotoWeb, limpiarMenuWeb } = require('./validadores-pagina');
 
 function registrarSockets(io) {
   io.on('connection', (socket) => {
@@ -120,6 +120,8 @@ function registrarSockets(io) {
         paginaActual: limpiarDireccion(datos.paginaActual) || '',
         // «espejo»: la página lleva el puente. «vivo»: la abrió la app de PC y manda fotos.
         paginaModo: datos.paginaModo === 'espejo' || datos.paginaModo === 'vivo' ? datos.paginaModo : '',
+        // En «vivo»: el menú que la app de PC le leyó a la página, para las cajas del celular.
+        paginaMenu: datos.paginaModo === 'vivo' ? limpiarMenuWeb(datos.paginaMenu) : null,
         ancho: Number.isInteger(datos.ancho) ? Math.min(8000, Math.max(0, datos.ancho)) : 0,
         alto: Number.isInteger(datos.alto) ? Math.min(8000, Math.max(0, datos.alto)) : 0,
         zoom: {

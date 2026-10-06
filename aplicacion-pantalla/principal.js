@@ -89,7 +89,11 @@ function teclasDeLaVentana(evento, tecla) {
 // descargas, sin ventanas nuevas y con su propia sesión, que se borra al cerrar la app.
 const SESION_PAGINA = 'pagina-web';
 const ANCHO_FOTO = 640;
+const CAJAS_DEL_MENU = 12;
 let pagina = null;
+// Menú de la página abierta, para las cajas del celular. null: todavía no se leyó.
+let menuPagina = null;
+let relojMenu = null;
 
 function esPaginaWeb(direccion) {
   return typeof direccion === 'string' && direccion.length <= 2000 && /^https?:\/\//i.test(direccion);
@@ -101,10 +105,67 @@ function acomodarPagina() {
   pagina.setBounds({ x: 0, y: 0, width: ancho, height: alto });
 }
 
+// Busca el menú de la página: los enlaces de <nav>, o si no los del encabezado o los de algo
+// que se llame «menu» o «nav». Sólo enlaces del mismo sitio y sin repetir. Esta función corre
+// adentro de la página, no acá.
+function buscarMenu(tope) {
+  const lugares = ['nav a[href]', '[role="navigation"] a[href]', 'header a[href]',
+    '[class*="menu" i] a[href], [id*="menu" i] a[href], [class*="nav" i] a[href], [id*="nav" i] a[href]'];
+  for (const lugar of lugares) {
+    const cajas = [];
+    const vistas = new Set();
+    for (const enlace of document.querySelectorAll(lugar)) {
+      if (enlace.origin !== location.origin || !/^https?:$/.test(enlace.protocol) || vistas.has(enlace.href)) continue;
+      const dibujo = enlace.querySelector('img');
+      const texto = ((enlace.textContent || '').replace(/\s+/g, ' ').trim() || enlace.getAttribute('aria-label') ||
+        enlace.title || (dibujo && dibujo.alt) || '').trim();
+      if (!texto) continue;
+      vistas.add(enlace.href);
+      cajas.push({
+        texto: texto.slice(0, 30),
+        url: enlace.href,
+        icono: dibujo ? (dibujo.currentSrc || dibujo.src || '') : '',
+        actual: enlace.hasAttribute('aria-current') || enlace.href === location.href
+      });
+      if (cajas.length === tope) break;
+    }
+    if (cajas.length >= 2) return cajas;
+  }
+  return [];
+}
+
+// Lo que contesta la página no es de confianza: se revisa antes de guardarlo.
+async function leerMenu() {
+  if (!pagina) return;
+  const contenido = pagina.webContents;
+  let cajas = [];
+  try {
+    cajas = await contenido.executeJavaScript(`(${buscarMenu.toString()})(${CAJAS_DEL_MENU})`);
+  } catch { /* la página se cerró o no dejó */ }
+  if (!pagina || pagina.webContents !== contenido) return;
+  menuPagina = (Array.isArray(cajas) ? cajas : []).slice(0, CAJAS_DEL_MENU)
+    .filter(caja => caja && typeof caja.texto === 'string' && caja.texto.trim() && esPaginaWeb(caja.url) && caja.url.length <= 500)
+    .map(caja => ({
+      texto: caja.texto.trim().slice(0, 30),
+      url: caja.url,
+      icono: esPaginaWeb(caja.icono) && caja.icono.length <= 500 ? caja.icono : '',
+      actual: caja.actual === true
+    }));
+}
+
+// Al terminar de cargar, y otra vez un rato después por si la página arma su menú más tarde.
+function leerMenuPronto() {
+  clearTimeout(relojMenu);
+  leerMenu();
+  relojMenu = setTimeout(leerMenu, 1500);
+}
+
 function cerrarPagina() {
   if (!pagina) return;
   const vieja = pagina;
   pagina = null;
+  menuPagina = null;
+  clearTimeout(relojMenu);
   if (ventana) ventana.contentView.removeChildView(vieja);
   vieja.webContents.close();
 }
@@ -123,6 +184,11 @@ function abrirPagina(direccion) {
     });
     contenido.on('will-navigate', (evento, url) => { if (!esPaginaWeb(url)) evento.preventDefault(); });
     contenido.on('before-input-event', teclasDeLaVentana);
+    contenido.on('did-start-navigation', (detalles) => {
+      if (detalles.isMainFrame && !detalles.isSameDocument) { menuPagina = null; clearTimeout(relojMenu); }
+    });
+    contenido.on('did-finish-load', leerMenuPronto);
+    contenido.on('did-navigate-in-page', (_evento, _url, principal) => { if (principal) leerMenu(); });
     ventana.contentView.addChildView(pagina);
     acomodarPagina();
   }
@@ -157,6 +223,10 @@ function ordenParaLaPagina(orden) {
     // dy en «pantallas»: 1 baja una pantalla entera.
     const pasos = Math.min(3, Math.max(-3, orden.dy)) * alto;
     contenido.sendInputEvent({ type: 'mouseWheel', x: Math.round(ancho / 2), y: Math.round(alto / 2), deltaX: 0, deltaY: -Math.round(pasos) });
+  } else if (orden.accion === 'ir') {
+    // Una caja del menú tocada en el celular: sólo se va a direcciones que están en el menú leído.
+    if (!menuPagina || !menuPagina.some(caja => caja.url === orden.url)) return false;
+    contenido.loadURL(orden.url).catch(() => {});
   } else if (orden.accion === 'volver') {
     if (contenido.navigationHistory.canGoBack()) contenido.navigationHistory.goBack();
   } else if (orden.accion === 'texto' && typeof orden.texto === 'string' && orden.texto.length <= 200) {
@@ -179,7 +249,7 @@ async function fotoDeLaPagina() {
   const entera = await contenido.capturePage();
   if (!pagina || entera.isEmpty()) return null;
   const chica = entera.getSize().width > ANCHO_FOTO ? entera.resize({ width: ANCHO_FOTO, quality: 'good' }) : entera;
-  return { jpg: chica.toJPEG(55).toString('base64'), url: contenido.getURL(), titulo: contenido.getTitle() };
+  return { jpg: chica.toJPEG(55).toString('base64'), url: contenido.getURL(), titulo: contenido.getTitle(), menu: menuPagina };
 }
 
 // Sólo la pantalla de Conexiones (el marco principal de la ventana) puede dar estas órdenes.

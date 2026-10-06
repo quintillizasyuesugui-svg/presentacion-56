@@ -61,3 +61,25 @@ test('foto en vivo: sólo pasa un JPEG chico', () => {
     assert.strictEqual(limpiarFotoWeb(mala), null);
   }
 });
+
+test('foto en vivo: el menú de la página llega limpio para las cajas del celular', () => {
+  const { limpiarMenuWeb } = require('../servidor/validadores-pagina');
+  assert.strictEqual(limpiarMenuWeb(undefined), null);
+  assert.strictEqual(limpiarMenuWeb('menu'), null);
+  assert.deepStrictEqual(limpiarMenuWeb([]), []);
+  assert.deepStrictEqual(limpiarMenuWeb([
+    { texto: '  Inicio \n', url: 'https://sitio.com/', icono: 'https://sitio.com/casa.png', actual: true, otro: 1 },
+    { texto: 'Precios', url: 'https://sitio.com/precios', icono: 'casa.png', actual: 'sí' },
+    { texto: 'Malo', url: 'javascript:alert(1)' },
+    { texto: 'Sin https', url: 'sitio.com/x' },
+    { texto: '   ', url: 'https://sitio.com/vacio' },
+    { texto: 7, url: 'https://sitio.com/numero' },
+    null
+  ]), [
+    { texto: 'Inicio', url: 'https://sitio.com/', icono: 'https://sitio.com/casa.png', actual: true },
+    { texto: 'Precios', url: 'https://sitio.com/precios', icono: '', actual: false }
+  ]);
+  const muchas = Array.from({ length: 40 }, (_, i) => ({ texto: 'Caja ' + i + ' ' + 'x'.repeat(60), url: 'https://sitio.com/' + i }));
+  assert.strictEqual(limpiarMenuWeb(muchas).length, 12);
+  assert.ok(limpiarMenuWeb(muchas).every(caja => caja.texto.length <= 30));
+});

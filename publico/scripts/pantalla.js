@@ -1001,7 +1001,7 @@
 
     const slide = diapositivas[index];
     const numero = ++cambioNumero;
-    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 });
+    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
     contarEstado();
     const esUltima = index === diapositivas.length - 1;
     if (slide.pagina) {
@@ -1052,9 +1052,17 @@
   let esperaPuente = null;
   let relojVivo = null;
   let ticsVivo = 0;
-  let fotoYa = 0;        // tics que faltan para sacar una foto antes del segundo (después de una orden)
   let sacandoFoto = false;
   let ultimaFoto = '';
+  let momentoFoto = 0;   // cuándo se sacó la última foto
+  let ultimaOrden = 0;   // cuándo llegó la última orden del celular
+  let apuroHasta = 0;    // hasta cuándo se sacan fotos seguidas
+  let paginaMenu = null; // el menú que la app le leyó a la página (null: todavía no se sabe)
+  const TIC_VIVO = 100;
+  const FOTO_QUIETA = 1000;    // con la página quieta: una foto por segundo
+  const FOTO_APURADA = 160;    // mientras se la maneja: unas 6 por segundo
+  const APURO_TRAS_ORDEN = 1500;
+  const APURO_MAXIMO = 4000;   // una página que se mueve sola no deja las fotos seguidas para siempre
 
   function origenDe(direccion) {
     try { return new URL(direccion).origin; } catch { return ''; }
@@ -1105,10 +1113,17 @@
     marcoPagina.removeAttribute('src');
     ultimaFoto = '';
     ticsVivo = 0;
-    fotoYa = 2;
+    momentoFoto = 0;
+    paginaMenu = null;
+    apurarFotos(APURO_MAXIMO); // mientras carga, que el celular la vea aparecer
     appPC.abrir(paginaBase);
-    relojVivo = setInterval(ticVivo, 250);
+    relojVivo = setInterval(ticVivo, TIC_VIVO);
     contarEstado();
+  }
+
+  function apurarFotos(cuanto) {
+    ultimaOrden = Date.now();
+    apuroHasta = ultimaOrden + cuanto;
   }
 
   function dejarVivo() {
@@ -1118,27 +1133,39 @@
     appPC.cerrar();
   }
 
-  // Cuatro veces por segundo: la página se esconde si hay algo de Conexiones encima (texto en
-  // vivo, video, frase final). Una vez por segundo, o enseguida después de una orden, se saca
-  // una foto; sólo se manda si cambió, para no gastar datos del celular con la página quieta.
+  // Unas cinco veces por segundo: la página se esconde si hay algo de Conexiones encima (texto
+  // en vivo, video, frase final). Con la página quieta se saca una foto por segundo; mientras se
+  // la maneja desde el celular (y un rato después), unas seis por segundo. Sólo se manda la foto
+  // que cambió, para no gastar datos del celular.
   async function ticVivo() {
-    appPC.visible(!(liveWriteActive || videoEnPantalla || showingFinal));
-    ticsVivo++;
-    const toca = fotoYa > 0 ? --fotoYa === 0 : ticsVivo % 4 === 0;
-    if (!toca || sacandoFoto) return;
+    if (ticsVivo++ % 2 === 0) appPC.visible(!(liveWriteActive || videoEnPantalla || showingFinal));
+    const ahora = Date.now();
+    const pausa = ahora < apuroHasta ? FOTO_APURADA : FOTO_QUIETA;
+    if (sacandoFoto || ahora - momentoFoto < pausa) return;
     sacandoFoto = true;
+    momentoFoto = ahora;
     try {
       const foto = await appPC.foto();
-      if (foto && foto.jpg && paginaModo === 'vivo' && foto.jpg !== ultimaFoto) {
-        ultimaFoto = foto.jpg;
-        if (foto.url) paginaActual = foto.url.slice(0, 500);
-        socket.emit('webFoto', { jpg: foto.jpg, url: foto.url, titulo: foto.titulo });
+      if (foto && foto.jpg && paginaModo === 'vivo') {
+        if (foto.jpg !== ultimaFoto) {
+          ultimaFoto = foto.jpg;
+          if (foto.url) paginaActual = foto.url.slice(0, 500);
+          socket.emit('webFoto', { jpg: foto.jpg, url: foto.url, titulo: foto.titulo });
+          // Si sigue cambiando (la página está cargando o bajando), siguen las fotos seguidas.
+          if (Date.now() - ultimaOrden < APURO_MAXIMO) apuroHasta = Math.max(apuroHasta, Date.now() + 800);
+        }
+        // Las apps de PC anteriores a la 1.2.0 no leen el menú: queda en «no se sabe».
+        const menu = Array.isArray(foto.menu) ? foto.menu : null;
+        if (JSON.stringify(menu) !== JSON.stringify(paginaMenu)) {
+          paginaMenu = menu;
+          contarEstado();
+        }
       }
     } catch { /* la página se cerró mientras se sacaba la foto */ }
     sacandoFoto = false;
   }
   // Un celular que recién entra pide el estado: se le manda la foto aunque no haya cambiado.
-  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; fotoYa = 1; });
+  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; momentoFoto = 0; });
 
   // La página avisa cada vez que termina de cargar: así el celular sabe dónde está.
   window.addEventListener('message', (evento) => {
@@ -1156,9 +1183,9 @@
   socket.on('web', (orden) => {
     if (!orden || capaPagina.hidden) return;
     if (paginaModo === 'vivo') {
-      if (['toque', 'rueda', 'volver', 'texto', 'tecla'].includes(orden.accion)) {
+      if (['toque', 'rueda', 'volver', 'texto', 'tecla', 'ir'].includes(orden.accion)) {
         appPC.orden(orden);
-        fotoYa = 2; // medio segundo después, para que el celular vea enseguida lo que cambió
+        apurarFotos(APURO_TRAS_ORDEN); // fotos seguidas, para que el celular vea enseguida lo que cambió
       }
       return;
     }
@@ -1190,6 +1217,7 @@
       pagina: slide && slide.pagina ? slide.pagina : '',
       paginaActual: slide && slide.pagina ? paginaActual : '',
       paginaModo: slide && slide.pagina ? paginaModo : '',
+      paginaMenu: slide && slide.pagina && paginaModo === 'vivo' ? paginaMenu : null,
       ancho: window.innerWidth,
       alto: window.innerHeight,
       zoom: zoomActual
@@ -1202,11 +1230,44 @@
   // (cx, cy: de 0 a 1). Al pasar de foto vuelve a la foto entera.
   const zoomCapa = document.getElementById('zoomCapa');
   let zoomActual = { z: 1, cx: 0.5, cy: 0.5 };
-  function aplicarZoom(z) {
-    zoomActual = z;
-    zoomCapa.style.transform = z.z > 1.01
-      ? `scale(${z.z}) translate(${(0.5 - z.cx) * 100}%, ${(0.5 - z.cy) * 100}%)`
+  // Lo que se ve persigue a lo pedido en cada cuadro, sin esperar al aviso siguiente: así la
+  // foto sigue al dedo de cerca y no avanza a tirones si los avisos llegan desparejos.
+  let zoomVisto = { z: 1, cx: 0.5, cy: 0.5 };
+  let zoomCuadro = null;
+  let zoomMomento = 0;
+  const ZOOM_SEGUIMIENTO = 45; // milisegundos: más chico, más pegado al dedo
+  function pintarZoom() {
+    zoomCapa.style.transform = zoomVisto.z > 1.01
+      ? `scale(${zoomVisto.z}) translate(${(0.5 - zoomVisto.cx) * 100}%, ${(0.5 - zoomVisto.cy) * 100}%)`
       : '';
+  }
+  function seguirZoom(ahora) {
+    const parte = 1 - Math.exp(-Math.min(100, Math.max(0, ahora - zoomMomento)) / ZOOM_SEGUIMIENTO);
+    zoomMomento = ahora;
+    let falta = 0;
+    for (const dato of ['z', 'cx', 'cy']) {
+      zoomVisto[dato] += (zoomActual[dato] - zoomVisto[dato]) * parte;
+      falta = Math.max(falta, Math.abs(zoomActual[dato] - zoomVisto[dato]));
+    }
+    if (falta < 0.0005) {
+      zoomVisto = { z: zoomActual.z, cx: zoomActual.cx, cy: zoomActual.cy };
+      zoomCuadro = null;
+    } else {
+      zoomCuadro = requestAnimationFrame(seguirZoom);
+    }
+    pintarZoom();
+  }
+  function aplicarZoom(z, alInstante) {
+    zoomActual = z;
+    if (alInstante) {
+      cancelAnimationFrame(zoomCuadro);
+      zoomCuadro = null;
+      zoomVisto = { z: z.z, cx: z.cx, cy: z.cy };
+      pintarZoom();
+    } else if (zoomCuadro === null) {
+      zoomMomento = performance.now();
+      zoomCuadro = requestAnimationFrame(seguirZoom);
+    }
   }
   socket.on('zoom', (z) => {
     if (!started || !z) return;
