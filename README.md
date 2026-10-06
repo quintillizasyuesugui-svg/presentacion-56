@@ -72,6 +72,23 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   una tiene más; con muchas, menos. El admin puede fijarle un espacio propio a alguien.
 - Al borrar una cuenta se borran también su música y sus videos.
 
+## 🌐 Página web como diapositiva
+
+En **Gestionar** hay una caja «🌐 Página web»: se pega el enlace y queda en la lista como una
+diapositiva más (se ordena y se elimina igual que una foto). Al llegar a ella, la pantalla
+muestra la página y el celular lo detecta solo y abre el **espejo**: la misma página en chico.
+Lo que se toca en el espejo pasa también en la pantalla.
+
+- Debajo del espejo aparecen los botones del menú de la página, «Página anterior» y
+  «Página siguiente». «🔍 Acercar» agranda el espejo en el celular.
+- Para poder manejarla, la página tiene que llevar el puente: copiar `publico/puente.js` a la
+  página (por ejemplo como `puente-conexiones.js`) y agregarle
+  `<script src="puente-conexiones.js" defer></script>`. Abierta sola, la página no cambia en nada.
+- Una página sin el puente se ve igual, pero no se maneja desde el celular. Las que no se
+  dejan mostrar dentro de otra (Google, Facebook, bancos) no aparecen.
+- El servidor nunca abre la página: sólo guarda la dirección (`servidor/validadores-pagina.js`).
+  El recuadro de la pantalla no puede abrir ventanas ni sacarla de Conexiones.
+
 ## 🛡️ Los 4 guardianes (`servidor/guardian.js`)
 Para que con muchos usuarios no se atore el servidor gratis:
 - **👤 Usuarios**: nadie acapara (máximo de subidas en curso por persona, turnos justos) y

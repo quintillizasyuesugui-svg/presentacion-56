@@ -78,7 +78,8 @@
     const pieza = document.createElement('div');
     pieza.className = 'papel-volando';
     pieza.innerHTML = `<span class="papel-sube"><span class="papel-hoja"></span><span class="papel-bollo">${BOLLO_SVG}</span></span>`;
-    pieza.querySelector('.papel-hoja').style.backgroundImage = `url("${mini.currentSrc || mini.src}")`;
+    const foto = mini.currentSrc || mini.src; // una página web no tiene foto: la hoja sale en blanco
+    if (foto) pieza.querySelector('.papel-hoja').style.backgroundImage = `url("${foto}")`;
     document.body.append(pieza);
     const base = `translate(${desde.x - 17}px, ${desde.y - 17}px)`;
     const HOJA = 150;   // la hoja aparece
@@ -222,14 +223,15 @@
     emptyHint.hidden = images.length > 0;
     pintarBarrasDeElegir();
 
-    images.forEach(({ id, src }, i) => {
+    images.forEach(({ id, src, pagina, titulo }, i) => {
       const row = document.createElement('div');
       row.className = 'image-row';
       row.dataset.id = id;
+      // Una página web va con un globo en lugar de la foto y con su dirección como nombre.
       row.innerHTML = `
         <span class="order-badge">${i + 1}</span>
-        <img class="thumb" src="${src}" alt="">
-        <span class="filename-label">${id.split('/').pop()}</span>
+        ${pagina ? '<span class="thumb thumb-pagina" aria-hidden="true">🌐</span>' : `<img class="thumb" src="${src}" alt="">`}
+        <span class="filename-label"></span>
         <div class="row-actions">
           <button type="button" class="icon-btn" data-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Subir de posición">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
@@ -248,6 +250,7 @@
           </button>
         </div>
       `;
+      row.querySelector('.filename-label').textContent = pagina ? (titulo || pagina) : id.split('/').pop();
       if (eligiendo) {
         // La fila entera es la casilla: sin flechas, sin tacho y sin arrastrar.
         const marcada = elegidas.has(id);
@@ -488,6 +491,36 @@
       uploadBtn.disabled = false;
       uploadBtn.textContent = '➕ Subir imágenes';
       fileInput.value = '';
+    }
+  });
+
+  // ---- Agregar una página web ----
+  // Se pega el enlace y queda al final de la lista, como una diapositiva más.
+  const paginaForm = document.getElementById('paginaForm');
+  const paginaDireccion = document.getElementById('paginaDireccion');
+  const paginaBtn = document.getElementById('paginaBtn');
+  paginaForm.noValidate = true; // «mi-pagina.com» sin https:// también vale: lo completa el servidor
+  paginaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const direccion = paginaDireccion.value.trim();
+    if (!direccion) { showToast('Pegá primero el enlace de la página.'); paginaDireccion.focus(); return; }
+    paginaBtn.disabled = true;
+    try {
+      const res = await authFetch('/api/paginas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direccion })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo agregar la página. Probá de nuevo.');
+      images = data;
+      paginaDireccion.value = '';
+      render();
+      showToast('Página agregada al final de la lista.');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      paginaBtn.disabled = false;
     }
   });
 

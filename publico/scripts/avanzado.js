@@ -88,7 +88,8 @@
 
     try {
       const res = await authFetch('/api/images');
-      advancedImages = await res.json(); // sólo las propias (o todas, si es admin)
+      // Sólo las propias (o todas, si es admin). Las páginas web no se ajustan ni se unen.
+      advancedImages = (await res.json()).filter(registro => !registro.pagina);
     } catch (err) {
       showToast('No se pudieron cargar las imágenes.');
       return;

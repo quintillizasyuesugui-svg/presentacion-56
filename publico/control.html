@@ -77,6 +77,26 @@
     </div>
     <p class="zoom-ayuda" id="zoomAyuda" hidden>Dos dedos: agrandar · Un dedo: mover · Doble toque: normal</p>
   </section>
+  <!-- Espejo: cuando la pantalla muestra una página web, acá se ve la misma página en chico.
+       Lo que se toca acá pasa también en la pantalla (ver «Espejo» en control.js). -->
+  <section class="espejo-web" id="espejoWeb" aria-label="Página web en la pantalla" hidden>
+    <div class="espejo-rotulo">
+      <span id="espejoTitulo">🌐 Página web</span>
+      <button type="button" class="btn small" id="espejoAcercar" aria-pressed="false">🔍 Acercar</button>
+    </div>
+    <div class="espejo-caja" id="espejoCaja">
+      <div class="espejo-lienzo" id="espejoLienzo">
+        <iframe id="espejoMarco" title="La página de la pantalla, en chico" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </div>
+    <p class="zoom-ayuda" id="espejoAyuda">Tocá lo que quieras: pasa lo mismo en la pantalla.</p>
+    <!-- Los botones del menú de la página, detectados solos (se arman en control.js) -->
+    <div class="espejo-menu" id="espejoMenu" role="group" aria-label="Menú de la página" hidden></div>
+    <div class="btn-row">
+      <button type="button" class="btn secondary" id="espejoAnterior">◀ Página anterior</button>
+      <button type="button" class="btn secondary" id="espejoSiguiente">Página siguiente ▶</button>
+    </div>
+  </section>
   <div class="spacer"></div>
 
   <div id="lugarMiniReproductor"></div>

@@ -402,6 +402,137 @@
     cambiarZoom({ z: zoom.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12) }, true);
   }, { passive: false });
 
+  // ---- Espejo: la página web de la pantalla, en chico ----
+  // Cuando la diapositiva es una página web, en lugar de la foto para el zoom se muestra la misma
+  // página. Se dibuja con el tamaño de la pantalla y se achica entera, así queda con la misma
+  // forma. Si la página lleva el «puente» (publico/puente.js) avisa qué se tocó y a qué página
+  // se pasó, y eso se manda a la pantalla. Este celular manda; la pantalla lo sigue.
+  const espejoWeb = document.getElementById('espejoWeb');
+  const espejoCaja = document.getElementById('espejoCaja');
+  const espejoLienzo = document.getElementById('espejoLienzo');
+  const espejoMarco = document.getElementById('espejoMarco');
+  const espejoAyuda = document.getElementById('espejoAyuda');
+  const espejoAcercar = document.getElementById('espejoAcercar');
+  const zoomControl = document.querySelector('.zoom-control');
+  const ESPEJO_ANCHO = 1280;
+  const AYUDA_ESPEJO = 'Tocá lo que quieras: pasa lo mismo en la pantalla.';
+  let espejoBase = '';       // la dirección que se agregó en Gestionar
+  let espejoUrl = '';        // en cuál de sus páginas va este espejo
+  let espejoAlto = 720;
+  let espejoCerca = false;
+  let espejoPreparada = false;
+  let espejoEspera = null;
+
+  function origenDe(direccion) {
+    try { return new URL(direccion).origin; } catch { return ''; }
+  }
+
+  function espejoAjustar() {
+    if (espejoWeb.hidden) return;
+    const escala = espejoCaja.clientWidth * (espejoCerca ? 2 : 1) / ESPEJO_ANCHO;
+    espejoCaja.style.aspectRatio = ESPEJO_ANCHO + ' / ' + espejoAlto;
+    espejoLienzo.style.width = (ESPEJO_ANCHO * escala) + 'px';
+    espejoLienzo.style.height = (espejoAlto * escala) + 'px';
+    espejoMarco.style.width = ESPEJO_ANCHO + 'px';
+    espejoMarco.style.height = espejoAlto + 'px';
+    espejoMarco.style.transform = 'scale(' + escala + ')';
+  }
+
+  function espejoMostrar(estado) {
+    if (!origenDe(estado.pagina) || origenDe(estado.pagina) === location.origin) return;
+    const forma = estado.ancho > 0 && estado.alto > 0 ? estado.alto / estado.ancho : 9 / 16;
+    espejoAlto = Math.round(ESPEJO_ANCHO * Math.min(1, Math.max(0.4, forma)));
+    zoomControl.hidden = true;
+    espejoWeb.hidden = false;
+    if (estado.pagina !== espejoBase) {
+      espejoBase = estado.pagina;
+      espejoUrl = estado.paginaActual || estado.pagina;
+      espejoPreparada = false;
+      espejoAyuda.textContent = AYUDA_ESPEJO;
+      espejoPintarMenu(null);
+      document.getElementById('espejoTitulo').textContent = '🌐 Página web';
+      espejoMarco.src = espejoUrl;
+      clearTimeout(espejoEspera);
+      espejoEspera = setTimeout(() => {
+        if (!espejoPreparada) espejoAyuda.textContent = 'Esta página no está preparada para Conexiones: se ve, pero lo que toques acá no pasa en la pantalla.';
+      }, 8000);
+    }
+    espejoAjustar();
+  }
+
+  function espejoOcultar() {
+    if (espejoWeb.hidden) return;
+    espejoWeb.hidden = true;
+    zoomControl.hidden = false;
+    espejoBase = '';
+    espejoUrl = '';
+    clearTimeout(espejoEspera);
+    espejoMarco.removeAttribute('src');
+  }
+
+  window.addEventListener('message', (evento) => {
+    if (evento.source !== espejoMarco.contentWindow || espejoWeb.hidden) return;
+    const aviso = evento.data;
+    if (!aviso || aviso.conexiones !== true || evento.origin !== origenDe(espejoBase)) return;
+    if (aviso.tipo === 'listo' && typeof aviso.url === 'string') {
+      espejoPreparada = true;
+      espejoAyuda.textContent = AYUDA_ESPEJO;
+      if (typeof aviso.titulo === 'string' && aviso.titulo.trim()) {
+        document.getElementById('espejoTitulo').textContent = '🌐 ' + aviso.titulo.trim().slice(0, 60);
+      }
+      if (aviso.url !== espejoUrl) {
+        espejoUrl = aviso.url;
+        socket.emit('web', { accion: 'ir', url: aviso.url });
+      }
+      espejoPintarMenu(aviso.menu);
+    } else if (aviso.tipo === 'clic' && typeof aviso.ruta === 'string') {
+      socket.emit('web', { accion: 'clic', ruta: aviso.ruta, navega: aviso.navega === true });
+    } else if (aviso.tipo === 'desplazar') {
+      socket.emit('web', { accion: 'desplazar', y: aviso.y });
+    }
+  });
+
+  // Botones del menú de la página: los detecta el puente y acá se muestran en una tira. Tocar
+  // uno lleva el espejo a esa página, y la pantalla lo sigue.
+  const espejoMenu = document.getElementById('espejoMenu');
+  function espejoPintarMenu(menu) {
+    espejoMenu.textContent = '';
+    const enlaces = Array.isArray(menu) ? menu.slice(0, 12).filter(e => e && typeof e.url === 'string' && typeof e.texto === 'string' && origenDe(e.url) === origenDe(espejoBase)) : [];
+    espejoMenu.hidden = enlaces.length === 0;
+    for (const enlace of enlaces) {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'espejo-boton';
+      if (enlace.actual === true) boton.setAttribute('aria-current', 'page');
+      if (typeof enlace.icono === 'string' && origenDe(enlace.icono) === origenDe(espejoBase)) {
+        const dibujo = document.createElement('img');
+        dibujo.src = enlace.icono;
+        dibujo.alt = '';
+        boton.append(dibujo);
+      }
+      boton.append(enlace.texto.slice(0, 30));
+      boton.addEventListener('click', () => { if (enlace.url !== espejoUrl) espejoMarco.src = enlace.url; });
+      espejoMenu.append(boton);
+    }
+  }
+
+  function espejoPasarPagina(cuanto) {
+    if (!espejoMarco.contentWindow || !espejoBase) return;
+    if (!espejoPreparada) { showToast('Esta página no está preparada para Conexiones.'); return; }
+    espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'pagina', valor: cuanto }, origenDe(espejoBase));
+  }
+  document.getElementById('espejoAnterior').addEventListener('click', () => espejoPasarPagina(-1));
+  document.getElementById('espejoSiguiente').addEventListener('click', () => espejoPasarPagina(1));
+
+  // «Acercar» agranda sólo el espejo del celular (se mueve con el dedo); la pantalla queda igual.
+  espejoAcercar.addEventListener('click', () => {
+    espejoCerca = !espejoCerca;
+    espejoAcercar.setAttribute('aria-pressed', String(espejoCerca));
+    espejoAcercar.textContent = espejoCerca ? '🔍 Alejar' : '🔍 Acercar';
+    espejoAjustar();
+  });
+  window.addEventListener('resize', espejoAjustar);
+
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
     authNameBadge.textContent = authBadgeText(auth);
@@ -427,7 +558,12 @@
         fotoPantalla = { foto: estado.foto, total: estado.total };
         if (!showStarted) { showStarted = true; pintarPasos(); }
         updateNavButtonsState();
-        zoomMostrarFoto(estado.src, estado.zoom);
+        if (estado.pagina) {
+          espejoMostrar(estado);
+        } else {
+          espejoOcultar();
+          zoomMostrarFoto(estado.src, estado.zoom);
+        }
       }
     });
     identificarSocket();

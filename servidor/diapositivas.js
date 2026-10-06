@@ -13,6 +13,12 @@ const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona, visiblePara } = require('./personas');
 const { enFila } = require('./guardian');
 const { definirConfianza } = require('./limite-registros');
+const { limpiarDireccion, tituloDe } = require('./validadores-pagina');
+const crypto = require('crypto');
+
+// Una página web también es una diapositiva: { id, src: '', pagina: dirección, titulo, owner }.
+// No tiene archivo ni foto en Cloudinary; la pantalla la muestra en un recuadro.
+const PAGINAS_POR_PERSONA = 30;
 
 const ERROR_SIN_NUBE = 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá .env.example.';
 
@@ -34,7 +40,7 @@ async function imagenesDeLaCarpeta() {
 async function quitarLocalesQueFaltan(orden) {
   const existentes = [];
   for (const registro of orden) {
-    if (registro.id.startsWith('presentacion/')) {
+    if (registro.pagina || registro.id.startsWith('presentacion/')) {
       existentes.push(registro);
       continue;
     }
@@ -116,6 +122,7 @@ async function subirImagen(contenido, tipo, owner, nombreLocal) {
 }
 
 async function borrarImagenSubida(registro) {
+  if (registro.pagina) return; // una página web no dejó nada guardado
   if (registro.id.startsWith('presentacion/')) {
     if (nubeLista) await cloudinary.uploader.destroy(registro.id).catch(() => {});
   } else {
@@ -186,7 +193,9 @@ function registrarRutasDiapositivas(app, io) {
   // Antes cada pedido leía el disco y volvía a subir el respaldo a Cloudinary; ahora sale de memoria.
   app.get('/images', requierePersona, (req, res) => {
     try {
-      res.json(visiblePara(req.person, almacenOrden.actual()).map(r => ({ src: r.src, transform: r.transform || null })));
+      res.json(visiblePara(req.person, almacenOrden.actual()).map(r => (r.pagina
+        ? { src: '', transform: null, pagina: r.pagina, titulo: r.titulo || '' }
+        : { src: r.src, transform: r.transform || null })));
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Algo salió mal en el servidor. Probá de nuevo en un momento.' });
@@ -226,6 +235,27 @@ function registrarRutasDiapositivas(app, io) {
       res.json(visiblePara(req.person, orden));
     } catch (err) {
       responderError(res, err, 'Error al subir la imagen.');
+    }
+  });
+
+  // ---- Agregar una página web ----
+  // POST /api/paginas — { direccion }. Queda al final del orden, como una diapositiva más.
+  app.post('/api/paginas', requierePersona, async (req, res) => {
+    const pagina = limpiarDireccion((req.body || {}).direccion);
+    if (!pagina) {
+      return res.status(400).json({ error: 'Esa dirección no sirve. Pegá el enlace completo de la página, por ejemplo https://mi-pagina.com' });
+    }
+    try {
+      const orden = await almacenOrden.modificar((o) => {
+        const suyas = o.filter(r => r.pagina && r.owner === req.person.name);
+        if (suyas.some(r => r.pagina === pagina)) throw new ErrorPedido(400, 'Esa página ya está en tu lista.');
+        if (suyas.length >= PAGINAS_POR_PERSONA) throw new ErrorPedido(400, `Podés tener hasta ${PAGINAS_POR_PERSONA} páginas web. Eliminá alguna para agregar otra.`);
+        o.push({ id: 'pagina-' + crypto.randomBytes(8).toString('hex'), src: '', pagina, titulo: tituloDe(pagina), owner: req.person.name });
+      });
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
+      res.json(visiblePara(req.person, orden));
+    } catch (err) {
+      responderError(res, err, 'No se pudo agregar la página. Probá de nuevo.');
     }
   });
 
@@ -287,7 +317,9 @@ function registrarRutasDiapositivas(app, io) {
       }
 
       const orden = await almacenOrden.modificar((o) => {
-        o[propiaDe(o, id, req.person, 'ajustar')].transform = { scale, x, y };
+        const registro = o[propiaDe(o, id, req.person, 'ajustar')];
+        if (registro.pagina) throw new ErrorPedido(400, 'Una página web no se puede ajustar.');
+        registro.transform = { scale, x, y };
       });
       avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, orden));
@@ -317,6 +349,7 @@ function registrarRutasDiapositivas(app, io) {
       const posiciones = ids.map(id => orden.findIndex(r => r.id === id));
       if (posiciones.some(i => i === -1)) throw new ErrorPedido(400, 'Alguna de las imágenes ya no existe.');
       if (posiciones.some(i => orden[i].originals)) throw new ErrorPedido(400, 'Una diapositiva combinada no se puede volver a unir.');
+      if (posiciones.some(i => orden[i].pagina)) throw new ErrorPedido(400, 'Una página web no se puede unir con imágenes.');
       if (!req.person.isAdmin && posiciones.some(i => orden[i].owner !== req.person.name)) {
         throw new ErrorPedido(403, 'Sólo podés unir tus propias imágenes.');
       }

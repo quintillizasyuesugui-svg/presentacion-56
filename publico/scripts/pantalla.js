@@ -876,6 +876,7 @@
   function precargar(desde) {
     for (let i = 0; i <= ADELANTE && i < diapositivas.length; i++) {
       const slide = diapositivas[(desde + i) % diapositivas.length];
+      if (slide.pagina) continue; // una página web no tiene foto para bajar
       const dir = direccionParaPantalla(slide.src);
       if (precargadas.has(dir)) continue;
       const imagen = new Image();
@@ -1003,8 +1004,15 @@
     aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 });
     contarEstado();
     const esUltima = index === diapositivas.length - 1;
+    if (slide.pagina) {
+      mostrarPagina(slide.pagina);
+      precargar(index + 1);
+      scheduleAutoAdvance();
+      return;
+    }
     cuandoEsteLista(direccionParaPantalla(slide.src), slide.src, (dir) => {
       if (numero !== cambioNumero) return; // mientras cargaba se pasó a otra
+      ocultarPagina(); // si venía de una página web, se va recién cuando la foto está lista
       img.classList.remove('show');
       imgBg.classList.remove('show');
       img.onload = () => {
@@ -1027,6 +1035,62 @@
 
   socket.on('cambiar', (accion) => aplicarCambio(accion));
 
+  // ---- Página web como diapositiva ----
+  // La página se muestra en un recuadro que tapa la foto. Si está preparada para Conexiones
+  // (lleva el «puente», ver publico/puente.js) avisa en cuál de sus páginas va y repite lo que
+  // se toca en el espejo del celular. Si no lo lleva, igual se ve.
+  const capaPagina = document.getElementById('capaPagina');
+  const marcoPagina = document.getElementById('marcoPagina');
+  let paginaBase = '';   // la dirección que se agregó en Gestionar
+  let paginaActual = ''; // en cuál de sus páginas va ahora
+
+  function origenDe(direccion) {
+    try { return new URL(direccion).origin; } catch { return ''; }
+  }
+
+  function mostrarPagina(direccion) {
+    // Conexiones adentro de Conexiones no se muestra: el recuadro quedaría con los mismos permisos.
+    if (!origenDe(direccion) || origenDe(direccion) === location.origin) return;
+    if (direccion !== paginaBase) {
+      paginaBase = direccion;
+      paginaActual = direccion;
+      marcoPagina.src = direccion;
+    }
+    capaPagina.hidden = false;
+    contarEstado();
+  }
+
+  function ocultarPagina() {
+    if (capaPagina.hidden) return;
+    capaPagina.hidden = true;
+    paginaBase = '';
+    paginaActual = '';
+    marcoPagina.removeAttribute('src'); // corta también el sonido que tuviera la página
+  }
+
+  // La página avisa cada vez que termina de cargar: así el celular sabe dónde está.
+  window.addEventListener('message', (evento) => {
+    if (evento.source !== marcoPagina.contentWindow || capaPagina.hidden) return;
+    const aviso = evento.data;
+    if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
+    if (evento.origin !== origenDe(paginaBase) || aviso.url === paginaActual) return;
+    paginaActual = aviso.url.slice(0, 500);
+    contarEstado();
+  });
+
+  socket.on('web', (orden) => {
+    if (!orden || capaPagina.hidden) return;
+    if (orden.accion === 'ir') {
+      // Sólo a otras páginas del mismo sitio que se agregó.
+      if (origenDe(orden.url) !== origenDe(paginaBase) || orden.url === paginaActual) return;
+      paginaActual = orden.url;
+      marcoPagina.src = orden.url;
+      return;
+    }
+    if (!marcoPagina.contentWindow) return;
+    marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: orden.accion, ruta: orden.ruta, navega: orden.navega, y: orden.y }, origenDe(paginaBase));
+  });
+
   // «Cerrar pantalla» desde el celular: esta pantalla cierra la sesión y queda libre (con
   // «🔑 Iniciar sesión») para la siguiente persona.
   socket.on('cerrarPantalla', () => logoutAuth());
@@ -1041,6 +1105,10 @@
       foto: started ? index + 1 : 0,
       total: diapositivas.length,
       src: slide ? slide.src : '',
+      pagina: slide && slide.pagina ? slide.pagina : '',
+      paginaActual: slide && slide.pagina ? paginaActual : '',
+      ancho: window.innerWidth,
+      alto: window.innerHeight,
       zoom: zoomActual
     });
   }

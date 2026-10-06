@@ -34,6 +34,16 @@
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple hidden>
 
+    <!-- Página web: se pega el enlace y queda en la lista como una diapositiva más -->
+    <form class="caja-pagina" id="paginaForm">
+      <label for="paginaDireccion">🌐 Página web</label>
+      <div class="caja-pagina-fila">
+        <input type="url" id="paginaDireccion" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Pegá el enlace de tu página">
+        <button type="submit" class="btn" id="paginaBtn">Agregar</button>
+      </div>
+      <p class="caja-pagina-nota">Se muestra en la pantalla como una diapositiva más. Para manejarla desde el celular, la página tiene que estar preparada para Conexiones.</p>
+    </form>
+
     <!-- Elegir varias imágenes para eliminarlas juntas (igual que en Música y videos) -->
     <div class="barra-seleccion barra-elegir" id="barraElegir" hidden>
       <button type="button" class="btn chico" id="elegirBtn">☑️ Seleccionar</button>
