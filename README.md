@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.0.1.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.1.0.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -84,8 +84,18 @@ Lo que se toca en el espejo pasa también en la pantalla.
 - Para poder manejarla, la página tiene que llevar el puente: copiar `publico/puente.js` a la
   página (por ejemplo como `puente-conexiones.js`) y agregarle
   `<script src="puente-conexiones.js" defer></script>`. Abierta sola, la página no cambia en nada.
-- Una página sin el puente se ve igual, pero no se maneja desde el celular. Las que no se
-  dejan mostrar dentro de otra (Google, Facebook, bancos) no aparecen.
+- Una página sin el puente, con la pantalla abierta en un navegador, se ve pero no se maneja
+  desde el celular; las que no se dejan mostrar dentro de otra (Google, Facebook, bancos) no
+  aparecen.
+- **Cualquier página, con la app de PC (Conexiones Pantalla 1.1.0 o más nueva):** si la página
+  no lleva el puente, la app la abre de verdad, como un navegador, y el celular pasa solo a
+  **foto en vivo**: muestra una foto de la pantalla que se renueva sola (640 px, sólo cuando
+  algo cambia). Un toque sobre la foto es un clic en ese punto; deslizar sube o baja; hay
+  botones ⬆ ⬇, «↩ Volver» y «⌨ Escribir». La página abierta así no tiene permisos (cámara,
+  micrófono, avisos), no descarga archivos, no abre ventanas y usa una sesión aparte que se
+  borra al cerrar la app (`aplicacion-pantalla/principal.js`).
+- «⬅️ Atrás» y «➡️ Siguiente» siguen pasando de diapositiva: así se sale de la página a la foto
+  que sigue.
 - El servidor nunca abre la página: sólo guarda la dirección (`servidor/validadores-pagina.js`).
   El recuadro de la pantalla no puede abrir ventanas ni sacarla de Conexiones.
 

@@ -42,7 +42,40 @@ function limpiarOrdenWeb(datos) {
     if (!Number.isFinite(datos.y)) return null;
     return { accion: 'desplazar', y: Math.min(1, Math.max(0, datos.y)) };
   }
+  // «Foto en vivo» (la página la abre la app de PC): tocar un punto de la foto, girar la rueda,
+  // volver a la página anterior, escribir un texto o apretar una tecla.
+  if (datos.accion === 'toque') {
+    if (!Number.isFinite(datos.x) || !Number.isFinite(datos.y)) return null;
+    return { accion: 'toque', x: Math.min(1, Math.max(0, datos.x)), y: Math.min(1, Math.max(0, datos.y)) };
+  }
+  if (datos.accion === 'rueda') {
+    if (!Number.isFinite(datos.dy)) return null;
+    return { accion: 'rueda', dy: Math.min(3, Math.max(-3, datos.dy)) }; // en «pantallas»: 1 = una pantalla hacia abajo
+  }
+  if (datos.accion === 'volver') return { accion: 'volver' };
+  if (datos.accion === 'texto') {
+    if (typeof datos.texto !== 'string' || !datos.texto || datos.texto.length > 200 || /[\u0000-\u001f]/.test(datos.texto)) return null;
+    return { accion: 'texto', texto: datos.texto };
+  }
+  if (datos.accion === 'tecla') {
+    return TECLAS.includes(datos.tecla) ? { accion: 'tecla', tecla: datos.tecla } : null;
+  }
   return null;
 }
 
-module.exports = { limpiarDireccion, tituloDe, limpiarOrdenWeb, LARGO_MAXIMO };
+const TECLAS = ['Enter', 'Backspace', 'Tab', 'Escape'];
+const FOTO_MAXIMA = 400000; // letras de la foto en base64: unos 300 KB
+
+// Foto de la página que manda la app de PC para el celular: un JPEG chico, la dirección y el título.
+function limpiarFotoWeb(datos) {
+  if (!datos || typeof datos !== 'object') return null;
+  const jpg = datos.jpg;
+  if (typeof jpg !== 'string' || jpg.length < 100 || jpg.length > FOTO_MAXIMA || !jpg.startsWith('/9j/') || !/^[A-Za-z0-9+/]+=*$/.test(jpg)) return null;
+  return {
+    jpg,
+    url: limpiarDireccion(datos.url) || '',
+    titulo: typeof datos.titulo === 'string' ? datos.titulo.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80) : ''
+  };
+}
+
+module.exports = { limpiarDireccion, tituloDe, limpiarOrdenWeb, limpiarFotoWeb, LARGO_MAXIMO };

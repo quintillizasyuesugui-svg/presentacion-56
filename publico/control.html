@@ -89,6 +89,25 @@
         <iframe id="espejoMarco" title="La página de la pantalla, en chico" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
       </div>
     </div>
+    <!-- Foto en vivo: cuando la página la abre la app de PC (cualquier página), acá se ve una
+         foto de la pantalla que se renueva sola. Se toca donde se quiere hacer clic. -->
+    <div class="vivo-caja" id="vivoCaja" hidden>
+      <img id="vivoFoto" alt="Lo que muestra la pantalla" hidden>
+      <span class="vivo-tag">● en vivo</span>
+      <p class="vivo-espera" id="vivoEspera">Abriendo la página en la PC…</p>
+    </div>
+    <div class="vivo-botones" id="vivoBotones" hidden>
+      <button type="button" class="btn small" id="vivoSubir" aria-label="Subir">⬆</button>
+      <button type="button" class="btn small" id="vivoBajar" aria-label="Bajar">⬇</button>
+      <button type="button" class="btn small" id="vivoVolver">↩ Volver</button>
+      <button type="button" class="btn small" id="vivoTeclado" aria-expanded="false">⌨ Escribir</button>
+    </div>
+    <form class="vivo-escribir" id="vivoEscribir" hidden>
+      <input type="text" id="vivoTexto" autocomplete="off" autocapitalize="off" maxlength="200" placeholder="Tocá primero la casilla en la foto y escribí acá" aria-label="Texto para escribir en la página">
+      <button type="submit" class="btn small">Enviar</button>
+      <button type="button" class="btn small" id="vivoBorrar" aria-label="Borrar una letra">⌫</button>
+      <button type="button" class="btn small" id="vivoEnter" aria-label="Tecla Enter">↵</button>
+    </form>
     <p class="zoom-ayuda" id="espejoAyuda">Tocá lo que quieras: pasa lo mismo en la pantalla.</p>
     <!-- Los botones del menú de la página, detectados solos (se arman en control.js) -->
     <div class="espejo-menu" id="espejoMenu" role="group" aria-label="Menú de la página" hidden></div>

@@ -4,7 +4,7 @@ const { ipDe } = require('./limite-intentos');
 const { parseLiveWriteBody } = require('./validadores-frase');
 const { limpiarOrdenMedios, limpiarEstadoMedios } = require('./validadores-medios');
 const { vigilanteDeMensajes, conectar, desconectar, pantallaConSonido } = require('./guardian');
-const { limpiarDireccion, limpiarOrdenWeb } = require('./validadores-pagina');
+const { limpiarDireccion, limpiarOrdenWeb, limpiarFotoWeb } = require('./validadores-pagina');
 
 function registrarSockets(io) {
   io.on('connection', (socket) => {
@@ -118,6 +118,8 @@ function registrarSockets(io) {
         // pantalla, para que el celular la muestre en chico con la misma forma.
         pagina: limpiarDireccion(datos.pagina) || '',
         paginaActual: limpiarDireccion(datos.paginaActual) || '',
+        // «espejo»: la página lleva el puente. «vivo»: la abrió la app de PC y manda fotos.
+        paginaModo: datos.paginaModo === 'espejo' || datos.paginaModo === 'vivo' ? datos.paginaModo : '',
         ancho: Number.isInteger(datos.ancho) ? Math.min(8000, Math.max(0, datos.ancho)) : 0,
         alto: Number.isInteger(datos.alto) ? Math.min(8000, Math.max(0, datos.alto)) : 0,
         zoom: {
@@ -145,6 +147,13 @@ function registrarSockets(io) {
       if (!socket.ownerName) return;
       const orden = limpiarOrdenWeb(datos);
       if (orden) socket.to('owner:' + socket.ownerName).emit('web', orden);
+    });
+
+    // Foto en vivo: la app de PC manda cómo se ve la página y va a los celulares de la misma persona.
+    socket.on('webFoto', (datos) => {
+      if (!socket.ownerName) return;
+      const foto = limpiarFotoWeb(datos);
+      if (foto) socket.to('owner:' + socket.ownerName).emit('webFoto', foto);
     });
 
     socket.on('mediosPedirEstado', () => {

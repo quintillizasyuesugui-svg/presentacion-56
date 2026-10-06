@@ -1043,6 +1043,18 @@
   const marcoPagina = document.getElementById('marcoPagina');
   let paginaBase = '';   // la dirección que se agregó en Gestionar
   let paginaActual = ''; // en cuál de sus páginas va ahora
+  // Cómo se maneja desde el celular: «espejo» si la página lleva el puente; «vivo» si no lo lleva
+  // y esta pantalla es la app de PC, que la abre de verdad y manda fotos; vacío: sólo se ve.
+  let paginaModo = '';
+  const appPC = window.ConexionesPC && window.ConexionesPC.pagina ? window.ConexionesPC.pagina : null;
+  const ESPERA_DEL_PUENTE = 700;  // después de que el recuadro terminó de cargar
+  const ESPERA_MAXIMA = 12000;
+  let esperaPuente = null;
+  let relojVivo = null;
+  let ticsVivo = 0;
+  let fotoYa = 0;        // tics que faltan para sacar una foto antes del segundo (después de una orden)
+  let sacandoFoto = false;
+  let ultimaFoto = '';
 
   function origenDe(direccion) {
     try { return new URL(direccion).origin; } catch { return ''; }
@@ -1052,9 +1064,15 @@
     // Conexiones adentro de Conexiones no se muestra: el recuadro quedaría con los mismos permisos.
     if (!origenDe(direccion) || origenDe(direccion) === location.origin) return;
     if (direccion !== paginaBase) {
+      dejarVivo();
       paginaBase = direccion;
       paginaActual = direccion;
+      paginaModo = '';
       marcoPagina.src = direccion;
+      // En la app de PC: si la página termina de cargar y no contestó con el puente, la abre la
+      // app (ver el aviso «load» más abajo). El tope es por si nunca termina de cargar.
+      clearTimeout(esperaPuente);
+      if (appPC) esperaPuente = setTimeout(pasarAVivo, ESPERA_MAXIMA);
     }
     capaPagina.hidden = false;
     contarEstado();
@@ -1063,23 +1081,87 @@
   function ocultarPagina() {
     if (capaPagina.hidden) return;
     capaPagina.hidden = true;
+    clearTimeout(esperaPuente);
+    dejarVivo();
     paginaBase = '';
     paginaActual = '';
+    paginaModo = '';
     marcoPagina.removeAttribute('src'); // corta también el sonido que tuviera la página
   }
+
+  // ---- Foto en vivo (sólo en la app de PC) ----
+  // El puente avisa apenas arranca la página, antes de que el recuadro termine de cargar. Si
+  // terminó de cargar y no avisó, es una página sin puente (o que no se deja mostrar acá).
+  marcoPagina.addEventListener('load', () => {
+    if (!appPC || capaPagina.hidden || paginaModo || !marcoPagina.getAttribute('src')) return;
+    const cual = paginaBase;
+    clearTimeout(esperaPuente);
+    esperaPuente = setTimeout(() => { if (cual === paginaBase) pasarAVivo(); }, ESPERA_DEL_PUENTE);
+  });
+
+  function pasarAVivo() {
+    if (!appPC || capaPagina.hidden || paginaModo) return;
+    paginaModo = 'vivo';
+    marcoPagina.removeAttribute('src');
+    ultimaFoto = '';
+    ticsVivo = 0;
+    fotoYa = 2;
+    appPC.abrir(paginaBase);
+    relojVivo = setInterval(ticVivo, 250);
+    contarEstado();
+  }
+
+  function dejarVivo() {
+    if (paginaModo !== 'vivo') return;
+    clearInterval(relojVivo);
+    relojVivo = null;
+    appPC.cerrar();
+  }
+
+  // Cuatro veces por segundo: la página se esconde si hay algo de Conexiones encima (texto en
+  // vivo, video, frase final). Una vez por segundo, o enseguida después de una orden, se saca
+  // una foto; sólo se manda si cambió, para no gastar datos del celular con la página quieta.
+  async function ticVivo() {
+    appPC.visible(!(liveWriteActive || videoEnPantalla || showingFinal));
+    ticsVivo++;
+    const toca = fotoYa > 0 ? --fotoYa === 0 : ticsVivo % 4 === 0;
+    if (!toca || sacandoFoto) return;
+    sacandoFoto = true;
+    try {
+      const foto = await appPC.foto();
+      if (foto && foto.jpg && paginaModo === 'vivo' && foto.jpg !== ultimaFoto) {
+        ultimaFoto = foto.jpg;
+        if (foto.url) paginaActual = foto.url.slice(0, 500);
+        socket.emit('webFoto', { jpg: foto.jpg, url: foto.url, titulo: foto.titulo });
+      }
+    } catch { /* la página se cerró mientras se sacaba la foto */ }
+    sacandoFoto = false;
+  }
+  // Un celular que recién entra pide el estado: se le manda la foto aunque no haya cambiado.
+  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; fotoYa = 1; });
 
   // La página avisa cada vez que termina de cargar: así el celular sabe dónde está.
   window.addEventListener('message', (evento) => {
     if (evento.source !== marcoPagina.contentWindow || capaPagina.hidden) return;
     const aviso = evento.data;
     if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
-    if (evento.origin !== origenDe(paginaBase) || aviso.url === paginaActual) return;
+    if (evento.origin !== origenDe(paginaBase)) return;
+    const primera = paginaModo !== 'espejo';
+    if (primera) { paginaModo = 'espejo'; clearTimeout(esperaPuente); }
+    if (!primera && aviso.url === paginaActual) return;
     paginaActual = aviso.url.slice(0, 500);
     contarEstado();
   });
 
   socket.on('web', (orden) => {
     if (!orden || capaPagina.hidden) return;
+    if (paginaModo === 'vivo') {
+      if (['toque', 'rueda', 'volver', 'texto', 'tecla'].includes(orden.accion)) {
+        appPC.orden(orden);
+        fotoYa = 2; // medio segundo después, para que el celular vea enseguida lo que cambió
+      }
+      return;
+    }
     if (orden.accion === 'ir') {
       // Sólo a otras páginas del mismo sitio que se agregó.
       if (origenDe(orden.url) !== origenDe(paginaBase) || orden.url === paginaActual) return;
@@ -1107,6 +1189,7 @@
       src: slide ? slide.src : '',
       pagina: slide && slide.pagina ? slide.pagina : '',
       paginaActual: slide && slide.pagina ? paginaActual : '',
+      paginaModo: slide && slide.pagina ? paginaModo : '',
       ancho: window.innerWidth,
       alto: window.innerHeight,
       zoom: zoomActual

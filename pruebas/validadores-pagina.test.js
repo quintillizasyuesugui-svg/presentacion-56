@@ -37,3 +37,27 @@ test('órdenes del espejo: descarta lo raro', () => {
     assert.strictEqual(limpiarOrdenWeb(mala), null, JSON.stringify(mala));
   }
 });
+
+test('foto en vivo: órdenes para la página que abre la app de PC', () => {
+  const { limpiarOrdenWeb } = require('../servidor/validadores-pagina');
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'toque', x: 0.25, y: 2 }), { accion: 'toque', x: 0.25, y: 1 });
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'rueda', dy: -9 }), { accion: 'rueda', dy: -3 });
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'volver', de: 'más' }), { accion: 'volver' });
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'texto', texto: 'hola café' }), { accion: 'texto', texto: 'hola café' });
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'tecla', tecla: 'Enter' }), { accion: 'tecla', tecla: 'Enter' });
+  for (const mala of [{ accion: 'toque', x: 'a', y: 0 }, { accion: 'rueda' }, { accion: 'texto', texto: '' }, { accion: 'texto', texto: 'a'.repeat(201) },
+    { accion: 'texto', texto: 'a\nb' }, { accion: 'tecla', tecla: 'F4' }, { accion: 'tecla', tecla: 'Delete' }]) {
+    assert.strictEqual(limpiarOrdenWeb(mala), null, JSON.stringify(mala));
+  }
+});
+
+test('foto en vivo: sólo pasa un JPEG chico', () => {
+  const { limpiarFotoWeb } = require('../servidor/validadores-pagina');
+  const jpg = '/9j/' + 'A'.repeat(400);
+  assert.deepStrictEqual(limpiarFotoWeb({ jpg, url: 'https://es.wikipedia.org/wiki/Caf%C3%A9', titulo: ' Café \n Wikipedia ', otro: 1 }),
+    { jpg, url: 'https://es.wikipedia.org/wiki/Caf%C3%A9', titulo: 'Café   Wikipedia' });
+  assert.deepStrictEqual(limpiarFotoWeb({ jpg, url: 'javascript:alert(1)' }), { jpg, url: '', titulo: '' });
+  for (const mala of [null, {}, { jpg: 'hola' }, { jpg: 'iVBOR' + 'A'.repeat(400) }, { jpg: '/9j/' + 'A'.repeat(400001) }, { jpg: '/9j/' + '<'.repeat(400) }, { jpg: 42 }]) {
+    assert.strictEqual(limpiarFotoWeb(mala), null);
+  }
+});

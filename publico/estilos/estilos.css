@@ -2939,3 +2939,48 @@ body.eligiendo-imagenes { padding-bottom: 104px; }
 .espejo-boton[aria-current] { border-color: var(--primary-400); background: var(--primary-900); }
 .espejo-boton:active { transform: scale(0.95); }
 .espejo-boton:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+
+/* Foto en vivo: la página la abrió la app de PC; el celular ve una foto que se renueva. */
+.vivo-caja {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 46vh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--primary-500);
+  background: #000;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+.vivo-caja[hidden] { display: none; }
+.vivo-caja img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }
+.vivo-caja img[hidden] { display: none; }
+.vivo-tag { position: absolute; right: 8px; bottom: 8px; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(0, 0, 0, 0.65); color: #3ddc84; font-size: 0.68rem; font-weight: 800; pointer-events: none; }
+.vivo-espera { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem; background: var(--gray-900); pointer-events: none; }
+.vivo-espera[hidden] { display: none; }
+.vivo-anillo { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 3px solid var(--primary-300); pointer-events: none; animation: vivo-anillo 600ms ease-out forwards; }
+@keyframes vivo-anillo { to { transform: scale(3.4); opacity: 0; } }
+.vivo-botones { display: grid; grid-template-columns: 1fr 1fr 1.6fr 1.8fr; gap: 6px; }
+.vivo-botones[hidden] { display: none; }
+.vivo-escribir { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; }
+.vivo-escribir[hidden] { display: none; }
+.vivo-escribir input {
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--gray-600);
+  background: var(--gray-950);
+  color: var(--gray-50);
+  font: inherit;
+  font-size: 1rem;
+}
+.vivo-escribir input:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .vivo-anillo { animation-duration: 1ms; } }
+/* Lo que se esconde dentro del control de página web se esconde de verdad, también los botones
+   y filas que tienen su propio «display». */
+.espejo-web [hidden] { display: none !important; }
+.vivo-botones .btn, .vivo-escribir .btn { min-width: 0; padding-inline: 6px; white-space: nowrap; }

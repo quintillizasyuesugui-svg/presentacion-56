@@ -444,6 +444,8 @@
     espejoAlto = Math.round(ESPEJO_ANCHO * Math.min(1, Math.max(0.4, forma)));
     zoomControl.hidden = true;
     espejoWeb.hidden = false;
+    if (estado.paginaModo === 'vivo') { vivoMostrar(estado); return; }
+    vivoOcultar();
     if (estado.pagina !== espejoBase) {
       espejoBase = estado.pagina;
       espejoUrl = estado.paginaActual || estado.pagina;
@@ -460,8 +462,129 @@
     espejoAjustar();
   }
 
+  // ---- Foto en vivo: la página la abrió la app de PC ----
+  // En lugar de la misma página en chico se muestra una foto de la pantalla, que llega sola cada
+  // vez que algo cambia. Un toque sobre la foto es un clic en ese punto; deslizar sube o baja.
+  const vivoCaja = document.getElementById('vivoCaja');
+  const vivoFoto = document.getElementById('vivoFoto');
+  const vivoEspera = document.getElementById('vivoEspera');
+  const vivoBotones = document.getElementById('vivoBotones');
+  const vivoEscribir = document.getElementById('vivoEscribir');
+  const vivoTexto = document.getElementById('vivoTexto');
+  const vivoTeclado = document.getElementById('vivoTeclado');
+  const AYUDA_VIVO = 'Tocá donde quieras hacer clic. Deslizá para subir o bajar.';
+  let enVivo = false;
+
+  function vivoMostrar(estado) {
+    if (!enVivo || estado.pagina !== espejoBase) {
+      enVivo = true;
+      espejoBase = estado.pagina;
+      espejoUrl = '';
+      clearTimeout(espejoEspera);
+      espejoMarco.removeAttribute('src');
+      espejoPintarMenu(null);
+      vivoFoto.hidden = true;
+      vivoEspera.hidden = false;
+      document.getElementById('espejoTitulo').textContent = '🌐 ' + (new URL(estado.pagina).hostname.replace(/^www\./, ''));
+    }
+    const forma = estado.ancho > 0 && estado.alto > 0 ? estado.ancho / estado.alto : 16 / 9;
+    vivoCaja.style.aspectRatio = String(Math.min(2.5, Math.max(1, forma)));
+    for (const [elemento, visto] of [[vivoCaja, true], [vivoBotones, true], [espejoCaja, false], [espejoAcercar, false],
+      [document.getElementById('espejoAnterior').parentElement, false]]) elemento.hidden = !visto;
+    espejoAyuda.textContent = AYUDA_VIVO;
+  }
+
+  function vivoOcultar() {
+    if (!enVivo) return;
+    enVivo = false;
+    for (const [elemento, visto] of [[vivoCaja, false], [vivoBotones, false], [vivoEscribir, false], [espejoCaja, true], [espejoAcercar, true],
+      [document.getElementById('espejoAnterior').parentElement, true]]) elemento.hidden = !visto;
+    vivoTeclado.setAttribute('aria-expanded', 'false');
+    vivoFoto.removeAttribute('src');
+    espejoBase = '';
+  }
+
+  socket.on('webFoto', (foto) => {
+    if (!enVivo || !foto || typeof foto.jpg !== 'string') return;
+    vivoFoto.src = 'data:image/jpeg;base64,' + foto.jpg;
+    vivoFoto.hidden = false;
+    vivoEspera.hidden = true;
+    if (foto.titulo) document.getElementById('espejoTitulo').textContent = '🌐 ' + foto.titulo.slice(0, 60);
+  });
+
+  function vivoMandar(orden) {
+    if (enVivo) socket.emit('web', orden);
+  }
+
+  // Anillo en el punto tocado, para ver que el toque salió.
+  function vivoMarcar(x, y) {
+    const anillo = document.createElement('i');
+    anillo.className = 'vivo-anillo';
+    anillo.style.left = (x * 100) + '%';
+    anillo.style.top = (y * 100) + '%';
+    vivoCaja.append(anillo);
+    anillo.addEventListener('animationend', () => anillo.remove());
+  }
+
+  let vivoDedo = null;
+  vivoCaja.addEventListener('pointerdown', (e) => {
+    try { vivoCaja.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
+    vivoDedo = { id: e.pointerId, x: e.clientX, y: e.clientY, ultimaY: e.clientY, movido: false, ultimoEnvio: 0, pendiente: 0 };
+  });
+  vivoCaja.addEventListener('pointermove', (e) => {
+    if (!vivoDedo || e.pointerId !== vivoDedo.id) return;
+    if (!vivoDedo.movido && Math.hypot(e.clientX - vivoDedo.x, e.clientY - vivoDedo.y) < 10) return;
+    vivoDedo.movido = true;
+    // Deslizar hacia arriba baja la página, como en cualquier pantalla táctil.
+    vivoDedo.pendiente += (vivoDedo.ultimaY - e.clientY) / vivoCaja.clientHeight;
+    vivoDedo.ultimaY = e.clientY;
+    const ahora = Date.now();
+    if (ahora - vivoDedo.ultimoEnvio >= 90 && Math.abs(vivoDedo.pendiente) > 0.01) {
+      vivoMandar({ accion: 'rueda', dy: vivoDedo.pendiente });
+      vivoDedo.pendiente = 0;
+      vivoDedo.ultimoEnvio = ahora;
+    }
+  });
+  function vivoSoltar(e) {
+    if (!vivoDedo || e.pointerId !== vivoDedo.id) return;
+    const dedo = vivoDedo;
+    vivoDedo = null;
+    if (e.type === 'pointercancel') return;
+    if (dedo.movido) {
+      if (Math.abs(dedo.pendiente) > 0.01) vivoMandar({ accion: 'rueda', dy: dedo.pendiente });
+      return;
+    }
+    const caja = vivoCaja.getBoundingClientRect();
+    const x = (e.clientX - caja.left) / caja.width;
+    const y = (e.clientY - caja.top) / caja.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1 || vivoFoto.hidden) return;
+    vivoMarcar(x, y);
+    vivoMandar({ accion: 'toque', x, y });
+  }
+  vivoCaja.addEventListener('pointerup', vivoSoltar);
+  vivoCaja.addEventListener('pointercancel', vivoSoltar);
+
+  document.getElementById('vivoSubir').addEventListener('click', () => vivoMandar({ accion: 'rueda', dy: -0.6 }));
+  document.getElementById('vivoBajar').addEventListener('click', () => vivoMandar({ accion: 'rueda', dy: 0.6 }));
+  document.getElementById('vivoVolver').addEventListener('click', () => vivoMandar({ accion: 'volver' }));
+  vivoTeclado.addEventListener('click', () => {
+    vivoEscribir.hidden = !vivoEscribir.hidden;
+    vivoTeclado.setAttribute('aria-expanded', String(!vivoEscribir.hidden));
+    if (!vivoEscribir.hidden) vivoTexto.focus();
+  });
+  vivoEscribir.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const texto = vivoTexto.value;
+    if (!texto) return;
+    vivoMandar({ accion: 'texto', texto });
+    vivoTexto.value = '';
+  });
+  document.getElementById('vivoBorrar').addEventListener('click', () => vivoMandar({ accion: 'tecla', tecla: 'Backspace' }));
+  document.getElementById('vivoEnter').addEventListener('click', () => vivoMandar({ accion: 'tecla', tecla: 'Enter' }));
+
   function espejoOcultar() {
     if (espejoWeb.hidden) return;
+    vivoOcultar();
     espejoWeb.hidden = true;
     zoomControl.hidden = false;
     espejoBase = '';
