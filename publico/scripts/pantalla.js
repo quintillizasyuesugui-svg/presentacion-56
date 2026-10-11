@@ -749,6 +749,8 @@
     // a las de otras personas. Se repite en cada reconexión — la sala es por
     // conexión de socket, no por dispositivo.
     function identificarSocket() { socket.emit('identificar', auth.pin); }
+    // Ya en su sala: avisa que es una pantalla, así el celular sabe que tiene dónde mostrar.
+    socket.on('identificado', () => socket.emit('soyPantalla'));
     identificarSocket();
     socket.on('connect', identificarSocket);
 
@@ -1117,6 +1119,8 @@
     paginaMenu = null;
     apurarFotos(APURO_MAXIMO); // mientras carga, que el celular la vea aparecer
     appPC.abrir(paginaBase);
+    // Si ya se había marcado una zona antes de que la abriera la app, sigue agrandada.
+    if (appPC.zoom) appPC.zoom(zoomActual);
     relojVivo = setInterval(ticVivo, TIC_VIVO);
     contarEstado();
   }
@@ -1218,6 +1222,8 @@
       paginaActual: slide && slide.pagina ? paginaActual : '',
       paginaModo: slide && slide.pagina ? paginaModo : '',
       paginaMenu: slide && slide.pagina && paginaModo === 'vivo' ? paginaMenu : null,
+      // En «vivo» agranda la app de PC; las apps anteriores a la 1.3.0 no saben hacerlo.
+      paginaZoom: Boolean(slide && slide.pagina && (paginaModo !== 'vivo' || (appPC && appPC.zoom))),
       ancho: window.innerWidth,
       alto: window.innerHeight,
       zoom: zoomActual
@@ -1237,9 +1243,12 @@
   let zoomMomento = 0;
   const ZOOM_SEGUIMIENTO = 45; // milisegundos: más chico, más pegado al dedo
   function pintarZoom() {
-    zoomCapa.style.transform = zoomVisto.z > 1.01
+    const forma = zoomVisto.z > 1.01
       ? `scale(${zoomVisto.z}) translate(${(0.5 - zoomVisto.cx) * 100}%, ${(0.5 - zoomVisto.cy) * 100}%)`
       : '';
+    zoomCapa.style.transform = forma;
+    // La página web se agranda igual que la foto: la parte marcada en el celular llena la pantalla.
+    marcoPagina.style.transform = forma;
   }
   function seguirZoom(ahora) {
     const parte = 1 - Math.exp(-Math.min(100, Math.max(0, ahora - zoomMomento)) / ZOOM_SEGUIMIENTO);
@@ -1259,6 +1268,8 @@
   }
   function aplicarZoom(z, alInstante) {
     zoomActual = z;
+    // La página que abrió la app de PC es un recuadro aparte: la agranda la app.
+    if (paginaModo === 'vivo' && appPC && appPC.zoom) { appPC.zoom(z); apurarFotos(APURO_TRAS_ORDEN); }
     if (alInstante) {
       cancelAnimationFrame(zoomCuadro);
       zoomCuadro = null;

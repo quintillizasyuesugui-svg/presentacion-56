@@ -46,9 +46,16 @@
 
   <!-- Cuatro cuadritos: cada uno avisa si está pasando algo («Mostrar» late hasta que se toca y
        después dice en qué foto va; Escribir en vivo con punto rojo; música sonando con punto violeta). -->
+  <!-- ¿Hay una pantalla abierta con este PIN? Sin pantalla, «Mostrar» no tiene dónde mostrar. -->
+  <p class="estado-pantalla" id="estadoPantalla" role="status" hidden>
+    <span aria-hidden="true">📺</span>
+    <span><b id="estadoPantallaTitulo"></b> <span id="estadoPantallaTexto"></span></span>
+  </p>
+
   <div class="cuadritos" role="group" aria-label="Acciones en la pantalla">
     <button type="button" class="cuadrito cuadrito-mostrar listo" id="mostrarBtn" onclick="enviar('mostrar')">
       <span class="cuadrito-play" id="mostrarPlay" aria-hidden="true"></span>
+      <span class="cuadrito-sin" id="mostrarSin" aria-hidden="true" hidden>📺</span>
       <span class="cuadrito-numero" id="mostrarNumero" hidden><b id="mostrarFoto">1</b>/<span id="mostrarTotal">1</span></span>
       <span class="cuadrito-nombre" id="mostrarNombre">Mostrar</span>
       <span class="cuadrito-avance" id="mostrarAvance" hidden><i id="mostrarBarra"></i></span>
@@ -82,6 +89,7 @@
   <section class="espejo-web" id="espejoWeb" aria-label="Página web en la pantalla" hidden>
     <div class="espejo-rotulo">
       <span id="espejoTitulo">🌐 Página web</span>
+      <button type="button" class="btn small zona-boton" id="zonaBtn" aria-pressed="false" hidden>✂ Zona</button>
       <button type="button" class="btn small" id="espejoAcercar" aria-pressed="false">🔍 Acercar</button>
     </div>
     <div class="espejo-caja" id="espejoCaja">

@@ -16,7 +16,24 @@ function registrarSockets(io) {
     socket.use(([evento], next) => {
       if (evento === 'identificar' || permitir(socket.ownerName)) next();
     });
-    socket.on('disconnect', () => { if (socket.ownerName) desconectar(socket.ownerName); });
+    socket.on('disconnect', () => {
+      if (!socket.ownerName) return;
+      desconectar(socket.ownerName);
+      // Se fue una pantalla (cerró sesión, se recargó o se cortó): sus celulares se enteran.
+      if (socket.esPantalla) avisarPantalla(socket.ownerName);
+    });
+
+    // ¿Esta persona tiene alguna pantalla abierta? Las pantallas entran a una sala propia
+    // ('pantalla:' + nombre); el celular no deja tocar «Mostrar» hasta que haya una.
+    const hayPantalla = (nombre) => Boolean((io.sockets.adapter.rooms.get('pantalla:' + nombre) || { size: 0 }).size);
+    const avisarPantalla = (nombre) => io.to('owner:' + nombre).emit('hayPantalla', hayPantalla(nombre));
+    function marcarPantalla() {
+      if (!socket.ownerName || socket.esPantalla) return;
+      socket.esPantalla = true;
+      socket.join('pantalla:' + socket.ownerName);
+      avisarPantalla(socket.ownerName);
+    }
+    socket.on('soyPantalla', marcarPantalla);
 
     // "cambiar"/"cine" van SÓLO a la sala del propio dueño (según el PIN con el
     // que el control se identificó) — antes se mandaban a TODAS las pantallas
@@ -98,7 +115,9 @@ function registrarSockets(io) {
     // «¿Ya estás mostrando?»: el control que se abre (o vuelve de Gestionar) le pregunta a la
     // pantalla de la misma persona; ella contesta en qué foto va. Así «Mostrar» se toca una vez.
     socket.on('pantallaPedirEstado', () => {
-      if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('pantallaPedirEstado');
+      if (!socket.ownerName) return;
+      socket.emit('hayPantalla', hayPantalla(socket.ownerName));
+      socket.to('owner:' + socket.ownerName).emit('pantallaPedirEstado');
     });
     // «Cerrar pantalla»: quien terminó de presentar cierra, desde su celular, la sesión de sus
     // propias pantallas; quedan libres para que entre la siguiente persona. Sólo va a la sala
@@ -108,6 +127,9 @@ function registrarSockets(io) {
     });
     socket.on('pantallaEstado', (datos) => {
       if (!socket.ownerName || !datos || typeof datos !== 'object') return;
+      // Una pantalla abierta desde antes (página guardada vieja) no avisa «soyPantalla»,
+      // pero sólo las pantallas cuentan su estado: con eso alcanza para reconocerla.
+      marcarPantalla();
       const z = datos.zoom && typeof datos.zoom === 'object' ? datos.zoom : {};
       const limpio = {
         mostrando: datos.mostrando === true,
@@ -122,6 +144,8 @@ function registrarSockets(io) {
         paginaModo: datos.paginaModo === 'espejo' || datos.paginaModo === 'vivo' ? datos.paginaModo : '',
         // En «vivo»: el menú que la app de PC le leyó a la página, para las cajas del celular.
         paginaMenu: datos.paginaModo === 'vivo' ? limpiarMenuWeb(datos.paginaMenu) : null,
+        // ¿Esta pantalla puede agrandar una parte de la página? (la app de PC, desde la 1.3.0)
+        paginaZoom: datos.paginaZoom === true,
         ancho: Number.isInteger(datos.ancho) ? Math.min(8000, Math.max(0, datos.ancho)) : 0,
         alto: Number.isInteger(datos.alto) ? Math.min(8000, Math.max(0, datos.alto)) : 0,
         zoom: {

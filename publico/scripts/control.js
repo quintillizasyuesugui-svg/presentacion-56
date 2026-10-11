@@ -14,6 +14,11 @@
   });
 
   function enviar(accion) {
+    // Sin una pantalla abierta no hay dónde mostrar: se avisa en vez de hacer como que anda.
+    if (!hayPantalla) {
+      showToast(SIN_PANTALLA);
+      return;
+    }
     // "Atrás"/"Siguiente" antes de "Mostrar" no tienen nada que recorrer
     // (pantalla.html los ignora igual, ver aplicarCambio ahí) — en vez de que
     // no pase nada en silencio, avisa por qué.
@@ -66,16 +71,31 @@
   let autoAdvanceOn = false;
   let showStarted = false; // recién true al apretar "Mostrar" — antes, pantalla.html no tiene nada que recorrer
   let fotoPantalla = { foto: 0, total: 0 }; // en qué foto va la pantalla (lo cuenta ella, ver «pantallaEstado»)
+  // ¿Hay una pantalla abierta con este mismo PIN? Lo avisa el servidor («hayPantalla»).
+  // Hasta que conteste no se sabe, y el cuadrito se ve como siempre.
+  let hayPantalla = false;
+  let pantallaSabida = false;
+  const SIN_PANTALLA = '📺 Primero abrí la pantalla en la PC.';
 
-  // Cuadrito «Mostrar»: celeste que late hasta que se toca; después verde con «3/10» y una barrita.
+  // Cuadrito «Mostrar»: gris «Sin pantalla» mientras no haya dónde mostrar; celeste que late
+  // hasta que se toca; después verde con «3/10» y una barrita.
   function pintarMostrar() {
     const encendido = showStarted;
-    mostrarBtn.classList.toggle('listo', !encendido);
+    const sinPantalla = pantallaSabida && !hayPantalla && !encendido;
+    mostrarBtn.classList.toggle('sin-pantalla', sinPantalla);
+    mostrarBtn.classList.toggle('listo', !encendido && !sinPantalla);
     mostrarBtn.classList.toggle('mostrando', encendido);
-    document.getElementById('mostrarPlay').hidden = encendido;
+    document.getElementById('mostrarSin').hidden = !sinPantalla;
+    document.getElementById('mostrarPlay').hidden = encendido || sinPantalla;
+    const franja = document.getElementById('estadoPantalla');
+    // Con «Primeros pasos» a la vista no hace falta: el paso 2 ya dice lo mismo y no sobra lugar.
+    franja.hidden = !pantallaSabida || encendido || !document.getElementById('primerosPasos').hidden;
+    franja.classList.toggle('lista', hayPantalla);
+    document.getElementById('estadoPantallaTitulo').textContent = hayPantalla ? 'Pantalla lista.' : 'Falta la pantalla.';
+    document.getElementById('estadoPantallaTexto').textContent = hayPantalla ? 'Tocá «Mostrar».' : 'Abrila en la PC.';
     document.getElementById('mostrarNumero').hidden = !encendido;
     document.getElementById('mostrarAvance').hidden = !encendido;
-    document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : 'Mostrar';
+    document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : sinPantalla ? 'Sin pantalla' : 'Mostrar';
     if (encendido) {
       const total = Math.max(1, fotoPantalla.total || totalSlidesSeguro());
       const foto = Math.min(total, Math.max(1, fotoPantalla.foto || 1));
@@ -253,6 +273,7 @@
     pasosOcultos = true;
     try { localStorage.setItem(CLAVE_PASOS, '1'); } catch { /* sin almacenamiento */ }
     primerosPasos.hidden = true;
+    pintarMostrar();
   }
   document.getElementById('pasosCerrar').addEventListener('click', ocultarPasos);
   function pintarPasos() {
@@ -260,6 +281,7 @@
     const hechos = [totalSlides > 0, pantallaVista, showStarted];
     hechos.forEach((hecho, i) => document.getElementById('paso' + (i + 1)).classList.toggle('hecho', hecho));
     primerosPasos.hidden = false;
+    pintarMostrar();
     if (hechos.every(Boolean)) {
       document.getElementById('pasosTitulo').textContent = '✅ ¡Listo! Ya estás presentando';
       setTimeout(ocultarPasos, 4000);
@@ -310,6 +332,17 @@
     pintarZoom();
   }
 
+  // La pantalla ya no muestra nada (se cerró o se desconectó): vuelve el cartel de antes.
+  function zoomApagar() {
+    zoomSrc = '';
+    zoomFoto.hidden = true;
+    zoomFoto.removeAttribute('src');
+    zoomVisor.hidden = true;
+    zoomTag.hidden = true;
+    document.getElementById('zoomApagado').hidden = false;
+    document.getElementById('zoomAyuda').hidden = true;
+  }
+
   function acotarZoom() {
     zoom.z = Math.min(4, Math.max(1, zoom.z));
     const m = 0.5 / zoom.z;
@@ -351,6 +384,7 @@
     if (!z) return;
     zoom = { z: z.z, cx: z.cx, cy: z.cy };
     pintarZoom();
+    if (!espejoWeb.hidden) zonaPintar();
   });
 
   const dedos = new Map();
@@ -595,8 +629,150 @@
   document.getElementById('vivoBorrar').addEventListener('click', () => vivoMandar({ accion: 'tecla', tecla: 'Backspace' }));
   document.getElementById('vivoEnter').addEventListener('click', () => vivoMandar({ accion: 'tecla', tecla: 'Enter' }));
 
+  // ---- Zona: agrandar una parte de la página en la pantalla ----
+  // Con «✂ Zona» se dibuja un cuadro sobre la página y la pantalla se llena con esa parte (viaja
+  // con el mismo aviso «zoom» de las fotos). El cuadro se mueve arrastrando el círculo ✥, así el
+  // resto de la página se sigue pudiendo tocar. El botón pasa a «↩ Entera» para volver.
+  const zonaBtn = document.getElementById('zonaBtn');
+  const zonaCapa = document.createElement('div');
+  zonaCapa.className = 'zona-capa';
+  zonaCapa.hidden = true;
+  const zonaVisor = document.createElement('div');
+  zonaVisor.className = 'zona-visor';
+  zonaVisor.hidden = true;
+  const zonaMango = document.createElement('span');
+  zonaMango.className = 'zona-mango';
+  zonaMango.textContent = '✥';
+  zonaMango.setAttribute('aria-label', 'Mover el cuadro');
+  zonaVisor.append(zonaMango);
+  const AYUDA_ZONA = 'Dibujá un cuadro para agrandar.';
+  const AYUDA_MOVER = 'Mové el cuadro con ✥.';
+  let zonaMarcando = false;
+  let zonaAyudaAntes = '';
+
+  // En foto en vivo la página se ve en la foto; si no, en el recuadro del espejo.
+  function zonaLugar() { return enVivo ? vivoCaja : espejoLienzo; }
+
+  function zonaPintar() {
+    const lugar = zonaLugar();
+    if (zonaVisor.parentElement !== lugar) lugar.append(zonaVisor, zonaCapa);
+    const agrandada = zoom.z > 1.01;
+    const lado = 100 / zoom.z;
+    zonaVisor.hidden = !agrandada;
+    zonaVisor.style.width = lado + '%';
+    zonaVisor.style.height = lado + '%';
+    zonaVisor.style.left = (zoom.cx * 100 - lado / 2) + '%';
+    zonaVisor.style.top = (zoom.cy * 100 - lado / 2) + '%';
+    zonaCapa.hidden = !zonaMarcando;
+    zonaBtn.textContent = agrandada ? '↩ Entera' : '✂ Zona';
+    zonaBtn.setAttribute('aria-pressed', String(zonaMarcando));
+    // El renglón de ayuda dice qué hacer ahora; al terminar vuelve a decir lo de antes.
+    const propia = espejoAyuda.textContent === AYUDA_ZONA || espejoAyuda.textContent === AYUDA_MOVER;
+    const ahora = zonaMarcando ? AYUDA_ZONA : agrandada ? AYUDA_MOVER : '';
+    if (ahora && !propia) zonaAyudaAntes = espejoAyuda.textContent;
+    if (ahora) espejoAyuda.textContent = ahora;
+    else if (propia) espejoAyuda.textContent = zonaAyudaAntes;
+  }
+
+  function zonaMandar(nuevo, alFinal) {
+    Object.assign(zoom, nuevo);
+    acotarZoom();
+    zonaPintar();
+    mandarZoom(alFinal);
+  }
+
+  // Lo que dice la pantalla manda: si puede agrandar páginas y qué parte está mostrando.
+  function zonaDesdeEstado(estado) {
+    zonaBtn.hidden = estado.paginaZoom !== true;
+    if (zonaBtn.hidden) zonaMarcando = false;
+    const z = estado.zoom;
+    zoom = z && Number.isFinite(z.z) && !zonaBtn.hidden ? { z: z.z, cx: z.cx, cy: z.cy } : { z: 1, cx: 0.5, cy: 0.5 };
+    zonaPintar();
+  }
+
+  function zonaApagar() {
+    zonaMarcando = false;
+    zonaVisor.hidden = true;
+    zonaCapa.hidden = true;
+    zonaBtn.hidden = true;
+  }
+
+  zonaBtn.addEventListener('click', () => {
+    if (zoom.z > 1.01) {
+      zonaMarcando = false;
+      zonaMandar({ z: 1, cx: 0.5, cy: 0.5 }, true);
+    } else {
+      zonaMarcando = !zonaMarcando;
+      zonaPintar();
+    }
+  });
+
+  function zonaPunto(e) {
+    const r = zonaLugar().getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+  }
+
+  // Dibujar el cuadro. Los toques no pasan a la página de abajo mientras se marca.
+  let zonaInicio = null;
+  let zonaMarco = null;
+  zonaCapa.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    try { zonaCapa.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
+    zonaInicio = zonaPunto(e);
+    zonaMarco = document.createElement('div');
+    zonaMarco.className = 'zona-marco';
+    zonaCapa.append(zonaMarco);
+  });
+  zonaCapa.addEventListener('pointermove', (e) => {
+    e.stopPropagation();
+    if (!zonaMarco) return;
+    const p = zonaPunto(e);
+    zonaMarco.style.left = Math.min(zonaInicio.x, p.x) * 100 + '%';
+    zonaMarco.style.top = Math.min(zonaInicio.y, p.y) * 100 + '%';
+    zonaMarco.style.width = Math.abs(p.x - zonaInicio.x) * 100 + '%';
+    zonaMarco.style.height = Math.abs(p.y - zonaInicio.y) * 100 + '%';
+  });
+  function zonaSoltar(e) {
+    e.stopPropagation();
+    if (!zonaMarco) return;
+    const p = zonaPunto(e);
+    const ancho = Math.abs(p.x - zonaInicio.x);
+    const alto = Math.abs(p.y - zonaInicio.y);
+    zonaMarco.remove();
+    zonaMarco = null;
+    // Un cuadro muy chico es un toque sin querer: se sigue esperando el cuadro.
+    if (e.type === 'pointercancel' || ancho < 0.06 || alto < 0.06) return;
+    zonaMarcando = false;
+    zonaMandar({ z: 1 / Math.max(ancho, alto), cx: (p.x + zonaInicio.x) / 2, cy: (p.y + zonaInicio.y) / 2 }, true);
+  }
+  zonaCapa.addEventListener('pointerup', zonaSoltar);
+  zonaCapa.addEventListener('pointercancel', zonaSoltar);
+
+  // Mover el cuadro con el círculo.
+  let zonaAgarre = null;
+  zonaMango.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    try { zonaMango.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
+    zonaAgarre = { x: e.clientX, y: e.clientY, cx: zoom.cx, cy: zoom.cy };
+  });
+  zonaMango.addEventListener('pointermove', (e) => {
+    e.stopPropagation();
+    if (!zonaAgarre) return;
+    const r = zonaLugar().getBoundingClientRect();
+    zonaMandar({ cx: zonaAgarre.cx + (e.clientX - zonaAgarre.x) / r.width, cy: zonaAgarre.cy + (e.clientY - zonaAgarre.y) / r.height });
+  });
+  function zonaSoltarMango(e) {
+    e.stopPropagation();
+    if (!zonaAgarre) return;
+    zonaAgarre = null;
+    mandarZoom(true);
+  }
+  zonaMango.addEventListener('pointerup', zonaSoltarMango);
+  zonaMango.addEventListener('pointercancel', zonaSoltarMango);
+
   function espejoOcultar() {
     if (espejoWeb.hidden) return;
+    zonaApagar();
     vivoOcultar();
     espejoWeb.hidden = true;
     zoomControl.hidden = false;
@@ -698,11 +874,30 @@
         updateNavButtonsState();
         if (estado.pagina) {
           espejoMostrar(estado);
+          if (!espejoWeb.hidden) zonaDesdeEstado(estado);
         } else {
           espejoOcultar();
           zoomMostrarFoto(estado.src, estado.zoom);
         }
       }
+    });
+    // La pantalla entró o se fue. Si se va en medio de la presentación, el control deja de
+    // decir «En pantalla» y vuelve a pedir que se conecte una.
+    socket.on('hayPantalla', (hay) => {
+      hayPantalla = hay === true;
+      pantallaSabida = true;
+      if (hayPantalla) {
+        pantallaVista = true;
+      } else {
+        const estabaMostrando = showStarted;
+        showStarted = false;
+        fotoPantalla = { foto: 0, total: 0 };
+        espejoOcultar();
+        zoomApagar();
+        if (estabaMostrando) showToast('📺 Se cerró la pantalla. Abrila otra vez.');
+      }
+      updateNavButtonsState();
+      pintarPasos();
     });
     identificarSocket();
     socket.on('connect', identificarSocket);
@@ -750,6 +945,7 @@
       return;
     }
     if (orden.tipo === 'diapositiva') {
+      if (!hayPantalla) { showHeard(oido, 'primero abrí la pantalla'); return; }
       socket.emit('cambiar', orden.accion);
       showHeard(oido);
       return;

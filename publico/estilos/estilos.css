@@ -1005,6 +1005,16 @@ body.control {
 .cuadrito-avance { position: absolute; left: 8px; right: 8px; bottom: 7px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
 .cuadrito-avance[hidden] { display: none; }
 .cuadrito-avance i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--green-400); transition: width 400ms var(--ease-out); }
+/* Sin pantalla abierta: el cuadrito queda gris y una franja dice qué falta. */
+.cuadrito-mostrar.sin-pantalla { background: var(--gray-900); border-style: dashed; border-color: var(--gray-600); }
+.cuadrito-mostrar.sin-pantalla .cuadrito-nombre { color: var(--text-muted); }
+.cuadrito-sin { position: relative; font-size: 1.3rem; line-height: 1; filter: grayscale(1); opacity: 0.75; }
+.cuadrito-sin::after { content: ""; position: absolute; left: -3px; right: -3px; top: 50%; height: 2px; background: var(--red-400); transform: rotate(-35deg); }
+.cuadrito-sin[hidden] { display: none; }
+.estado-pantalla { display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 10px; border-radius: 10px; font-size: 0.76rem; line-height: 1.25; border: 1px solid var(--gray-700); background: var(--gray-900); color: var(--text-muted); }
+.estado-pantalla[hidden] { display: none; }
+.estado-pantalla.lista { border-color: var(--green-500); color: #bbf7d0; }
+.estado-pantalla b { color: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .cuadrito-mostrar.listo, .cuadrito-punto { animation: none; }
 }
@@ -2871,7 +2881,7 @@ body.eligiendo-imagenes { padding-bottom: 104px; }
 
 /* ---- Página web como diapositiva ---- */
 /* En la pantalla: el recuadro tapa la foto mientras se muestra la página. */
-.capa-pagina { position: absolute; inset: 0; z-index: 3; background: #fff; }
+.capa-pagina { position: absolute; inset: 0; z-index: 3; background: #fff; overflow: hidden; }
 .capa-pagina[hidden] { display: none; }
 .capa-pagina iframe { display: block; width: 100%; height: 100%; border: 0; }
 
@@ -2882,6 +2892,18 @@ body.eligiendo-imagenes { padding-bottom: 104px; }
 .espejo-rotulo { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--primary-200); }
 .espejo-rotulo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .espejo-rotulo .btn { flex: none; }
+/* Dos botones en el mismo renglón que el nombre: más chicos, para que el nombre no se corte. */
+.espejo-rotulo .btn.small { min-height: 34px; padding: 0 0.6rem; font-size: 0.74rem; border-radius: 10px; }
+.espejo-rotulo span { flex: 1; }
+/* «✂ Zona»: se dibuja un cuadro sobre la página y la pantalla se llena con esa parte. */
+.zona-boton[aria-pressed="true"] { background: var(--primary-400); color: var(--gray-950); border-color: var(--primary-200); }
+.zona-capa { position: absolute; inset: 0; z-index: 3; cursor: crosshair; touch-action: none; background: rgba(52, 205, 250, 0.08); outline: 2px dashed var(--primary-300); outline-offset: -2px; }
+.zona-capa[hidden] { display: none; }
+.zona-marco { position: absolute; border: 2px dashed #fff; background: rgba(52, 205, 250, 0.3); pointer-events: none; }
+.zona-visor { position: absolute; z-index: 2; border: 2px solid var(--amber-400); border-radius: 4px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.45); pointer-events: none; }
+.zona-visor[hidden] { display: none; }
+/* Círculo para mover el cuadro; el resto de la página se sigue pudiendo tocar. */
+.zona-mango { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; border: 2px solid #fff; background: var(--amber-400); color: #201400; font-size: 1.1rem; font-weight: 900; display: grid; place-items: center; pointer-events: auto; touch-action: none; cursor: grab; }
 .espejo-caja {
   width: 100%;
   aspect-ratio: 16 / 9;

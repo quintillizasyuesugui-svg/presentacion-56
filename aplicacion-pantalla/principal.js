@@ -99,10 +99,34 @@ function esPaginaWeb(direccion) {
   return typeof direccion === 'string' && direccion.length <= 2000 && /^https?:\/\//i.test(direccion);
 }
 
+// Zona agrandada desde el celular: cuánto (z: 1 a 4) y qué punto de la página queda en el centro
+// (cx, cy: de 0 a 1). El recuadro se hace z veces más grande que la ventana y la página se dibuja
+// z veces más grande adentro: se ve igual, sólo que de cerca, y la ventana recorta lo que sobra.
+const ZOOM_MAXIMO = 4;
+let zoomPagina = { z: 1, cx: 0.5, cy: 0.5 };
+
 function acomodarPagina() {
   if (!pagina || !ventana) return;
   const [ancho, alto] = ventana.getContentSize();
-  pagina.setBounds({ x: 0, y: 0, width: ancho, height: alto });
+  const z = zoomPagina.z;
+  const mitad = 0.5 / z;
+  const cx = Math.min(1 - mitad, Math.max(mitad, zoomPagina.cx));
+  const cy = Math.min(1 - mitad, Math.max(mitad, zoomPagina.cy));
+  pagina.setBounds({
+    x: Math.round(ancho / 2 - cx * ancho * z),
+    y: Math.round(alto / 2 - cy * alto * z),
+    width: Math.round(ancho * z),
+    height: Math.round(alto * z)
+  });
+  pagina.webContents.setZoomFactor(z);
+}
+
+function zoomDeLaPagina(zona) {
+  if (!zona || typeof zona !== 'object') return false;
+  const numero = (valor, minimo, maximo, siNo) => (Number.isFinite(valor) ? Math.min(maximo, Math.max(minimo, valor)) : siNo);
+  zoomPagina = { z: numero(zona.z, 1, ZOOM_MAXIMO, 1), cx: numero(zona.cx, 0, 1, 0.5), cy: numero(zona.cy, 0, 1, 0.5) };
+  acomodarPagina();
+  return true;
 }
 
 // Busca el menú de la página: los enlaces de <nav>, o si no los del encabezado o los de algo
@@ -165,6 +189,7 @@ function cerrarPagina() {
   const vieja = pagina;
   pagina = null;
   menuPagina = null;
+  zoomPagina = { z: 1, cx: 0.5, cy: 0.5 };
   clearTimeout(relojMenu);
   if (ventana) ventana.contentView.removeChildView(vieja);
   vieja.webContents.close();
@@ -188,6 +213,8 @@ function abrirPagina(direccion) {
       if (detalles.isMainFrame && !detalles.isSameDocument) { menuPagina = null; clearTimeout(relojMenu); }
     });
     contenido.on('did-finish-load', leerMenuPronto);
+    // Al pasar a otro sitio la página vuelve a su tamaño normal: se le repone el agrandado.
+    contenido.on('did-navigate', () => { if (pagina && pagina.webContents === contenido) contenido.setZoomFactor(zoomPagina.z); });
     contenido.on('did-navigate-in-page', (_evento, _url, principal) => { if (principal) leerMenu(); });
     ventana.contentView.addChildView(pagina);
     acomodarPagina();
@@ -215,7 +242,8 @@ function ordenParaLaPagina(orden) {
   if (orden.accion === 'toque' && Number.isFinite(orden.x) && Number.isFinite(orden.y)) {
     const x = Math.round(Math.min(1, Math.max(0, orden.x)) * ancho);
     const y = Math.round(Math.min(1, Math.max(0, orden.y)) * alto);
-    marcarToque(x, y);
+    // El anillo se dibuja adentro de la página, que mide z veces menos que el recuadro.
+    marcarToque(Math.round(x / zoomPagina.z), Math.round(y / zoomPagina.z));
     contenido.sendInputEvent({ type: 'mouseMove', x, y });
     contenido.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
     contenido.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
@@ -267,6 +295,7 @@ function registrarPedidosDePagina() {
   atender('pagina:visible', (siNo) => { if (pagina) pagina.setVisible(siNo !== false); return true; });
   atender('pagina:orden', ordenParaLaPagina);
   atender('pagina:foto', () => fotoDeLaPagina().catch(() => null));
+  atender('pagina:zoom', zoomDeLaPagina);
 }
 
 app.on('second-instance', () => {
