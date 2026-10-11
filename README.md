@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.2.0.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.3.0.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -99,6 +99,16 @@ Lo que se toca en el espejo pasa también en la pantalla.
   cajas debajo de la foto; tocar una lleva la pantalla a esa parte. Si la página no tiene un
   menú que se pueda leer, el celular avisa «No detecté cajas de menú en esta página» y se
   maneja tocando la foto.
+- **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
+  «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
+  llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»
+  vuelve. Viaja con el mismo aviso `zoom` de las fotos. En foto en vivo hace falta la app de PC
+  1.3.0 o más nueva, que agranda el recuadro de la página sin reacomodarla; con una app
+  anterior el botón no aparece.
+- **Sin pantalla:** el celular sabe si hay una pantalla abierta con el mismo PIN (aviso
+  `hayPantalla`). Si no hay, el cuadrito «Mostrar» queda gris en «Sin pantalla» y tocarlo avisa
+  que primero hay que abrirla; si la pantalla se cierra en medio, el celular deja de decir
+  «En pantalla».
 - **Fluidez:** mientras se toca o se desliza, la foto en vivo se renueva unas 5 veces por
   segundo (con la página quieta, una por segundo y sólo si cambió). Al mover una imagen
   agrandada, el celular avisa unas 30 veces por segundo y la pantalla la sigue en cada cuadro.
