@@ -511,6 +511,13 @@
   const AYUDA_SIN_MENU = 'No detecté cajas de menú en esta página. Tocá la foto para manejarla; deslizá para subir o bajar.';
   let enVivo = false;
 
+  // El renglón de ayuda sólo ocupa lugar cuando avisa algo (dibujar la zona, mover el cuadro, una
+  // página que no se puede manejar). La frase de siempre se esconde: así el control entra entero
+  // en un celular chico sin tener que bajar.
+  const esconderAyudaComun = () => { espejoAyuda.hidden = espejoAyuda.textContent === AYUDA_ESPEJO || espejoAyuda.textContent === AYUDA_VIVO; };
+  new MutationObserver(esconderAyudaComun).observe(espejoAyuda, { childList: true, characterData: true, subtree: true });
+  esconderAyudaComun();
+
   // Cajas del menú que la app de PC le leyó a la página. Sin dato todavía (null) se deja lo que
   // había, para que las cajas no parpadeen cada vez que la página cambia.
   function vivoPintarMenu(menu) {
