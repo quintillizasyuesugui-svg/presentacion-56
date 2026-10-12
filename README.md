@@ -107,9 +107,11 @@ Lo que se toca en el espejo pasa también en la pantalla.
   anterior el botón no aparece.
 - **«🔄» Actualizar la página:** si cambiaste tu página en internet y la pantalla sigue mostrando la
   de antes, el botón «🔄» (al lado del nombre de la página) hace que la pantalla la pida de nuevo.
-  Con la app de PC 1.3.1 o más nueva se borra antes lo que tenía guardado, así sale la última
-  versión; en un navegador sólo se la vuelve a cargar. El celular avisa «Página al día» cuando la
-  pantalla contesta.
+  Funciona con la app de PC y también con la pantalla abierta en un navegador común: la app
+  (1.3.1 o más nueva) borra lo que tenía guardado; en un navegador, la página que lleva el puente
+  pide de nuevo sus archivos (estilos, programas e imágenes) y se recarga sola, y la que no lo
+  lleva se abre con una marca en la dirección. El celular avisa «Página al día» cuando la pantalla
+  contesta. Para que ande en un navegador, la página tiene que llevar el `puente.js` actual.
 - **Borrar lo que se está mostrando:** si se borra la imagen o la página que está en pantalla, la
   pantalla pasa enseguida a la que quedó en su lugar; si no queda ninguna, vuelve a la espera.
 - **Sin pantalla:** el celular sabe si hay una pantalla abierta con el mismo PIN (aviso

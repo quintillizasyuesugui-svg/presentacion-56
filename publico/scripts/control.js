@@ -787,7 +787,12 @@
     void actualizarBtn.offsetWidth; // para que las flechitas giren otra vez aunque se toque seguido
     actualizarBtn.classList.add('girando');
     socket.emit('web', { accion: 'recargar' });
-    if (!enVivo && espejoUrl) espejoMarco.src = espejoUrl;
+    // El espejo de este celular también: con el puente, la página trae sus archivos nuevos y se
+    // recarga sola; sin puente, se la vuelve a pedir.
+    if (!enVivo && espejoUrl) {
+      if (espejoPreparada && espejoMarco.contentWindow) espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, origenDe(espejoBase));
+      else espejoMarco.src = espejoUrl;
+    }
     clearTimeout(esperandoPagina);
     esperandoPagina = setTimeout(() => { esperandoPagina = null; showToast('📺 La pantalla no contestó. Probá otra vez.'); }, 6000);
   });

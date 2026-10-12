@@ -108,10 +108,34 @@
     if (actual !== -1 && destino) location.href = destino.href;
   }
 
+  // «🔄» en el celular: la página cambió en internet y el navegador tiene guardada la de antes.
+  // Se piden de nuevo, salteando lo guardado, la página y sus archivos (estilos, programas e
+  // imágenes del mismo sitio); recién entonces se vuelve a cargar, y sale la última versión.
+  // Así funciona en cualquier navegador, sin la aplicación de PC.
+  var recargando = false;
+  function recargar() {
+    if (recargando) return;
+    recargando = true;
+    var direcciones = [location.href];
+    var piezas = document.querySelectorAll('link[rel~="stylesheet"][href], script[src], img[src]');
+    for (var i = 0; i < piezas.length && direcciones.length < 80; i++) {
+      var direccion = piezas[i].href || piezas[i].currentSrc || piezas[i].src;
+      try {
+        if (new URL(direccion, location.href).origin === location.origin && direcciones.indexOf(direccion) === -1) direcciones.push(direccion);
+      } catch (error) { /* dirección que no sirve */ }
+    }
+    var volver = function () { if (recargando) { recargando = false; location.reload(); } };
+    Promise.all(direcciones.map(function (cual) {
+      return fetch(cual, { cache: 'reload' }).catch(function () { /* sin internet: se recarga igual */ });
+    })).then(volver);
+    setTimeout(volver, 6000); // con internet lento no se queda esperando
+  }
+
   addEventListener('message', function (evento) {
     if (evento.source !== window.parent || !permitido(evento.origin)) return;
     var orden = evento.data;
     if (!orden || orden.conexiones !== true) return;
+    if (orden.tipo === 'recargar') { recargar(); return; }
     if (orden.tipo === 'clic' && typeof orden.ruta === 'string') {
       var elemento = null;
       try { elemento = document.querySelector(orden.ruta); } catch (error) { /* camino que no sirve */ }

@@ -1221,6 +1221,7 @@
     const aviso = evento.data;
     if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
     if (evento.origin !== origenDe(paginaBase)) return;
+    clearTimeout(recargaSinRespuesta); // la página contestó: se volvió a cargar por su cuenta
     const primera = paginaModo !== 'espejo';
     if (primera) { paginaModo = 'espejo'; clearTimeout(esperaPuente); }
     if (!primera && aviso.url === paginaActual) return;
@@ -1228,18 +1229,38 @@
     contarEstado();
   });
 
-  // «🔄» en el celular: la página cambió en internet y acá se ve la de antes. En la app de PC se
-  // borra lo guardado y se la pide de nuevo; en un navegador sólo se la puede volver a cargar.
+  // «🔄» en el celular: la página cambió en internet y acá se ve la de antes. Tiene que andar igual
+  // con la app de PC y en cualquier navegador:
+  //  - en la app de PC se borra lo guardado y se la pide de nuevo;
+  //  - en un navegador, si la página lleva el puente, se le pide que traiga sus archivos nuevos y se
+  //    recargue sola (un navegador no deja borrar desde acá lo que guardó de otro sitio);
+  //  - sin puente, se la abre con una marca en la dirección, para que no use la página guardada.
+  let recargaSinRespuesta = null;
+  function conMarca(direccion) {
+    const url = new URL(direccion);
+    url.searchParams.set('conexiones', Date.now().toString(36));
+    return url.href;
+  }
   async function recargarPagina() {
+    clearTimeout(recargaSinRespuesta);
     if (paginaModo === 'vivo') {
       const hecho = await appPC.orden({ accion: 'recargar' });
       if (!hecho) appPC.abrir(paginaActual || paginaBase); // apps de PC anteriores a la 1.3.1
       apurarFotos(APURO_MAXIMO);
     } else {
       const direccion = paginaActual || paginaBase;
-      if (appPC && appPC.limpiar) await appPC.limpiar();
-      if (capaPagina.hidden || (paginaActual || paginaBase) !== direccion) return; // mientras tanto se pasó a otra
-      marcoPagina.src = direccion;
+      const sigueIgual = () => !capaPagina.hidden && (paginaActual || paginaBase) === direccion;
+      if (appPC && appPC.limpiar) {
+        await appPC.limpiar();
+        if (!sigueIgual()) return; // mientras tanto se pasó a otra
+        marcoPagina.src = direccion;
+      } else if (paginaModo === 'espejo' && marcoPagina.contentWindow) {
+        marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, origenDe(paginaBase));
+        // Una página con un puente anterior no sabe recargarse sola: si no contesta, se la abre con la marca.
+        recargaSinRespuesta = setTimeout(() => { if (sigueIgual()) marcoPagina.src = conMarca(direccion); }, 9000);
+      } else {
+        marcoPagina.src = conMarca(direccion);
+      }
     }
     contarEstado(); // así el celular sabe que la pantalla ya la pidió de nuevo
   }
