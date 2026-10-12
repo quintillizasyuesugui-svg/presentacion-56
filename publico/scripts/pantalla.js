@@ -966,6 +966,9 @@
       cerrarBanda();
       pintarInvitacion();
     } else if (accion === 'siguiente') {
+      // Una página web con menú no se pasa de largo: «Siguiente» (o el reloj) recorre antes cada
+      // parte del menú. Cuando no queda ninguna, sigue la diapositiva siguiente o la frase final.
+      if (!showingFinal && pasarParteDelMenu()) { scheduleAutoAdvance(); return; }
       if (showingFinal) {
         // Si era sólo una prueba ("Enviar a PC"), no tocó el índice — al
         // cerrarla, lo de abajo ya es la diapositiva correcta, no hay que
@@ -982,11 +985,12 @@
         updateHud();
         updateProgress();
         // Si fue el avance automático el que llegó hasta acá, termina el show solo.
-        if (fromAuto) terminarAvanceAutomatico();
+        if (fromAuto) { volverAEntera(); terminarAvanceAutomatico(); }
         return; // no tocar #img/#imgBg mientras se muestra la frase
       } else if (fromAuto && autoAdvance && autoAdvance.enabled && diapositivas.length && index >= diapositivas.length - 1) {
         // Última diapositiva sin frase final: el avance automático también termina acá (antes
         // volvía a la 1 y seguía en loop para siempre). Se queda en la última.
+        volverAEntera();
         terminarAvanceAutomatico();
         return;
       } else {
@@ -1045,6 +1049,7 @@
 
     const slide = diapositivas[index];
     const numero = ++cambioNumero;
+    partesVistas = null;
     aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
     const esUltima = index === diapositivas.length - 1;
     if (slide.pagina) {
@@ -1122,6 +1127,7 @@
       paginaBase = direccion;
       paginaActual = direccion;
       paginaModo = '';
+      menuPuente = null;
       marcoPagina.src = direccion;
       // En la app de PC: si la página termina de cargar y no contestó con el puente, la abre la
       // app (ver el aviso «load» más abajo). El tope es por si nunca termina de cargar.
@@ -1140,7 +1146,73 @@
     paginaBase = '';
     paginaActual = '';
     paginaModo = '';
+    menuPuente = null;
     marcoPagina.removeAttribute('src'); // corta también el sonido que tuviera la página
+  }
+
+  // ---- Avance automático adentro de una página web ----
+  // Con el temporizador prendido, una página web no se pasa de largo: después de la portada el
+  // reloj recorre las partes de su menú, una por turno, y recién entonces sigue la diapositiva
+  // siguiente. El menú lo avisa la página (puente) o lo lee la app de PC; si no se sabe, la
+  // página dura un turno, como una foto.
+  let menuPuente = null;   // el menú que avisó la página con el puente
+  let partesVistas = null; // direcciones de esta página que ya se mostraron
+  let pasoSolo = 0;        // sube cada vez que se pasa de parte desde acá: el espejo del celular la sigue
+  const PARTES_TOPE = 12;
+
+  // «…/index.html» y «…/» son la misma parte.
+  function sinVueltas(direccion) {
+    try {
+      const url = new URL(direccion);
+      url.pathname = url.pathname.replace(/\/index\.html?$/i, '/');
+      if (!url.hash) url.hash = '';
+      return url.href;
+    } catch { return ''; }
+  }
+
+  // Anota la parte de la página que se está viendo, también si se llegó tocando en el celular:
+  // lo que ya se vio no se repite.
+  function anotarParte() {
+    if (!paginaBase) return;
+    if (!partesVistas) partesVistas = new Set([sinVueltas(paginaBase)]);
+    partesVistas.add(sinVueltas(paginaActual || paginaBase));
+  }
+
+  // Se acabó el tiempo de lo que se estaba viendo: si se lo había agrandado o movido desde el
+  // celular, vuelve a su tamaño original, y el celular se entera.
+  function volverAEntera() {
+    if (zoomActual.z <= 1.01) return;
+    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
+    contarEstado();
+  }
+
+  // Pasa a la parte del menú que sigue. Devuelve false si no hay menú o ya se vieron todas.
+  function pasarParteDelMenu() {
+    const slide = diapositivas[index];
+    if (!slide || !slide.pagina || capaPagina.hidden || !paginaBase) return false;
+    const menu = paginaModo === 'vivo' ? paginaMenu : paginaModo === 'espejo' ? menuPuente : null;
+    if (!Array.isArray(menu)) return false;
+    anotarParte();
+    if (partesVistas.size > PARTES_TOPE) return false;
+    const parte = menu.find(caja => caja && typeof caja.url === 'string' &&
+      origenDe(caja.url) === origenDe(paginaBase) && !partesVistas.has(sinVueltas(caja.url)));
+    if (!parte) return false;
+    partesVistas.add(sinVueltas(parte.url));
+    pasoSolo++;
+    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true); // cada parte arranca entera
+    if (paginaModo === 'vivo') {
+      const numero = cambioNumero;
+      Promise.resolve(appPC.orden({ accion: 'ir', url: parte.url })).then((hecho) => {
+        // La app no tiene esa dirección en el menú de ahora: se prueba con la que sigue.
+        if (hecho === false && numero === cambioNumero) aplicarCambio('siguiente', { auto: true });
+      });
+      apurarFotos(APURO_MAXIMO);
+    } else {
+      paginaActual = parte.url;
+      marcoPagina.src = parte.url;
+    }
+    contarEstado();
+    return true;
   }
 
   // ---- Foto en vivo (sólo en la app de PC) ----
@@ -1197,7 +1269,7 @@
       if (foto && foto.jpg && paginaModo === 'vivo') {
         if (foto.jpg !== ultimaFoto) {
           ultimaFoto = foto.jpg;
-          if (foto.url) paginaActual = foto.url.slice(0, 500);
+          if (foto.url) { paginaActual = foto.url.slice(0, 500); anotarParte(); }
           socket.emit('webFoto', { jpg: foto.jpg, url: foto.url, titulo: foto.titulo });
           // Si sigue cambiando (la página está cargando o bajando), siguen las fotos seguidas.
           if (Date.now() - ultimaOrden < APURO_MAXIMO) apuroHasta = Math.max(apuroHasta, Date.now() + 800);
@@ -1222,10 +1294,14 @@
     if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
     if (evento.origin !== origenDe(paginaBase)) return;
     clearTimeout(recargaSinRespuesta); // la página contestó: se volvió a cargar por su cuenta
+    menuPuente = Array.isArray(aviso.menu)
+      ? aviso.menu.slice(0, PARTES_TOPE).filter(caja => caja && typeof caja.url === 'string' && caja.url.length <= 500)
+      : null;
     const primera = paginaModo !== 'espejo';
     if (primera) { paginaModo = 'espejo'; clearTimeout(esperaPuente); }
     if (!primera && aviso.url === paginaActual) return;
     paginaActual = aviso.url.slice(0, 500);
+    anotarParte();
     contarEstado();
   });
 
@@ -1306,6 +1382,7 @@
       paginaMenu: slide && slide.pagina && paginaModo === 'vivo' ? paginaMenu : null,
       // En «vivo» agranda la app de PC; las apps anteriores a la 1.3.0 no saben hacerlo.
       paginaZoom: Boolean(slide && slide.pagina && (paginaModo !== 'vivo' || (appPC && appPC.zoom))),
+      paginaPaso: pasoSolo,
       ancho: window.innerWidth,
       alto: window.innerHeight,
       zoom: zoomActual

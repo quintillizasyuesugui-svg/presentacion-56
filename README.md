@@ -99,6 +99,12 @@ Lo que se toca en el espejo pasa también en la pantalla.
   cajas debajo de la foto; tocar una lleva la pantalla a esa parte. Si la página no tiene un
   menú que se pueda leer, el celular avisa «No detecté cajas de menú en esta página» y se
   maneja tocando la foto.
+- **«Siguiente» recorre el menú de la página:** con una página web en pantalla, «Siguiente» (el
+  botón, la voz o el avance automático) pasa primero por cada parte de su menú, sin repetir la
+  portada ni lo que ya se vio; cuando no queda ninguna sigue la diapositiva siguiente, y si no
+  hay más, la frase final. Con el avance automático cada parte dura el tiempo completo. Lo que
+  se agrandó vuelve a su tamaño cuando se acaba el tiempo. Si no se puede leer el menú (página
+  sin puente en un navegador), la página dura un turno, como una foto.
 - **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
   «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
   llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»

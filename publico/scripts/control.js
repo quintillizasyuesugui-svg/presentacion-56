@@ -371,11 +371,17 @@
     }
   }
 
+  // ¿Hay algo en pantalla que se pueda agrandar? Una foto, o una página web con «✂ Zona».
+  function puedeZoom() {
+    return showStarted && (espejoWeb.hidden ? !zoomFoto.hidden : !zonaBtn.hidden);
+  }
+
   function cambiarZoom(nuevo, alFinal) {
-    if (!showStarted || zoomFoto.hidden) return;
+    if (!puedeZoom()) return;
     Object.assign(zoom, nuevo);
     acotarZoom();
     pintarZoom();
+    if (!espejoWeb.hidden) zonaPintar();
     mandarZoom(alFinal);
   }
 
@@ -453,6 +459,7 @@
   const AYUDA_ESPEJO = 'Tocá lo que quieras: pasa lo mismo en la pantalla.';
   let espejoBase = '';       // la dirección que se agregó en Gestionar
   let espejoUrl = '';        // en cuál de sus páginas va este espejo
+  let espejoPaso = 0;        // cuántas veces la pantalla pasó sola de parte (lo cuenta ella)
   let espejoAlto = 720;
   let espejoCerca = false;
   let espejoPreparada = false;
@@ -493,6 +500,14 @@
       espejoEspera = setTimeout(() => {
         if (!espejoPreparada) espejoAyuda.textContent = 'Esta página no está preparada para Conexiones: se ve, pero lo que toques acá no pasa en la pantalla.';
       }, 8000);
+      espejoPaso = estado.paginaPaso || 0;
+    } else if (Number.isInteger(estado.paginaPaso) && estado.paginaPaso !== espejoPaso) {
+      // La pantalla pasó sola a otra parte del menú («Siguiente» o el temporizador): el espejo la sigue.
+      espejoPaso = estado.paginaPaso;
+      if (estado.paginaActual && origenDe(estado.paginaActual) === origenDe(espejoBase) && estado.paginaActual !== espejoUrl) {
+        espejoUrl = estado.paginaActual;
+        espejoMarco.src = espejoUrl;
+      }
     }
     espejoAjustar();
   }
@@ -994,8 +1009,8 @@
       return;
     }
     if (orden.tipo === 'zoom') {
-      // Agrandar o achicar la imagen de la pantalla, igual que con los dos dedos.
-      if (!showStarted || zoomFoto.hidden) { showHeard(oido, 'primero tocá «Mostrar»'); return; }
+      // Agrandar o achicar la imagen (o la página web) de la pantalla, igual que con los dos dedos.
+      if (!puedeZoom()) { showHeard(oido, 'primero tocá «Mostrar»'); return; }
       if (orden.accion === 'centrar') {
         // Sólo centra: el tamaño queda como estaba.
         cambiarZoom({ cx: 0.5, cy: 0.5 }, true);
