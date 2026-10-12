@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('ConexionesPC', {
     visible: (siNo) => ipcRenderer.invoke('pagina:visible', siNo),
     orden: (orden) => ipcRenderer.invoke('pagina:orden', orden),
     foto: () => ipcRenderer.invoke('pagina:foto'),
-    zoom: (zona) => ipcRenderer.invoke('pagina:zoom', zona)
+    zoom: (zona) => ipcRenderer.invoke('pagina:zoom', zona),
+    limpiar: () => ipcRenderer.invoke('pagina:limpiar')
   }
 });

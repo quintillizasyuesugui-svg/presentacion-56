@@ -2896,6 +2896,11 @@ body.eligiendo-imagenes { padding-bottom: 104px; }
 .espejo-rotulo .btn.small { min-height: 34px; padding: 0 0.6rem; font-size: 0.74rem; border-radius: 10px; }
 .espejo-rotulo span { flex: 1; }
 /* «✂ Zona»: se dibuja un cuadro sobre la página y la pantalla se llena con esa parte. */
+/* «🔄»: vuelve a traer la página de internet. Las flechitas dan una vuelta al tocarlo. */
+.espejo-rotulo .actualizar-boton { width: 34px; padding: 0; }
+.espejo-rotulo .actualizar-boton span { flex: none; display: inline-block; overflow: visible; }
+.actualizar-boton.girando span { animation: actualizar-gira 700ms var(--ease-out); }
+@keyframes actualizar-gira { to { transform: rotate(360deg); } }
 .zona-boton[aria-pressed="true"] { background: var(--primary-400); color: var(--gray-950); border-color: var(--primary-200); }
 .zona-capa { position: absolute; inset: 0; z-index: 3; cursor: crosshair; touch-action: none; background: rgba(52, 205, 250, 0.08); outline: 2px dashed var(--primary-300); outline-offset: -2px; }
 .zona-capa[hidden] { display: none; }

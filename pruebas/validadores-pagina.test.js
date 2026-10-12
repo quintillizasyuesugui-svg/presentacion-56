@@ -43,6 +43,7 @@ test('foto en vivo: órdenes para la página que abre la app de PC', () => {
   assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'toque', x: 0.25, y: 2 }), { accion: 'toque', x: 0.25, y: 1 });
   assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'rueda', dy: -9 }), { accion: 'rueda', dy: -3 });
   assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'volver', de: 'más' }), { accion: 'volver' });
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'recargar', url: 'https://otra.com' }), { accion: 'recargar' });
   assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'texto', texto: 'hola café' }), { accion: 'texto', texto: 'hola café' });
   assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'tecla', tecla: 'Enter' }), { accion: 'tecla', tecla: 'Enter' });
   for (const mala of [{ accion: 'toque', x: 'a', y: 0 }, { accion: 'rueda' }, { accion: 'texto', texto: '' }, { accion: 'texto', texto: 'a'.repeat(201) },

@@ -53,6 +53,8 @@ function limpiarOrdenWeb(datos) {
     return { accion: 'rueda', dy: Math.min(3, Math.max(-3, datos.dy)) }; // en «pantallas»: 1 = una pantalla hacia abajo
   }
   if (datos.accion === 'volver') return { accion: 'volver' };
+  // «🔄»: volver a traer la página de internet, por si cambió y la pantalla tiene guardada la de antes.
+  if (datos.accion === 'recargar') return { accion: 'recargar' };
   if (datos.accion === 'texto') {
     if (typeof datos.texto !== 'string' || !datos.texto || datos.texto.length > 200 || /[\u0000-\u001f]/.test(datos.texto)) return null;
     return { accion: 'texto', texto: datos.texto };

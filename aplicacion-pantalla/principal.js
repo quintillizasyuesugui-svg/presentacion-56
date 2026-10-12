@@ -255,6 +255,9 @@ function ordenParaLaPagina(orden) {
     // Una caja del menú tocada en el celular: sólo se va a direcciones que están en el menú leído.
     if (!menuPagina || !menuPagina.some(caja => caja.url === orden.url)) return false;
     contenido.loadURL(orden.url).catch(() => {});
+  } else if (orden.accion === 'recargar') {
+    // Se tira lo guardado de esa página y se la pide de nuevo a internet: sale la última versión.
+    contenido.session.clearCache().catch(() => {}).then(() => { if (pagina && pagina.webContents === contenido) contenido.reloadIgnoringCache(); });
   } else if (orden.accion === 'volver') {
     if (contenido.navigationHistory.canGoBack()) contenido.navigationHistory.goBack();
   } else if (orden.accion === 'texto' && typeof orden.texto === 'string' && orden.texto.length <= 200) {
@@ -296,6 +299,8 @@ function registrarPedidosDePagina() {
   atender('pagina:orden', ordenParaLaPagina);
   atender('pagina:foto', () => fotoDeLaPagina().catch(() => null));
   atender('pagina:zoom', zoomDeLaPagina);
+  // Las páginas preparadas para Conexiones se ven adentro de la pantalla: lo guardado está en la ventana.
+  atender('pagina:limpiar', () => ventana.webContents.session.clearCache().then(() => true, () => false));
 }
 
 app.on('second-instance', () => {

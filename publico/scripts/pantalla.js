@@ -524,9 +524,29 @@
     authFetch('/api/images')
       .then(res => res.json())
       .then(images => {
+        // Lo que se estaba mostrando, para saber si sigue en la lista después del cambio.
+        const clave = (d) => (d ? d.id || d.pagina || d.src : '');
+        const mostrada = started ? clave(diapositivas[index]) : '';
         diapositivas = images;
-        // Si se borraron imágenes y el índice actual quedó fuera de rango, lo acotamos
-        if (index > diapositivas.length - 1) index = Math.max(0, diapositivas.length - 1);
+        if (started && !diapositivas.length) {
+          // Se borró todo en medio de la presentación: no queda nada que mostrar.
+          volverALaEspera();
+          return;
+        }
+        const dondeQuedo = mostrada ? diapositivas.findIndex(d => clave(d) === mostrada) : -1;
+        if (dondeQuedo >= 0) {
+          // Sigue en la lista (quizá en otro lugar, si se reordenó): no se toca lo que se ve.
+          index = dondeQuedo;
+        } else if (index > diapositivas.length - 1) {
+          // Si se borraron imágenes y el índice actual quedó fuera de rango, lo acotamos
+          index = Math.max(0, diapositivas.length - 1);
+        }
+        if (started && mostrada && dondeQuedo < 0) {
+          // La que estaba en pantalla se borró: se pasa a la que quedó en su lugar. Antes seguía
+          // a la vista hasta tocar «Siguiente».
+          pintarDiapositiva();
+          return;
+        }
         updateHud();
         updateProgress();
         if (diapositivas.length) precargar(started ? index + 1 : 0);
@@ -998,20 +1018,44 @@
       return;
     }
 
+    pintarDiapositiva();
+  }
+
+  // Sin diapositivas en medio de la presentación: vuelve la pantalla de espera, como antes de «Mostrar».
+  function volverALaEspera() {
+    started = false;
+    index = 0;
+    cambioNumero++;
+    ocultarPagina();
+    img.classList.remove('show');
+    imgBg.classList.remove('show');
+    waitingHint.textContent = '📷 Ya no quedan imágenes. Subilas desde el celular en «🖼️ Gestionar» y tocá Mostrar de nuevo.';
+    waiting.classList.remove('hide');
+    identityCorner.hidden = false;
+    aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
+    updateHud();
+    updateProgress();
+    contarEstado();
+  }
+
+  // Pone en pantalla la diapositiva en la que está el índice.
+  function pintarDiapositiva() {
     updateHud();
     updateProgress();
 
     const slide = diapositivas[index];
     const numero = ++cambioNumero;
     aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
-    contarEstado();
     const esUltima = index === diapositivas.length - 1;
     if (slide.pagina) {
+      // mostrarPagina avisa el estado cuando ya cambió de página: si se avisara antes, el celular
+      // abriría el espejo en la página web anterior (pasaba con dos páginas web seguidas).
       mostrarPagina(slide.pagina);
       precargar(index + 1);
       scheduleAutoAdvance();
       return;
     }
+    contarEstado();
     cuandoEsteLista(direccionParaPantalla(slide.src), slide.src, (dir) => {
       if (numero !== cambioNumero) return; // mientras cargaba se pasó a otra
       ocultarPagina(); // si venía de una página web, se va recién cuando la foto está lista
@@ -1072,7 +1116,7 @@
 
   function mostrarPagina(direccion) {
     // Conexiones adentro de Conexiones no se muestra: el recuadro quedaría con los mismos permisos.
-    if (!origenDe(direccion) || origenDe(direccion) === location.origin) return;
+    if (!origenDe(direccion) || origenDe(direccion) === location.origin) { contarEstado(); return; }
     if (direccion !== paginaBase) {
       dejarVivo();
       paginaBase = direccion;
@@ -1184,8 +1228,25 @@
     contarEstado();
   });
 
+  // «🔄» en el celular: la página cambió en internet y acá se ve la de antes. En la app de PC se
+  // borra lo guardado y se la pide de nuevo; en un navegador sólo se la puede volver a cargar.
+  async function recargarPagina() {
+    if (paginaModo === 'vivo') {
+      const hecho = await appPC.orden({ accion: 'recargar' });
+      if (!hecho) appPC.abrir(paginaActual || paginaBase); // apps de PC anteriores a la 1.3.1
+      apurarFotos(APURO_MAXIMO);
+    } else {
+      const direccion = paginaActual || paginaBase;
+      if (appPC && appPC.limpiar) await appPC.limpiar();
+      if (capaPagina.hidden || (paginaActual || paginaBase) !== direccion) return; // mientras tanto se pasó a otra
+      marcoPagina.src = direccion;
+    }
+    contarEstado(); // así el celular sabe que la pantalla ya la pidió de nuevo
+  }
+
   socket.on('web', (orden) => {
     if (!orden || capaPagina.hidden) return;
+    if (orden.accion === 'recargar') { recargarPagina(); return; }
     if (paginaModo === 'vivo') {
       if (['toque', 'rueda', 'volver', 'texto', 'tecla', 'ir'].includes(orden.accion)) {
         appPC.orden(orden);

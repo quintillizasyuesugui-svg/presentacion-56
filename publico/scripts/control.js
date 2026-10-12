@@ -770,6 +770,27 @@
   zonaMango.addEventListener('pointerup', zonaSoltarMango);
   zonaMango.addEventListener('pointercancel', zonaSoltarMango);
 
+  // ---- «🔄»: la página cambió en internet y la pantalla muestra la de antes ----
+  // La pantalla la vuelve a pedir (la app de PC borra antes lo que tenía guardado) y contesta con su
+  // estado: recién ahí se avisa «Página al día». El espejo de este celular también se vuelve a cargar.
+  const actualizarBtn = document.getElementById('actualizarBtn');
+  let esperandoPagina = null;
+  actualizarBtn.addEventListener('click', () => {
+    actualizarBtn.classList.remove('girando');
+    void actualizarBtn.offsetWidth; // para que las flechitas giren otra vez aunque se toque seguido
+    actualizarBtn.classList.add('girando');
+    socket.emit('web', { accion: 'recargar' });
+    if (!enVivo && espejoUrl) espejoMarco.src = espejoUrl;
+    clearTimeout(esperandoPagina);
+    esperandoPagina = setTimeout(() => { esperandoPagina = null; showToast('📺 La pantalla no contestó. Probá otra vez.'); }, 6000);
+  });
+  function paginaContesto() {
+    if (!esperandoPagina) return;
+    clearTimeout(esperandoPagina);
+    esperandoPagina = null;
+    showToast('✅ Página al día.');
+  }
+
   function espejoOcultar() {
     if (espejoWeb.hidden) return;
     zonaApagar();
@@ -875,10 +896,20 @@
         if (estado.pagina) {
           espejoMostrar(estado);
           if (!espejoWeb.hidden) zonaDesdeEstado(estado);
+          paginaContesto();
         } else {
           espejoOcultar();
           zoomMostrarFoto(estado.src, estado.zoom);
         }
+      } else if (showStarted && estado.total === 0) {
+        // Se borraron todas las imágenes mientras se mostraba: la pantalla volvió a la espera.
+        showStarted = false;
+        fotoPantalla = { foto: 0, total: 0 };
+        espejoOcultar();
+        zoomApagar();
+        updateNavButtonsState();
+        pintarPasos();
+        showToast('📷 Ya no quedan imágenes para mostrar.');
       }
     });
     // La pantalla entró o se fue. Si se va en medio de la presentación, el control deja de

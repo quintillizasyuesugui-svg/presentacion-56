@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.3.0.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.3.1.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -105,6 +105,13 @@ Lo que se toca en el espejo pasa también en la pantalla.
   vuelve. Viaja con el mismo aviso `zoom` de las fotos. En foto en vivo hace falta la app de PC
   1.3.0 o más nueva, que agranda el recuadro de la página sin reacomodarla; con una app
   anterior el botón no aparece.
+- **«🔄» Actualizar la página:** si cambiaste tu página en internet y la pantalla sigue mostrando la
+  de antes, el botón «🔄» (al lado del nombre de la página) hace que la pantalla la pida de nuevo.
+  Con la app de PC 1.3.1 o más nueva se borra antes lo que tenía guardado, así sale la última
+  versión; en un navegador sólo se la vuelve a cargar. El celular avisa «Página al día» cuando la
+  pantalla contesta.
+- **Borrar lo que se está mostrando:** si se borra la imagen o la página que está en pantalla, la
+  pantalla pasa enseguida a la que quedó en su lugar; si no queda ninguna, vuelve a la espera.
 - **Sin pantalla:** el celular sabe si hay una pantalla abierta con el mismo PIN (aviso
   `hayPantalla`). Si no hay, el cuadrito «Mostrar» queda gris en «Sin pantalla» y tocarlo avisa
   que primero hay que abrirla; si la pantalla se cierra en medio, el celular deja de decir
