@@ -16,7 +16,7 @@
   function enviar(accion) {
     // Sin una pantalla abierta no hay dónde mostrar: se avisa en vez de hacer como que anda.
     if (!hayPantalla) {
-      showToast(SIN_PANTALLA);
+      showToast(esperandoPantalla ? '📺 Abrí la pantalla en la PC: sigue sola.' : SIN_PANTALLA);
       return;
     }
     // "Atrás"/"Siguiente" antes de "Mostrar" no tienen nada que recorrer
@@ -75,13 +75,16 @@
   // Hasta que conteste no se sabe, y el cuadrito se ve como siempre.
   let hayPantalla = false;
   let pantallaSabida = false;
+  // La pantalla se cerró en medio de la presentación: al abrirla sigue sola donde iba.
+  let esperandoPantalla = false;
   const SIN_PANTALLA = '📺 Primero abrí la pantalla en la PC.';
 
   // Cuadrito «Mostrar»: gris «Sin pantalla» mientras no haya dónde mostrar; celeste que late
   // hasta que se toca; después verde con «3/10» y una barrita.
   function pintarMostrar() {
     const encendido = showStarted;
-    const sinPantalla = pantallaSabida && !hayPantalla && !encendido;
+    const esperando = esperandoPantalla && !encendido;
+    const sinPantalla = pantallaSabida && !encendido && (!hayPantalla || esperando);
     mostrarBtn.classList.toggle('sin-pantalla', sinPantalla);
     mostrarBtn.classList.toggle('listo', !encendido && !sinPantalla);
     mostrarBtn.classList.toggle('mostrando', encendido);
@@ -90,12 +93,12 @@
     const franja = document.getElementById('estadoPantalla');
     // Con «Primeros pasos» a la vista no hace falta: el paso 2 ya dice lo mismo y no sobra lugar.
     franja.hidden = !pantallaSabida || encendido || !document.getElementById('primerosPasos').hidden;
-    franja.classList.toggle('lista', hayPantalla);
-    document.getElementById('estadoPantallaTitulo').textContent = hayPantalla ? 'Pantalla lista.' : 'Falta la pantalla.';
-    document.getElementById('estadoPantallaTexto').textContent = hayPantalla ? 'Tocá «Mostrar».' : 'Abrila en la PC.';
+    franja.classList.toggle('lista', hayPantalla && !esperando);
+    document.getElementById('estadoPantallaTitulo').textContent = esperando ? 'Esperando la pantalla.' : hayPantalla ? 'Pantalla lista.' : 'Falta la pantalla.';
+    document.getElementById('estadoPantallaTexto').textContent = esperando ? (hayPantalla ? 'Ya sigue sola.' : 'Abrila: sigue sola.') : hayPantalla ? 'Tocá «Mostrar».' : 'Abrila en la PC.';
     document.getElementById('mostrarNumero').hidden = !encendido;
     document.getElementById('mostrarAvance').hidden = !encendido;
-    document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : sinPantalla ? 'Sin pantalla' : 'Mostrar';
+    document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : esperando ? 'Esperando' : sinPantalla ? 'Sin pantalla' : 'Mostrar';
     if (encendido) {
       const total = Math.max(1, fotoPantalla.total || totalSlidesSeguro());
       const foto = Math.min(total, Math.max(1, fotoPantalla.foto || 1));
@@ -162,6 +165,7 @@
     ocultarHojaCerrar();
     socket.emit('cerrarPantalla');
     showStarted = false;
+    esperandoPantalla = false;
     fotoPantalla = { foto: 0, total: 0 };
     updateNavButtonsState();
     pintarPasos();
@@ -916,6 +920,11 @@
     socket.on('identificado', () => socket.emit('pantallaPedirEstado'));
     socket.on('pantallaEstado', (estado) => {
       if (!estado) return;
+      // Ya contestó: o sigue donde iba («sigue») o no hay nada que esperar.
+      if (esperandoPantalla && !estado.sigue) {
+        esperandoPantalla = false;
+        if (!estado.mostrando) { updateNavButtonsState(); pintarPasos(); }
+      }
       if (estado.mostrando) {
         fotoPantalla = { foto: estado.foto, total: estado.total };
         if (!showStarted) { showStarted = true; pintarPasos(); }
@@ -941,18 +950,23 @@
     });
     // La pantalla entró o se fue. Si se va en medio de la presentación, el control deja de
     // decir «En pantalla» y vuelve a pedir que se conecte una.
-    socket.on('hayPantalla', (hay) => {
+    socket.on('hayPantalla', (hay, recuerda) => {
+      const habia = hayPantalla;
+      const sabida = pantallaSabida;
       hayPantalla = hay === true;
       pantallaSabida = true;
+      esperandoPantalla = recuerda === true && !(hayPantalla && showStarted);
       if (hayPantalla) {
         pantallaVista = true;
+        // Volvió la pantalla: se le pregunta en qué foto va.
+        if (sabida && !habia) socket.emit('pantallaPedirEstado');
       } else {
         const estabaMostrando = showStarted;
         showStarted = false;
         fotoPantalla = { foto: 0, total: 0 };
         espejoOcultar();
         zoomApagar();
-        if (estabaMostrando) showToast('📺 Se cerró la pantalla. Abrila otra vez.');
+        if (estabaMostrando) showToast(esperandoPantalla ? '📺 Se cerró la pantalla. Abrila: sigue sola.' : '📺 Se cerró la pantalla. Abrila otra vez.');
       }
       updateNavButtonsState();
       pintarPasos();

@@ -6,6 +6,11 @@ const { limpiarOrdenMedios, limpiarEstadoMedios } = require('./validadores-medio
 const { vigilanteDeMensajes, conectar, desconectar, pantallaConSonido } = require('./guardian');
 const { limpiarDireccion, limpiarOrdenWeb, limpiarFotoWeb, limpiarMenuWeb } = require('./validadores-pagina');
 
+// En qué foto va la presentación de cada persona. Si la pantalla se cierra o se recarga en
+// medio, al volver a abrirla sigue sola desde ahí. Se olvida al tocar «Cerrar pantalla» en el
+// celular o al cerrar la sesión de la pantalla.
+const recuerdos = new Map();
+
 function registrarSockets(io) {
   io.on('connection', (socket) => {
     console.log('✨ Dispositivo vinculado');
@@ -26,14 +31,25 @@ function registrarSockets(io) {
     // ¿Esta persona tiene alguna pantalla abierta? Las pantallas entran a una sala propia
     // ('pantalla:' + nombre); el celular no deja tocar «Mostrar» hasta que haya una.
     const hayPantalla = (nombre) => Boolean((io.sockets.adapter.rooms.get('pantalla:' + nombre) || { size: 0 }).size);
-    const avisarPantalla = (nombre) => io.to('owner:' + nombre).emit('hayPantalla', hayPantalla(nombre));
+    // El segundo dato dice si hay una presentación a medias para seguir.
+    const avisarPantalla = (nombre) => io.to('owner:' + nombre).emit('hayPantalla', hayPantalla(nombre), recuerdos.has(nombre));
     function marcarPantalla() {
       if (!socket.ownerName || socket.esPantalla) return;
       socket.esPantalla = true;
       socket.join('pantalla:' + socket.ownerName);
       avisarPantalla(socket.ownerName);
     }
-    socket.on('soyPantalla', marcarPantalla);
+    socket.on('soyPantalla', () => {
+      if (!socket.ownerName) return;
+      // Estaba mostrando cuando se cerró: la pantalla que entra sigue en la misma foto.
+      const recuerdo = recuerdos.get(socket.ownerName);
+      if (recuerdo && !socket.esPantalla) socket.emit('pantallaSeguir', recuerdo);
+      marcarPantalla();
+    });
+    // La pantalla terminó (cerró su sesión o se quedó sin imágenes): no hay nada que seguir.
+    socket.on('pantallaOlvidar', () => {
+      if (socket.ownerName && socket.esPantalla) recuerdos.delete(socket.ownerName);
+    });
 
     // "cambiar"/"cine" van SÓLO a la sala del propio dueño (según el PIN con el
     // que el control se identificó) — antes se mandaban a TODAS las pantallas
@@ -116,14 +132,16 @@ function registrarSockets(io) {
     // pantalla de la misma persona; ella contesta en qué foto va. Así «Mostrar» se toca una vez.
     socket.on('pantallaPedirEstado', () => {
       if (!socket.ownerName) return;
-      socket.emit('hayPantalla', hayPantalla(socket.ownerName));
+      socket.emit('hayPantalla', hayPantalla(socket.ownerName), recuerdos.has(socket.ownerName));
       socket.to('owner:' + socket.ownerName).emit('pantallaPedirEstado');
     });
     // «Cerrar pantalla»: quien terminó de presentar cierra, desde su celular, la sesión de sus
     // propias pantallas; quedan libres para que entre la siguiente persona. Sólo va a la sala
     // del dueño, así nadie puede cerrarle la pantalla a otro.
     socket.on('cerrarPantalla', () => {
-      if (socket.ownerName) socket.to('owner:' + socket.ownerName).emit('cerrarPantalla');
+      if (!socket.ownerName) return;
+      recuerdos.delete(socket.ownerName);
+      socket.to('owner:' + socket.ownerName).emit('cerrarPantalla');
     });
     socket.on('pantallaEstado', (datos) => {
       if (!socket.ownerName || !datos || typeof datos !== 'object') return;
@@ -133,6 +151,8 @@ function registrarSockets(io) {
       const z = datos.zoom && typeof datos.zoom === 'object' ? datos.zoom : {};
       const limpio = {
         mostrando: datos.mostrando === true,
+        // Todavía no muestra, pero está por seguir donde había quedado.
+        sigue: datos.mostrando !== true && datos.sigue === true,
         foto: Number.isInteger(datos.foto) ? datos.foto : 0,
         total: Number.isInteger(datos.total) ? datos.total : 0,
         src: typeof datos.src === 'string' ? datos.src.slice(0, 600) : '',
@@ -156,6 +176,7 @@ function registrarSockets(io) {
           cy: Number.isFinite(z.cy) ? Math.min(1, Math.max(0, z.cy)) : 0.5
         }
       };
+      if (limpio.mostrando && limpio.foto > 0) recuerdos.set(socket.ownerName, { foto: limpio.foto });
       socket.to('owner:' + socket.ownerName).emit('pantallaEstado', limpio);
     });
 

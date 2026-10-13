@@ -528,6 +528,11 @@
         const clave = (d) => (d ? d.id || d.pagina || d.src : '');
         const mostrada = started ? clave(diapositivas[index]) : '';
         diapositivas = images;
+        fotosCargadas = true;
+        if (!started && seguirEn) {
+          seguirDondeIba();
+          if (started) return;
+        }
         if (started && !diapositivas.length) {
           // Se borró todo en medio de la presentación: no queda nada que mostrar.
           volverALaEspera();
@@ -743,7 +748,7 @@
     waitingHint.textContent = 'Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).';
     identityCorner.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
-    logoutBtn.addEventListener('click', () => logoutAuth());
+    logoutBtn.addEventListener('click', () => { socket.emit('pantallaOlvidar'); logoutAuth(); });
     refreshSlides();
     refreshFraseFinal();
     refreshAutoAdvance();
@@ -1039,6 +1044,7 @@
     aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
     updateHud();
     updateProgress();
+    socket.emit('pantallaOlvidar');
     contarEstado();
   }
 
@@ -1085,6 +1091,27 @@
   }
 
   socket.on('cambiar', (accion) => aplicarCambio(accion));
+
+  // La pantalla se cerró o se recargó en medio de la presentación: el servidor recuerda en qué
+  // foto iba y esta pantalla sigue sola desde ahí, sin tocar «Mostrar» de nuevo.
+  let seguirEn = 0;
+  let fotosCargadas = false;
+  function seguirDondeIba() {
+    if (!seguirEn || started || !fotosCargadas) return;
+    const foto = Math.min(seguirEn, diapositivas.length);
+    seguirEn = 0;
+    if (foto >= 1) aplicarCambio(String(foto));
+    if (!started) {
+      // No quedó nada para mostrar: se avisa, así el celular deja de esperar.
+      socket.emit('pantallaOlvidar');
+      contarEstado();
+    }
+  }
+  socket.on('pantallaSeguir', (recuerdo) => {
+    if (started || !recuerdo || !Number.isInteger(recuerdo.foto) || recuerdo.foto < 1) return;
+    seguirEn = recuerdo.foto;
+    seguirDondeIba();
+  });
 
   // ---- Página web como diapositiva ----
   // La página se muestra en un recuadro que tapa la foto. Si está preparada para Conexiones
@@ -1373,6 +1400,7 @@
     const slide = started ? diapositivas[index] : null;
     socket.emit('pantallaEstado', {
       mostrando: started,
+      sigue: !started && seguirEn > 0,
       foto: started ? index + 1 : 0,
       total: diapositivas.length,
       src: slide ? slide.src : '',
