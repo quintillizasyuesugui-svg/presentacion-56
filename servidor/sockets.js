@@ -10,6 +10,17 @@ const { limpiarDireccion, limpiarOrdenWeb, limpiarFotoWeb, limpiarMenuWeb } = re
 // medio, al volver a abrirla sigue sola desde ahí. Se olvida al tocar «Cerrar pantalla» en el
 // celular o al cerrar la sesión de la pantalla.
 const recuerdos = new Map();
+// Lo mismo con la música, el video y «Escribir en vivo»: la pantalla que vuelve a abrirse sigue
+// con la misma canción o el mismo video en el segundo en que iban, y con la letra en vivo.
+const recuerdosMedios = new Map();
+const recuerdosVivo = new Map();
+// Pasado este tiempo con la pantalla cerrada, la música y el video ya no siguen solos.
+const MEDIOS_VENCEN_MS = 6 * 60 * 60 * 1000;
+function olvidarTodo(nombre) {
+  recuerdos.delete(nombre);
+  recuerdosMedios.delete(nombre);
+  recuerdosVivo.delete(nombre);
+}
 
 function registrarSockets(io) {
   io.on('connection', (socket) => {
@@ -33,6 +44,14 @@ function registrarSockets(io) {
     const hayPantalla = (nombre) => Boolean((io.sockets.adapter.rooms.get('pantalla:' + nombre) || { size: 0 }).size);
     // El segundo dato dice si hay una presentación a medias para seguir.
     const avisarPantalla = (nombre) => io.to('owner:' + nombre).emit('hayPantalla', hayPantalla(nombre), recuerdos.has(nombre));
+    // Las pantallas que se están cerrando todavía contestan un momento (mientras sale «Cerrando
+    // sesión…»): lo que cuenten ya no se recuerda, si no volvería todo al abrir otra.
+    function marcarCerradas(nombre) {
+      for (const id of io.sockets.adapter.rooms.get('pantalla:' + nombre) || []) {
+        const otro = io.sockets.sockets.get(id);
+        if (otro) otro.cerrada = true;
+      }
+    }
     function marcarPantalla() {
       if (!socket.ownerName || socket.esPantalla) return;
       socket.esPantalla = true;
@@ -44,11 +63,22 @@ function registrarSockets(io) {
       // Estaba mostrando cuando se cerró: la pantalla que entra sigue en la misma foto.
       const recuerdo = recuerdos.get(socket.ownerName);
       if (recuerdo && !socket.esPantalla) socket.emit('pantallaSeguir', recuerdo);
+      if (!socket.esPantalla) {
+        const vivo = recuerdosVivo.get(socket.ownerName);
+        if (vivo) socket.emit('escribirVivoEstado', vivo);
+        // Siempre contesta (aunque no haya nada), así la pantalla sabe que puede empezar a contar.
+        const medios = recuerdosMedios.get(socket.ownerName);
+        const hace = medios ? Date.now() - medios.en : 0;
+        socket.emit('mediosSeguir', medios && hace < MEDIOS_VENCEN_MS ? { ...medios.estado, hace } : null);
+      }
       marcarPantalla();
     });
     // La pantalla terminó (cerró su sesión o se quedó sin imágenes): no hay nada que seguir.
-    socket.on('pantallaOlvidar', () => {
-      if (socket.ownerName && socket.esPantalla) recuerdos.delete(socket.ownerName);
+    // Con 'todo' (cerró su sesión) también se olvidan la música, el video y la letra en vivo.
+    socket.on('pantallaOlvidar', (que) => {
+      if (!socket.ownerName || !socket.esPantalla) return;
+      if (que === 'todo') { socket.cerrada = true; olvidarTodo(socket.ownerName); }
+      else recuerdos.delete(socket.ownerName);
     });
 
     // "cambiar"/"cine" van SÓLO a la sala del propio dueño (según el PIN con el
@@ -108,6 +138,8 @@ function registrarSockets(io) {
       if (!socket.ownerName) return;
       const limpio = parseLiveWriteBody(datos);
       if (!limpio) return;
+      if (limpio.active) recuerdosVivo.set(socket.ownerName, limpio);
+      else recuerdosVivo.delete(socket.ownerName);
       io.to('owner:' + socket.ownerName).emit('escribirVivoEstado', limpio);
     });
 
@@ -126,7 +158,17 @@ function registrarSockets(io) {
     socket.on('mediosEstado', (datos) => {
       if (!socket.ownerName) return;
       const estado = limpiarEstadoMedios(datos);
-      if (estado) socket.to('owner:' + socket.ownerName).emit('mediosEstado', estado);
+      if (!estado) return;
+      // Lo que suena se recuerda, salvo que esta pantalla se esté cerrando.
+      if (!socket.cerrada) {
+        if (estado.musica || estado.video) {
+          recuerdosMedios.set(socket.ownerName, {
+            en: Date.now(),
+            estado: { musica: estado.musica, video: estado.video, musicaDespues: estado.musicaDespues === true }
+          });
+        } else recuerdosMedios.delete(socket.ownerName);
+      }
+      socket.to('owner:' + socket.ownerName).emit('mediosEstado', estado);
     });
     // «¿Ya estás mostrando?»: el control que se abre (o vuelve de Gestionar) le pregunta a la
     // pantalla de la misma persona; ella contesta en qué foto va. Así «Mostrar» se toca una vez.
@@ -140,7 +182,8 @@ function registrarSockets(io) {
     // del dueño, así nadie puede cerrarle la pantalla a otro.
     socket.on('cerrarPantalla', () => {
       if (!socket.ownerName) return;
-      recuerdos.delete(socket.ownerName);
+      olvidarTodo(socket.ownerName);
+      marcarCerradas(socket.ownerName);
       socket.to('owner:' + socket.ownerName).emit('cerrarPantalla');
     });
     socket.on('pantallaEstado', (datos) => {
@@ -176,7 +219,7 @@ function registrarSockets(io) {
           cy: Number.isFinite(z.cy) ? Math.min(1, Math.max(0, z.cy)) : 0.5
         }
       };
-      if (limpio.mostrando && limpio.foto > 0) recuerdos.set(socket.ownerName, { foto: limpio.foto });
+      if (limpio.mostrando && limpio.foto > 0 && !socket.cerrada) recuerdos.set(socket.ownerName, { foto: limpio.foto });
       socket.to('owner:' + socket.ownerName).emit('pantallaEstado', limpio);
     });
 

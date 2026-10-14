@@ -67,6 +67,8 @@ function limpiarEstadoMedios(datos) {
   const video = limpiarPista(datos.video);
   if (musica === undefined || video === undefined) return null;
   const estado = { pantalla: datos.pantalla, permitido: Boolean(datos.permitido), musica, video };
+  // Hay un video y la música estaba sonando antes: al terminar el video, sigue.
+  if (datos.musicaDespues === true) estado.musicaDespues = true;
   if (typeof datos.aviso === 'string' && datos.aviso) estado.aviso = datos.aviso.slice(0, 300);
   return estado;
 }

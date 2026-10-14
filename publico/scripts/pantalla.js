@@ -305,6 +305,8 @@
     if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
     autoAdvanceEndAt = null;
     if (!started || !autoAdvance || !autoAdvance.enabled) { updateAutoBadge(); return; }
+    // Hay un video (la pantalla siguió con él al volver a abrirse): el reloj arranca al terminarlo.
+    if (videoEnPantalla) { avanceRestanteMs = autoAdvance.seconds * 1000; updateAutoBadge(); return; }
     autoAdvanceEndAt = Date.now() + autoAdvance.seconds * 1000;
     updateAutoBadge();
     // Le avisa al control (celular) para que arranque el mismo contador en
@@ -748,7 +750,7 @@
     waitingHint.textContent = 'Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).';
     identityCorner.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
-    logoutBtn.addEventListener('click', () => { socket.emit('pantallaOlvidar'); logoutAuth(); });
+    logoutBtn.addEventListener('click', () => { socket.emit('pantallaOlvidar', 'todo'); logoutAuth(); });
     refreshSlides();
     refreshFraseFinal();
     refreshAutoAdvance();
@@ -931,8 +933,9 @@
   function aplicarCambio(accion, opts = {}) {
     const fromAuto = !!opts.auto;
     // Mientras hay un video en pantalla no se mueven las diapositivas: al terminarlo se
-    // vuelve a la misma en la que estaba.
-    if (videoEnPantalla) return;
+    // vuelve a la misma en la que estaba. Al volver a abrir la pantalla, la foto donde iba
+    // se pone igual detrás del video.
+    if (videoEnPantalla && !opts.seguir) return;
     // Avance automático prendido: los botones manuales de Siguiente/Atrás no
     // hacen nada en ESTA pantalla (el reloj es el que manda) — "Mostrar" y el
     // salto por número de voz siguen funcionando igual.
@@ -1100,7 +1103,7 @@
     if (!seguirEn || started || !fotosCargadas) return;
     const foto = Math.min(seguirEn, diapositivas.length);
     seguirEn = 0;
-    if (foto >= 1) aplicarCambio(String(foto));
+    if (foto >= 1) aplicarCambio(String(foto), { seguir: true });
     if (!started) {
       // No quedó nada para mostrar: se avisa, así el celular deja de esperar.
       socket.emit('pantallaOlvidar');

@@ -16,7 +16,7 @@
   const botonPermitir = document.getElementById('permitirSonido');
   const avisoPermiso = document.getElementById('avisoPermiso');
   const botonAvisoPermiso = document.getElementById('avisoPermisoBtn');
-  const textoAvisoPermiso = document.getElementById('avisoPermisoTexto');
+  const sonidoListo = document.getElementById('sonidoListo');
   const sello = document.getElementById('selloMusica');
   const selloTexto = document.getElementById('selloMusicaTexto');
   const capaVideo = document.getElementById('capaVideo');
@@ -36,6 +36,7 @@
   let volumenMusica = VOLUMEN_INICIAL_MUSICA;
   let fundido = null;
   let musicaAntesDelVideo = false;
+  let musicaSinSonido = false; // siguió sola al volver a abrir la pantalla, sin que nadie tocara la PC
 
   // ---- Video ----
   let video = null;          // el elemento del video actual (en la lista), o null
@@ -44,6 +45,7 @@
   let volumenVideo = VOLUMEN_INICIAL_VIDEO;
   let videoSinSonido = false; // arrancó sin sonido porque nadie había tocado la PC
   let vigiaVideo = null;
+  let pausarAlEmpezar = false; // YouTube siguió en pausa: se pone en el segundo y se frena
 
   // ---------- utilidades ----------
   function emitir(nombre, datos) { socket.emit(nombre, datos); }
@@ -81,15 +83,21 @@
     }, 4000);
   }
 
-  function pedirPermiso(texto) {
-    textoAvisoPermiso.textContent = texto || 'Tocá para que se escuche la música y los videos';
+  // Pastilla «🔇 Sonido apagado» abajo a la izquierda, igual para la música y para el video.
+  let temporizadorListo;
+  function pedirPermiso() {
+    clearTimeout(temporizadorListo);
+    sonidoListo.hidden = true;
     avisoPermiso.hidden = false;
   }
 
   // ---------- estado para el celular ----------
   let aviso = null;
+  // Hasta saber si hay que seguir con la música o el video de antes (ver «mediosSeguir»), la
+  // pantalla no cuenta nada: si contara «no suena nada», el servidor se olvidaría de lo que iba.
+  let contando = false;
   function publicarEstado() {
-    if (!soyLaActiva) return;
+    if (!soyLaActiva || !contando) return;
     const m = musicaActual();
     const estado = {
       pantalla: miPantalla,
@@ -117,7 +125,8 @@
         volumen: volumenVideo,
         posicion: videos.indexOf(video),
         total: videos.length
-      } : null
+      } : null,
+      musicaDespues: Boolean(video && musicaAntesDelVideo)
     };
     if (aviso) { estado.aviso = aviso; aviso = null; }
     emitir('mediosEstado', estado);
@@ -133,10 +142,17 @@
   function permitir() {
     permitido = true;
     soyLaActiva = true;
+    if (!avisoPermiso.hidden) {
+      // Estaba la pastilla: se avisa un momento que ya se escucha.
+      sonidoListo.hidden = false;
+      clearTimeout(temporizadorListo);
+      temporizadorListo = setTimeout(() => { sonidoListo.hidden = true; }, 2000);
+    }
     avisoPermiso.hidden = true;
     botonPermitir.textContent = '🔊 Sonido permitido';
     botonPermitir.disabled = true;
     emitir('mediosPantallaActiva', miPantalla);
+    if (musicaSinSonido) { musicaSinSonido = false; audio.muted = false; }
     // Si el celular ya había pedido algo, arranca ahora (y el video que iba sin sonido, se escucha).
     if (video) { videoSinSonido = false; activarSonidoDelVideo(); reanudarVideo(); }
     else if (quiereSonar) reproducirMusica();
@@ -146,7 +162,7 @@
   botonAvisoPermiso.addEventListener('click', permitir);
   // Cualquier toque cuenta (por ejemplo «Ir a pantalla completa»).
   document.addEventListener('pointerdown', (e) => {
-    if (videoSinSonido && !avisoPermiso.contains(e.target)) { permitir(); return; }
+    if ((videoSinSonido || musicaSinSonido) && !avisoPermiso.contains(e.target)) { permitir(); return; }
     if (!permitido) { permitido = true; publicarEstado(); }
   }, { capture: true });
 
@@ -171,7 +187,7 @@
     return true;
   }
 
-  function reproducirMusica() {
+  function reproducirMusica({ seguida = false } = {}) {
     const m = musicaActual();
     if (!m) { avisarAlCelular('🎵 Todavía no tenés música. Subila en Gestionar → 🎵 Música.'); return; }
     if (video) { avisarAlCelular('🎬 Hay un video en la pantalla: la música sigue sola cuando termine.'); return; }
@@ -181,13 +197,22 @@
     audio.play().then(() => {
       // Si mientras arrancaba llegó un video o una pausa, no sigue sonando.
       if (video || !quiereSonar) { audio.pause(); audio.volume = volumenMusica / 100; publicarEstado(); return; }
-      permitido = true;
-      avisoPermiso.hidden = true;
+      // Sin sonido (siguió sola) todavía hace falta el toque en la PC.
+      if (!audio.muted) { permitido = true; avisoPermiso.hidden = true; }
       fundir(volumenMusica / 100);
       mostrarSello('♪ ' + m.nombre);
       publicarEstado();
     }).catch((err) => {
-      if (err && err.name === 'NotAllowedError') {
+      if (err && err.name === 'NotAllowedError' && seguida && !audio.muted) {
+        // Siguió sola al volver a abrir la pantalla: suena sin sonido (eso siempre se puede)
+        // y con un toque en la PC se escucha, sin perder el segundo en que iba.
+        musicaSinSonido = true;
+        audio.muted = true;
+        permitido = false;
+        pedirPermiso();
+        avisarAlCelular('🔇 La música sigue sin sonido porque la pantalla se volvió a abrir. Tocá la pantalla de la PC una vez y se escucha.');
+        reproducirMusica();
+      } else if (err && err.name === 'NotAllowedError') {
         permitido = false;
         pedirPermiso();
         avisarAlCelular('🔇 Tocá «Permitir sonido» en la pantalla y después ▶ de nuevo.');
@@ -311,7 +336,8 @@
     return promesaYoutube;
   }
 
-  function mandarVideo(id) {
+  // «desde» y «pausado»: al volver a abrir la pantalla, el video sigue en el segundo en que iba.
+  function mandarVideo(id, { desde = 0, pausado = false } = {}) {
     const v = videos.find(x => x.id === id);
     if (!v) return avisarAlCelular('Ese video ya no está.');
     if (video) terminarVideo({ avisar: false, reanudar: false });
@@ -337,12 +363,28 @@
           height: '100%',
           videoId: v.youtubeId,
           playerVars: {
-            autoplay: 1, controls: 0, rel: 0, playsinline: 1, modestbranding: 1, iv_load_policy: 3,
-            ...(v.inicio ? { start: v.inicio } : {}), ...(v.fin ? { end: v.fin } : {}), origin: location.origin
+            autoplay: pausado ? 0 : 1, controls: 0, rel: 0, playsinline: 1, modestbranding: 1, iv_load_policy: 3,
+            ...(v.inicio || desde ? { start: Math.floor((v.inicio || 0) + desde) } : {}), ...(v.fin ? { end: v.fin } : {}), origin: location.origin
           },
           events: {
-            onReady: (e) => { arrancarYoutube(e.target); publicarEstado(); },
+            onReady: (e) => {
+              if (pausado) {
+                // YouTube no deja ponerse en un segundo sin arrancar: arranca callado y se frena.
+                e.target.setVolume(volumenVideo);
+                e.target.mute();
+                pausarAlEmpezar = true;
+                e.target.seekTo(Math.floor((v.inicio || 0) + desde), true);
+                e.target.playVideo();
+              } else arrancarYoutube(e.target);
+              publicarEstado();
+            },
             onStateChange: (e) => {
+              if (pausarAlEmpezar && e.data === window.YT.PlayerState.PLAYING) {
+                pausarAlEmpezar = false;
+                e.target.pauseVideo();
+                if (permitido && !videoSinSonido) e.target.unMute();
+                return;
+              }
               if (e.data === window.YT.PlayerState.ENDED) terminarVideo();
               else publicarEstado();
             },
@@ -373,8 +415,15 @@
         terminarVideo({ avisar: false });
         avisarAlCelular('🎬 No se pudo cargar ese video.');
       });
+      if (desde) {
+        const este = elVideo;
+        este.addEventListener('loadedmetadata', () => {
+          const total = Number.isFinite(este.duration) ? este.duration : Infinity;
+          este.currentTime = Math.min(desde, Math.max(0, total - 0.5));
+        }, { once: true });
+      }
       marcoVideo.appendChild(elVideo);
-      reanudarVideo();
+      if (!pausado) reanudarVideo();
     }
     publicarEstado();
   }
@@ -386,7 +435,7 @@
     if (videoSinSonido) return;
     videoSinSonido = true;
     permitido = false;
-    pedirPermiso('Tocá para que se escuche el video');
+    pedirPermiso();
     avisarAlCelular('🔇 El video arrancó sin sonido porque nadie tocó la PC todavía. Tocá la pantalla de la PC una vez y se escucha.');
   }
 
@@ -440,6 +489,7 @@
     const nombre = video.nombre;
     if (elVideo) { elVideo.pause(); elVideo.removeAttribute('src'); elVideo.load(); }
     if (yt && yt.destroy) yt.destroy();
+    pausarAlEmpezar = false;
     elVideo = null;
     yt = null;
     video = null;
@@ -458,7 +508,7 @@
 
   function ordenVideo({ accion, valor }) {
     if (accion === 'mandar') {
-      if (!permitido) pedirPermiso('Tocá para que se escuche el video');
+      if (!permitido) pedirPermiso();
       return mandarVideo(valor);
     }
     if (!video) return;
@@ -488,6 +538,62 @@
   });
   socket.on('mediosPedirEstado', publicarEstado);
 
+  // ---------- seguir donde iba ----------
+  // La pantalla se cerró o se recargó con música o un video: el servidor cuenta qué sonaba, en
+  // qué segundo y hace cuánto. Se sigue una sola vez, apenas está la lista de esta persona.
+  let listaCargada = false;
+  let paraSeguir;      // undefined: todavía no contestó el servidor; null: nada que seguir
+  let yaSeguido = false;
+  socket.on('mediosSeguir', (recuerdo) => {
+    if (yaSeguido) return;
+    paraSeguir = recuerdo || null;
+    seguirDondeIba();
+  });
+
+  function seguirDondeIba() {
+    if (yaSeguido || !listaCargada || paraSeguir === undefined) return;
+    yaSeguido = true;
+    const r = paraSeguir;
+    paraSeguir = null;
+    contando = true;
+    if (!r || !soyLaActiva) return publicarEstado();
+    const paso = Math.max(0, (Number(r.hace) || 0) / 1000);
+    const m = r.musica && musicas.find(x => x.id === r.musica.id);
+    const v = r.video && videos.find(x => x.id === r.video.id);
+    if (r.musica) volumenMusica = r.musica.volumen;
+    if (r.video) volumenVideo = r.video.volumen;
+    audio.volume = volumenMusica / 100;
+
+    // El video sigue si todavía no había terminado.
+    let desde = 0;
+    let quedaVideo = false;
+    if (v) {
+      desde = r.video.t + (r.video.sonando ? paso : 0);
+      quedaVideo = !r.video.duracion || desde < r.video.duracion - 1;
+    }
+
+    if (m) {
+      cargarMusica(m);
+      // Con un video encima la canción no corrió: sigue en el mismo segundo.
+      const t = r.musica.t + (r.musica.sonando && !v ? paso : 0);
+      const total = r.musica.duracion || m.duracion || 0;
+      const destino = total && t >= total - 0.5 ? 0 : t;
+      const ponerEn = () => { try { audio.currentTime = destino; } catch (e) { /* sin datos todavía */ } };
+      if (destino) {
+        if (audio.readyState >= 1) ponerEn();
+        else audio.addEventListener('loadedmetadata', ponerEn, { once: true });
+      }
+    }
+
+    if (v && quedaVideo) {
+      mandarVideo(v.id, { desde, pausado: !r.video.sonando });
+      musicaAntesDelVideo = Boolean(m && (r.musicaDespues || r.musica.sonando));
+    } else if (m && (r.musica.sonando || (r.video && r.musicaDespues))) {
+      reproducirMusica({ seguida: true });
+    }
+    publicarEstado();
+  }
+
   // ---------- lista de música y videos de esta persona ----------
   function cargarLista() {
     return authFetch('/api/multimedia')
@@ -504,6 +610,8 @@
           quiereSonar = false;
         }
         if (video && !videos.some(v => v.id === video.id)) terminarVideo();
+        listaCargada = true;
+        seguirDondeIba();
         publicarEstado();
       })
       .catch(err => console.error('No se pudo cargar la música y los videos:', err));
@@ -511,6 +619,8 @@
 
   window.esperarSesionPantalla().then(() => {
     cargarLista();
+    // Un servidor viejo no contesta «mediosSeguir»: igual se empieza a contar.
+    setTimeout(() => { if (paraSeguir === undefined) { paraSeguir = null; seguirDondeIba(); } }, 8000);
     socket.on('multimediaActualizada', cargarLista);
     socket.on('connect', () => setTimeout(() => { cargarLista(); }, 300));
   });

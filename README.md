@@ -67,6 +67,13 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   sin un toque; «Ir a pantalla completa» también sirve). La música suena encima de todo; un
   video pausa todo (música, avance automático, texto en vivo) y al terminar vuelve a la misma
   diapositiva. Si la misma persona abre dos pantallas, suena sólo la última donde se permitió.
+- **La pantalla se cierra o se recarga**: al abrirla sigue sola con lo mismo: la foto, la
+  canción o el video (subido o de YouTube) en el segundo en que iba, en pausa si estaba en pausa,
+  y la letra de «Escribir en vivo». Si el navegador la deja sin sonido, aparece abajo a la
+  izquierda «🔇 Sonido apagado · Tocá para activar»: un toque en la PC y se escucha sin volver al
+  principio (desde el celular no se puede: el navegador sólo acepta un toque en la PC; con la
+  app de PC nunca queda sin sonido). «Cerrar pantalla» en el celular o «Cerrar sesión» en la
+  pantalla lo olvidan todo. Se guarda en la memoria del servidor: si Render se reinicia, se pierde.
 - **Espacio por persona**: `PRESUPUESTO_MB` (12 GB) se reparte entre las personas
   registradas, entre `ESPACIO_MIN_MB` (100) y `ESPACIO_MAX_MB` (2000). Con pocas personas cada
   una tiene más; con muchas, menos. El admin puede fijarle un espacio propio a alguien.

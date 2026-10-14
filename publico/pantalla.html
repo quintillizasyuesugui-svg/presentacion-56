@@ -129,8 +129,9 @@
   <span id="selloMusicaTexto"></span>
 </div>
 <div class="aviso-permiso" id="avisoPermiso" hidden>
-  <button type="button" class="btn primary" id="avisoPermisoBtn">🔊 <span id="avisoPermisoTexto">Tocá para que se escuche la música y los videos</span></button>
+  <button type="button" class="pastilla-sonido" id="avisoPermisoBtn"><span class="punto-rojo" aria-hidden="true"></span>🔇 Sonido apagado <small>· Tocá para activar</small></button>
 </div>
+<div class="sonido-listo" id="sonidoListo" role="status" hidden>🔊 Sonido activado</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="scripts/autenticacion.js"></script>

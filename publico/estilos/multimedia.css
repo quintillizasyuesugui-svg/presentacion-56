@@ -77,17 +77,51 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
 .ondas i:nth-child(3) { animation-delay: 300ms; }
 @keyframes ondas-suben { to { height: 100%; } }
 
+/* Sonido apagado (el navegador no deja sonar hasta que alguien toca la PC): pastilla abajo a
+   la izquierda, igual para la música y para el video. */
 .aviso-permiso {
   position: fixed;
-  left: 50%;
-  bottom: max(28px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
   z-index: 45;
-  max-width: 92vw;
+  max-width: calc(100vw - 40px);
 }
-.aviso-permiso[hidden] { display: none; }
-.aviso-permiso .btn { animation: llamar-atencion 1.2s var(--ease-out) 3; }
-@keyframes llamar-atencion { 50% { transform: scale(1.06); box-shadow: 0 0 0 10px rgba(52, 205, 250, 0.25); } }
+.aviso-permiso[hidden], .sonido-listo[hidden] { display: none; }
+.pastilla-sonido {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 22px 11px 16px;
+  border: 2px solid var(--red-400);
+  border-radius: var(--radius-pill);
+  background: rgba(13, 20, 36, 0.92);
+  color: #fff;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+}
+.pastilla-sonido:hover { background: rgba(24, 34, 56, 0.95); }
+.pastilla-sonido:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 3px; }
+.pastilla-sonido small { font-size: 0.85rem; font-weight: 500; color: #c9d4ee; }
+.punto-rojo { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--red-400); animation: punto-late 1.2s ease-in-out infinite; }
+@keyframes punto-late { 50% { transform: scale(1.35); opacity: 0.6; } }
+/* Recién activado: se avisa un momento en el mismo lugar. */
+.sonido-listo {
+  position: fixed;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 45;
+  padding: 11px 20px;
+  border: 2px solid #3ddc84;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 30, 20, 0.92);
+  color: #d9ffe9;
+  font-weight: 600;
+  pointer-events: none;
+}
 
 /* ---------- Celular: fila de Música y Video en el control ---------- */
 .btn-row.medios-row .btn { flex: 1; }
@@ -512,5 +546,5 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .hoja-medios, .hoja-velo, .capa-video, .sello-musica { transition: none; }
-  .sonando .ondas i, .punto-vivo, .aviso-permiso .btn, .titulo-video { animation: none; }
+  .sonando .ondas i, .punto-vivo, .punto-rojo, .titulo-video { animation: none; }
 }
