@@ -91,7 +91,10 @@
       <span id="espejoTitulo">🌐 Página web</span>
       <button type="button" class="btn small actualizar-boton" id="actualizarBtn" aria-label="Actualizar la página"><span aria-hidden="true">🔄</span></button>
       <button type="button" class="btn small zona-boton" id="zonaBtn" aria-pressed="false" hidden>✂ Zona</button>
-      <button type="button" class="btn small" id="espejoAcercar" aria-pressed="false">🔍 Acercar</button>
+      <!-- Lupa: agranda sólo lo que se ve en este celular (botones o dos dedos); la pantalla queda igual. -->
+      <button type="button" class="btn small lupa-boton" id="lupaNormal" hidden>↩ Normal</button>
+      <button type="button" class="btn small lupa-boton" id="lupaMenos" aria-label="Achicar" disabled>−</button>
+      <button type="button" class="btn small lupa-boton" id="lupaMas" aria-label="Agrandar">+</button>
     </div>
     <div class="espejo-caja" id="espejoCaja">
       <div class="espejo-lienzo" id="espejoLienzo">
@@ -101,7 +104,7 @@
     <!-- Foto en vivo: cuando la página la abre la app de PC (cualquier página), acá se ve una
          foto de la pantalla que se renueva sola. Se toca donde se quiere hacer clic. -->
     <div class="vivo-caja" id="vivoCaja" hidden>
-      <img id="vivoFoto" alt="Lo que muestra la pantalla" hidden>
+      <div class="vivo-lienzo" id="vivoLienzo"><img id="vivoFoto" alt="Lo que muestra la pantalla" hidden></div>
       <span class="vivo-tag">● en vivo</span>
       <p class="vivo-espera" id="vivoEspera">Abriendo la página en la PC…</p>
     </div>

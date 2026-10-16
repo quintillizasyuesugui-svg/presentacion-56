@@ -457,7 +457,6 @@
   const espejoLienzo = document.getElementById('espejoLienzo');
   const espejoMarco = document.getElementById('espejoMarco');
   const espejoAyuda = document.getElementById('espejoAyuda');
-  const espejoAcercar = document.getElementById('espejoAcercar');
   const zoomControl = document.querySelector('.zoom-control');
   const ESPEJO_ANCHO = 1280;
   const AYUDA_ESPEJO = 'Tocá lo que quieras: pasa lo mismo en la pantalla.';
@@ -465,7 +464,7 @@
   let espejoUrl = '';        // en cuál de sus páginas va este espejo
   let espejoPaso = 0;        // cuántas veces la pantalla pasó sola de parte (lo cuenta ella)
   let espejoAlto = 720;
-  let espejoCerca = false;
+  let lupaZ = 1;             // cuánto agranda la lupa este celular (1 = normal)
   let espejoPreparada = false;
   let espejoEspera = null;
 
@@ -475,7 +474,7 @@
 
   function espejoAjustar() {
     if (espejoWeb.hidden) return;
-    const escala = espejoCaja.clientWidth * (espejoCerca ? 2 : 1) / ESPEJO_ANCHO;
+    const escala = espejoCaja.clientWidth * lupaZ / ESPEJO_ANCHO;
     espejoCaja.style.aspectRatio = ESPEJO_ANCHO + ' / ' + espejoAlto;
     espejoLienzo.style.width = (ESPEJO_ANCHO * escala) + 'px';
     espejoLienzo.style.height = (espejoAlto * escala) + 'px';
@@ -495,6 +494,7 @@
     if (estado.pagina !== espejoBase) {
       espejoBase = estado.pagina;
       espejoUrl = estado.paginaActual || estado.pagina;
+      lupaReiniciar();
       espejoPreparada = false;
       espejoAyuda.textContent = AYUDA_ESPEJO;
       espejoPintarMenu(null);
@@ -551,6 +551,7 @@
     if (nueva) {
       enVivo = true;
       espejoBase = estado.pagina;
+      lupaReiniciar();
       espejoUrl = '';
       clearTimeout(espejoEspera);
       espejoMarco.removeAttribute('src');
@@ -561,7 +562,7 @@
     }
     const forma = estado.ancho > 0 && estado.alto > 0 ? estado.ancho / estado.alto : 16 / 9;
     vivoCaja.style.aspectRatio = String(Math.min(2.5, Math.max(1, forma)));
-    for (const [elemento, visto] of [[vivoCaja, true], [vivoBotones, true], [espejoCaja, false], [espejoAcercar, false],
+    for (const [elemento, visto] of [[vivoCaja, true], [vivoBotones, true], [espejoCaja, false],
       [document.getElementById('espejoAnterior').parentElement, false]]) elemento.hidden = !visto;
     if (nueva) espejoAyuda.textContent = AYUDA_VIVO;
     vivoPintarMenu(estado.paginaMenu);
@@ -570,7 +571,7 @@
   function vivoOcultar() {
     if (!enVivo) return;
     enVivo = false;
-    for (const [elemento, visto] of [[vivoCaja, false], [vivoBotones, false], [vivoEscribir, false], [espejoCaja, true], [espejoAcercar, true],
+    for (const [elemento, visto] of [[vivoCaja, false], [vivoBotones, false], [vivoEscribir, false], [espejoCaja, true],
       [document.getElementById('espejoAnterior').parentElement, true]]) elemento.hidden = !visto;
     vivoTeclado.setAttribute('aria-expanded', 'false');
     vivoFoto.removeAttribute('src');
@@ -595,19 +596,119 @@
     anillo.className = 'vivo-anillo';
     anillo.style.left = (x * 100) + '%';
     anillo.style.top = (y * 100) + '%';
-    vivoCaja.append(anillo);
+    vivoLienzo.append(anillo);
     anillo.addEventListener('animationend', () => anillo.remove());
   }
 
+  // ---- Lupa: agranda sólo lo que se ve en este celular, para atinarle a los botones chicos ----
+  // «+» y «−» van de a un paso y «↩ Normal» vuelve. En foto en vivo también se agranda con dos
+  // dedos (y con la rueda del ratón); ya agrandada, un dedo mueve la foto en lugar de bajar la
+  // página. En el recuadro del espejo los dedos los toma la página de adentro: ahí sólo botones.
+  const lupaMenos = document.getElementById('lupaMenos');
+  const lupaMas = document.getElementById('lupaMas');
+  const lupaNormal = document.getElementById('lupaNormal');
+  const vivoLienzo = document.getElementById('vivoLienzo');
+  const LUPA_PASOS = [1, 1.5, 2, 3, 4];
+  const LUPA_MAXIMO = 4;
+  let vivoTx = 0;
+  let vivoTy = 0;
+
+  function lupaBotones() {
+    lupaMenos.disabled = lupaZ <= 1.01;
+    lupaMas.disabled = lupaZ >= LUPA_MAXIMO - 0.01;
+    lupaNormal.hidden = lupaZ <= 1.01;
+  }
+
+  function vivoPintarLupa() {
+    const ancho = vivoCaja.clientWidth;
+    const alto = vivoCaja.clientHeight;
+    vivoTx = Math.min(0, Math.max(ancho - ancho * lupaZ, vivoTx));
+    vivoTy = Math.min(0, Math.max(alto - alto * lupaZ, vivoTy));
+    vivoLienzo.style.transform = lupaZ > 1.01 ? `translate(${vivoTx}px, ${vivoTy}px) scale(${lupaZ})` : '';
+  }
+
+  // Agranda dejando quieto el punto (x, y) de la caja que se está mirando (el centro, si no se dice).
+  function lupaCambiar(nuevo, x, y) {
+    nuevo = Math.min(LUPA_MAXIMO, Math.max(1, nuevo));
+    if (enVivo) {
+      if (x === undefined) { x = vivoCaja.clientWidth / 2; y = vivoCaja.clientHeight / 2; }
+      vivoTx = x - (x - vivoTx) * nuevo / lupaZ;
+      vivoTy = y - (y - vivoTy) * nuevo / lupaZ;
+      lupaZ = nuevo;
+      vivoPintarLupa();
+    } else {
+      const ancho = espejoCaja.clientWidth;
+      const alto = espejoCaja.clientHeight;
+      const cx = (espejoCaja.scrollLeft + ancho / 2) / (espejoLienzo.offsetWidth || ancho);
+      const cy = (espejoCaja.scrollTop + alto / 2) / (espejoLienzo.offsetHeight || alto);
+      lupaZ = nuevo;
+      espejoAjustar();
+      espejoCaja.scrollLeft = cx * espejoLienzo.offsetWidth - ancho / 2;
+      espejoCaja.scrollTop = cy * espejoLienzo.offsetHeight - alto / 2;
+    }
+    lupaBotones();
+  }
+
+  function lupaReiniciar() {
+    lupaZ = 1;
+    vivoTx = 0;
+    vivoTy = 0;
+    vivoPintarLupa();
+    espejoAjustar();
+    lupaBotones();
+  }
+
+  lupaMas.addEventListener('click', () => lupaCambiar(LUPA_PASOS.find((p) => p > lupaZ + 0.01) ?? LUPA_MAXIMO));
+  lupaMenos.addEventListener('click', () => lupaCambiar([...LUPA_PASOS].reverse().find((p) => p < lupaZ - 0.01) ?? 1));
+  lupaNormal.addEventListener('click', lupaReiniciar);
+
+  // Un dedo: toque = clic; deslizar = subir o bajar (o mover la foto si está agrandada).
+  // Dos dedos: agrandar o achicar sin que se toque nada.
+  const vivoDedos = new Map();
   let vivoDedo = null;
+  let vivoPellizco = null;
+  function vivoMedio() {
+    const [a, b] = [...vivoDedos.values()];
+    const caja = vivoCaja.getBoundingClientRect();
+    return { x: (a.x + b.x) / 2 - caja.left, y: (a.y + b.y) / 2 - caja.top, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 };
+  }
   vivoCaja.addEventListener('pointerdown', (e) => {
     try { vivoCaja.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
-    vivoDedo = { id: e.pointerId, x: e.clientX, y: e.clientY, ultimaY: e.clientY, movido: false, ultimoEnvio: 0, pendiente: 0 };
+    // El primer dedo de un gesto nuevo: si se perdió el aviso de soltar de uno anterior, se olvida.
+    if (e.isPrimary) vivoDedos.clear();
+    vivoDedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (vivoDedos.size === 1) {
+      vivoDedo = { id: e.pointerId, x: e.clientX, y: e.clientY, ultimaY: e.clientY, movido: false, varios: false, tx: vivoTx, ty: vivoTy, ultimoEnvio: 0, pendiente: 0 };
+    } else if (vivoDedos.size === 2 && vivoDedo) {
+      vivoDedo.varios = true;
+      vivoDedo.pendiente = 0;
+      vivoPellizco = { ...vivoMedio(), z: lupaZ, tx: vivoTx, ty: vivoTy };
+    }
   });
   vivoCaja.addEventListener('pointermove', (e) => {
-    if (!vivoDedo || e.pointerId !== vivoDedo.id) return;
+    if (!vivoDedos.has(e.pointerId) || !vivoDedo) return;
+    vivoDedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (vivoDedos.size >= 2) {
+      if (!vivoPellizco) return;
+      // El punto de la foto que estaba entre los dedos sigue entre los dedos.
+      const ahora = vivoMedio();
+      const nuevo = Math.min(LUPA_MAXIMO, Math.max(1, vivoPellizco.z * ahora.d / vivoPellizco.d));
+      vivoTx = ahora.x - (vivoPellizco.x - vivoPellizco.tx) * nuevo / vivoPellizco.z;
+      vivoTy = ahora.y - (vivoPellizco.y - vivoPellizco.ty) * nuevo / vivoPellizco.z;
+      lupaZ = nuevo;
+      vivoPintarLupa();
+      lupaBotones();
+      return;
+    }
+    if (e.pointerId !== vivoDedo.id || vivoDedo.varios) return;
     if (!vivoDedo.movido && Math.hypot(e.clientX - vivoDedo.x, e.clientY - vivoDedo.y) < 10) return;
     vivoDedo.movido = true;
+    if (lupaZ > 1.01) {
+      vivoTx = vivoDedo.tx + e.clientX - vivoDedo.x;
+      vivoTy = vivoDedo.ty + e.clientY - vivoDedo.y;
+      vivoPintarLupa();
+      return;
+    }
     // Deslizar hacia arriba baja la página, como en cualquier pantalla táctil.
     vivoDedo.pendiente += (vivoDedo.ultimaY - e.clientY) / vivoCaja.clientHeight;
     vivoDedo.ultimaY = e.clientY;
@@ -619,23 +720,33 @@
     }
   });
   function vivoSoltar(e) {
-    if (!vivoDedo || e.pointerId !== vivoDedo.id) return;
+    if (!vivoDedos.delete(e.pointerId)) return;
+    if (vivoDedos.size < 2) vivoPellizco = null;
+    if (vivoDedos.size > 0 || !vivoDedo) return;
     const dedo = vivoDedo;
     vivoDedo = null;
-    if (e.type === 'pointercancel') return;
+    if (e.type === 'pointercancel' || dedo.varios) return;
     if (dedo.movido) {
       if (Math.abs(dedo.pendiente) > 0.01) vivoMandar({ accion: 'rueda', dy: dedo.pendiente });
       return;
     }
+    // Se mide sobre la foto (agrandada o no), así el clic cae en el botón que se ve bajo el dedo.
     const caja = vivoCaja.getBoundingClientRect();
-    const x = (e.clientX - caja.left) / caja.width;
-    const y = (e.clientY - caja.top) / caja.height;
+    if (e.clientX < caja.left || e.clientX > caja.right || e.clientY < caja.top || e.clientY > caja.bottom) return;
+    const foto = vivoLienzo.getBoundingClientRect();
+    const x = (e.clientX - foto.left) / foto.width;
+    const y = (e.clientY - foto.top) / foto.height;
     if (x < 0 || x > 1 || y < 0 || y > 1 || vivoFoto.hidden) return;
     vivoMarcar(x, y);
     vivoMandar({ accion: 'toque', x, y });
   }
   vivoCaja.addEventListener('pointerup', vivoSoltar);
   vivoCaja.addEventListener('pointercancel', vivoSoltar);
+  vivoCaja.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const caja = vivoCaja.getBoundingClientRect();
+    lupaCambiar(lupaZ * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - caja.left, e.clientY - caja.top);
+  }, { passive: false });
 
   document.getElementById('vivoSubir').addEventListener('click', () => vivoMandar({ accion: 'rueda', dy: -0.6 }));
   document.getElementById('vivoBajar').addEventListener('click', () => vivoMandar({ accion: 'rueda', dy: 0.6 }));
@@ -677,7 +788,7 @@
   let zonaAyudaAntes = '';
 
   // En foto en vivo la página se ve en la foto; si no, en el recuadro del espejo.
-  function zonaLugar() { return enVivo ? vivoCaja : espejoLienzo; }
+  function zonaLugar() { return enVivo ? vivoLienzo : espejoLienzo; }
 
   function zonaPintar() {
     const lugar = zonaLugar();
@@ -890,14 +1001,7 @@
   document.getElementById('espejoAnterior').addEventListener('click', () => espejoPasarPagina(-1));
   document.getElementById('espejoSiguiente').addEventListener('click', () => espejoPasarPagina(1));
 
-  // «Acercar» agranda sólo el espejo del celular (se mueve con el dedo); la pantalla queda igual.
-  espejoAcercar.addEventListener('click', () => {
-    espejoCerca = !espejoCerca;
-    espejoAcercar.setAttribute('aria-pressed', String(espejoCerca));
-    espejoAcercar.textContent = espejoCerca ? '🔍 Alejar' : '🔍 Acercar';
-    espejoAjustar();
-  });
-  window.addEventListener('resize', espejoAjustar);
+  window.addEventListener('resize', () => { espejoAjustar(); vivoPintarLupa(); });
 
   ensureAuthed().then((auth) => {
     authNameBadge.hidden = false;
