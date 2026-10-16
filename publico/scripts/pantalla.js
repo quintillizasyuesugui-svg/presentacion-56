@@ -1144,6 +1144,8 @@
   const FOTO_APURADA = 160;    // mientras se la maneja: unas 6 por segundo
   const APURO_TRAS_ORDEN = 1500;
   const APURO_MAXIMO = 4000;   // una página que se mueve sola no deja las fotos seguidas para siempre
+  const SUBIDA_MAXIMA = 3000;  // si el servidor no confirma una foto, a los 3 s se manda otra igual
+  let subiendoDesde = 0;       // la foto que va al servidor y todavía no llegó (0: ninguna)
 
   function origenDe(direccion) {
     try { return new URL(direccion).origin; } catch { return ''; }
@@ -1292,6 +1294,9 @@
     const ahora = Date.now();
     const pausa = ahora < apuroHasta ? FOTO_APURADA : FOTO_QUIETA;
     if (sacandoFoto || ahora - momentoFoto < pausa) return;
+    // Con internet lento (o un video que cambia todo el tiempo) no se sube otra foto hasta que
+    // llegó la anterior: así no se hace fila y la siguiente ya es la más nueva.
+    if (subiendoDesde && ahora - subiendoDesde < SUBIDA_MAXIMA) return;
     sacandoFoto = true;
     momentoFoto = ahora;
     try {
@@ -1300,7 +1305,11 @@
         if (foto.jpg !== ultimaFoto) {
           ultimaFoto = foto.jpg;
           if (foto.url) { paginaActual = foto.url.slice(0, 500); anotarParte(); }
-          socket.emit('webFoto', { jpg: foto.jpg, url: foto.url, titulo: foto.titulo });
+          const jpg = await fotoParaCelulares(foto.jpg);
+          const esta = subiendoDesde = Date.now();
+          socket.emit('webFoto', { jpg, url: foto.url, titulo: foto.titulo }, () => {
+            if (subiendoDesde === esta) subiendoDesde = 0;
+          });
           // Si sigue cambiando (la página está cargando o bajando), siguen las fotos seguidas.
           if (Date.now() - ultimaOrden < APURO_MAXIMO) apuroHasta = Math.max(apuroHasta, Date.now() + 800);
         }
@@ -1315,7 +1324,37 @@
     sacandoFoto = false;
   }
   // Un celular que recién entra pide el estado: se le manda la foto aunque no haya cambiado.
-  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; momentoFoto = 0; });
+  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; momentoFoto = 0; subiendoDesde = 0; });
+
+  // Si a algún celular las fotos le tardan en llegar (internet lento), van más chicas y livianas:
+  // se ve un poco menos nítido pero al día. Cuando vuelve a ir rápido, vuelven al tamaño de siempre.
+  const FOTOS_LIVIANAS = [
+    { hasta: 700, ancho: 0 },                     // rápido: la foto tal cual la saca la app
+    { hasta: 1600, ancho: 480, calidad: 0.45 },   // unas 2 veces más liviana
+    { hasta: Infinity, ancho: 360, calidad: 0.35 } // unas 4 veces más liviana
+  ];
+  let tardanzaFotos = 0;    // cuánto tarda en llegarle una foto a los celulares (promedio de las últimas)
+  socket.on('webFotoTardanza', (ms) => {
+    if (Number.isFinite(ms) && ms >= 0) tardanzaFotos = tardanzaFotos * 0.6 + Math.min(ms, 10000) * 0.4;
+  });
+
+  function fotoParaCelulares(jpg) {
+    const nivel = FOTOS_LIVIANAS.find(n => tardanzaFotos < n.hasta);
+    if (!nivel.ancho) return Promise.resolve(jpg);
+    return new Promise((listo) => {
+      const imagen = new Image();
+      imagen.onload = () => {
+        if (imagen.naturalWidth <= nivel.ancho) { listo(jpg); return; }
+        const lienzo = document.createElement('canvas');
+        lienzo.width = nivel.ancho;
+        lienzo.height = Math.round(imagen.naturalHeight * nivel.ancho / imagen.naturalWidth);
+        lienzo.getContext('2d').drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+        listo(lienzo.toDataURL('image/jpeg', nivel.calidad).split(',')[1] || jpg);
+      };
+      imagen.onerror = () => listo(jpg);
+      imagen.src = 'data:image/jpeg;base64,' + jpg;
+    });
+  }
 
   // La página avisa cada vez que termina de cargar: así el celular sabe dónde está.
   window.addEventListener('message', (evento) => {

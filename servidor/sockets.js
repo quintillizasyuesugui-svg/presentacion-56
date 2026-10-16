@@ -22,6 +22,18 @@ function olvidarTodo(nombre) {
   recuerdosVivo.delete(nombre);
 }
 
+// Si el celular no avisa en este tiempo (se cortó, quedó en segundo plano), se le manda igual.
+const FOTO_SIN_AVISO_MS = 4000;
+function mandarFotoWeb(celular, foto) {
+  if (celular.avisaFotos && Date.now() - (celular.fotoEnCamino || 0) < FOTO_SIN_AVISO_MS) {
+    celular.fotoGuardada = foto;
+    return;
+  }
+  celular.fotoEnCamino = Date.now();
+  celular.fotoGuardada = null;
+  celular.emit('webFoto', foto);
+}
+
 function registrarSockets(io) {
   io.on('connection', (socket) => {
     console.log('✨ Dispositivo vinculado');
@@ -242,10 +254,29 @@ function registrarSockets(io) {
     });
 
     // Foto en vivo: la app de PC manda cómo se ve la página y va a los celulares de la misma persona.
-    socket.on('webFoto', (datos) => {
+    // Con un video andando la foto cambia todo el tiempo: a un celular con internet lento no se le
+    // manda la siguiente hasta que avisa que mostró la anterior; mientras tanto se guarda sólo la
+    // más nueva. Así no se amontonan y el celular nunca queda mirando fotos viejas. Los celulares
+    // con el control de antes (no avisan) siguen recibiendo todas. El «listo» le dice a la pantalla
+    // que la foto ya llegó, para que no suba la siguiente antes.
+    socket.on('webFoto', (datos, listo) => {
+      if (typeof listo === 'function') listo();
       if (!socket.ownerName) return;
       const foto = limpiarFotoWeb(datos);
-      if (foto) socket.to('owner:' + socket.ownerName).emit('webFoto', foto);
+      if (!foto) return;
+      for (const id of io.sockets.adapter.rooms.get('owner:' + socket.ownerName) || []) {
+        const otro = id !== socket.id && io.sockets.sockets.get(id);
+        if (otro) mandarFotoWeb(otro, foto);
+      }
+    });
+    socket.on('webFotoRecibida', () => {
+      // Cuánto tardó en llegarle: la pantalla achica las fotos si algún celular va lento.
+      if (socket.fotoEnCamino && socket.ownerName) socket.to('owner:' + socket.ownerName).emit('webFotoTardanza', Date.now() - socket.fotoEnCamino);
+      socket.avisaFotos = true;
+      socket.fotoEnCamino = 0;
+      const guardada = socket.fotoGuardada;
+      socket.fotoGuardada = null;
+      if (guardada) mandarFotoWeb(socket, guardada);
     });
 
     socket.on('mediosPedirEstado', () => {

@@ -581,6 +581,9 @@
   socket.on('webFoto', (foto) => {
     if (!enVivo || !foto || typeof foto.jpg !== 'string') return;
     vivoFoto.src = 'data:image/jpeg;base64,' + foto.jpg;
+    // Avisa cuando ya la puede mostrar: recién ahí el servidor manda la siguiente (la más nueva).
+    const recibida = () => socket.emit('webFotoRecibida');
+    if (vivoFoto.decode) vivoFoto.decode().then(recibida, recibida); else recibida();
     vivoFoto.hidden = false;
     vivoEspera.hidden = true;
     if (foto.titulo) document.getElementById('espejoTitulo').textContent = '🌐 ' + foto.titulo.slice(0, 60);

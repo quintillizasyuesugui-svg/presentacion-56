@@ -162,9 +162,24 @@
   botonAvisoPermiso.addEventListener('click', permitir);
   // Cualquier toque cuenta (por ejemplo «Ir a pantalla completa»).
   document.addEventListener('pointerdown', (e) => {
-    if ((videoSinSonido || musicaSinSonido) && !avisoPermiso.contains(e.target)) { permitir(); return; }
+    if ((videoSinSonido || musicaSinSonido || !avisoPermiso.hidden) && !avisoPermiso.contains(e.target)) { permitir(); return; }
     if (!permitido) { permitido = true; publicarEstado(); }
   }, { capture: true });
+
+  // La pastilla sale siempre que el navegador tiene el sonido apagado, aunque se estén mostrando
+  // fotos o una página: así se toca la PC antes de que haga falta. La app de PC nunca lo apaga.
+  function sonidoApagado() {
+    if (permitido) return false;
+    try {
+      const Contexto = window.AudioContext || window.webkitAudioContext;
+      if (!Contexto) return false;
+      const prueba = new Contexto();
+      const apagado = prueba.state !== 'running';
+      prueba.close();
+      return apagado;
+    } catch { return false; }
+  }
+  if (sonidoApagado()) pedirPermiso();
 
   // Otra pantalla de la misma persona se quedó con el sonido: ésta se calla.
   socket.on('mediosPantallaActiva', (id) => {
