@@ -1141,11 +1141,14 @@
   let paginaMenu = null; // el menú que la app le leyó a la página (null: todavía no se sabe)
   const TIC_VIVO = 100;
   const FOTO_QUIETA = 1000;    // con la página quieta: una foto por segundo
+  const FOTO_CAMBIANDO = 500;  // una página que se mueve sola (un video): dos por segundo
   const FOTO_APURADA = 160;    // mientras se la maneja: unas 6 por segundo
   const APURO_TRAS_ORDEN = 1500;
   const APURO_MAXIMO = 4000;   // una página que se mueve sola no deja las fotos seguidas para siempre
   const SUBIDA_MAXIMA = 3000;  // si el servidor no confirma una foto, a los 3 s se manda otra igual
-  let subiendoDesde = 0;       // la foto que va al servidor y todavía no llegó (0: ninguna)
+  const SUBIDAS_A_LA_VEZ = 2;  // con el servidor lejos, mientras una sube ya sale la otra
+  let subiendo = [];           // cuándo salieron las fotos que todavía no llegaron al servidor
+  let cambiandoHasta = 0;      // la página se mueve sola (sin órdenes del celular)
 
   function origenDe(direccion) {
     try { return new URL(direccion).origin; } catch { return ''; }
@@ -1287,16 +1290,18 @@
 
   // Unas cinco veces por segundo: la página se esconde si hay algo de Conexiones encima (texto
   // en vivo, video, frase final). Con la página quieta se saca una foto por segundo; mientras se
-  // la maneja desde el celular (y un rato después), unas seis por segundo. Sólo se manda la foto
+  // la maneja desde el celular (y un rato después), unas seis por segundo; si se mueve sola (un
+  // video), dos por segundo. Sólo se manda la foto
   // que cambió, para no gastar datos del celular.
   async function ticVivo() {
     if (ticsVivo++ % 2 === 0) appPC.visible(!(liveWriteActive || videoEnPantalla || showingFinal));
     const ahora = Date.now();
-    const pausa = ahora < apuroHasta ? FOTO_APURADA : FOTO_QUIETA;
+    const pausa = ahora < apuroHasta ? FOTO_APURADA : ahora < cambiandoHasta ? FOTO_CAMBIANDO : FOTO_QUIETA;
     if (sacandoFoto || ahora - momentoFoto < pausa) return;
-    // Con internet lento (o un video que cambia todo el tiempo) no se sube otra foto hasta que
-    // llegó la anterior: así no se hace fila y la siguiente ya es la más nueva.
-    if (subiendoDesde && ahora - subiendoDesde < SUBIDA_MAXIMA) return;
+    // Con internet lento (o un video que cambia todo el tiempo) no se suben más de dos fotos sin
+    // que hayan llegado: así no se hace fila y la siguiente ya es la más nueva.
+    subiendo = subiendo.filter(t => ahora - t < SUBIDA_MAXIMA);
+    if (subiendo.length >= SUBIDAS_A_LA_VEZ) return;
     sacandoFoto = true;
     momentoFoto = ahora;
     try {
@@ -1306,12 +1311,14 @@
           ultimaFoto = foto.jpg;
           if (foto.url) { paginaActual = foto.url.slice(0, 500); anotarParte(); }
           const jpg = await fotoParaCelulares(foto.jpg);
-          const esta = subiendoDesde = Date.now();
+          const esta = Date.now();
+          subiendo.push(esta);
           socket.emit('webFoto', { jpg, url: foto.url, titulo: foto.titulo }, () => {
-            if (subiendoDesde === esta) subiendoDesde = 0;
+            subiendo = subiendo.filter(t => t !== esta);
           });
           // Si sigue cambiando (la página está cargando o bajando), siguen las fotos seguidas.
           if (Date.now() - ultimaOrden < APURO_MAXIMO) apuroHasta = Math.max(apuroHasta, Date.now() + 800);
+          else cambiandoHasta = Date.now() + 1500;
         }
         // Las apps de PC anteriores a la 1.2.0 no leen el menú: queda en «no se sabe».
         const menu = Array.isArray(foto.menu) ? foto.menu : null;
@@ -1324,7 +1331,7 @@
     sacandoFoto = false;
   }
   // Un celular que recién entra pide el estado: se le manda la foto aunque no haya cambiado.
-  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; momentoFoto = 0; subiendoDesde = 0; });
+  socket.on('pantallaPedirEstado', () => { ultimaFoto = ''; momentoFoto = 0; subiendo = []; });
 
   // Si a algún celular las fotos le tardan en llegar (internet lento), van más chicas y livianas:
   // se ve un poco menos nítido pero al día. Cuando vuelve a ir rápido, vuelven al tamaño de siempre.

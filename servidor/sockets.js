@@ -22,14 +22,19 @@ function olvidarTodo(nombre) {
   recuerdosVivo.delete(nombre);
 }
 
+// Hasta dos fotos en camino a cada celular: con el servidor lejos, mientras una va llegando ya
+// sale la otra (con una sola, la ida y vuelta del aviso dejaba al celular esperando).
 // Si el celular no avisa en este tiempo (se cortó, quedó en segundo plano), se le manda igual.
+const FOTOS_EN_CAMINO = 2;
 const FOTO_SIN_AVISO_MS = 4000;
 function mandarFotoWeb(celular, foto) {
-  if (celular.avisaFotos && Date.now() - (celular.fotoEnCamino || 0) < FOTO_SIN_AVISO_MS) {
+  const ahora = Date.now();
+  celular.fotosEnCamino = (celular.fotosEnCamino || []).filter(t => ahora - t < FOTO_SIN_AVISO_MS);
+  if (celular.avisaFotos && celular.fotosEnCamino.length >= FOTOS_EN_CAMINO) {
     celular.fotoGuardada = foto;
     return;
   }
-  celular.fotoEnCamino = Date.now();
+  celular.fotosEnCamino.push(ahora);
   celular.fotoGuardada = null;
   celular.emit('webFoto', foto);
 }
@@ -271,9 +276,9 @@ function registrarSockets(io) {
     });
     socket.on('webFotoRecibida', () => {
       // Cuánto tardó en llegarle: la pantalla achica las fotos si algún celular va lento.
-      if (socket.fotoEnCamino && socket.ownerName) socket.to('owner:' + socket.ownerName).emit('webFotoTardanza', Date.now() - socket.fotoEnCamino);
+      const salio = (socket.fotosEnCamino || []).shift();
+      if (salio && socket.ownerName) socket.to('owner:' + socket.ownerName).emit('webFotoTardanza', Date.now() - salio);
       socket.avisaFotos = true;
-      socket.fotoEnCamino = 0;
       const guardada = socket.fotoGuardada;
       socket.fotoGuardada = null;
       if (guardada) mandarFotoWeb(socket, guardada);
