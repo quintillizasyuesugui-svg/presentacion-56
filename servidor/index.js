@@ -13,6 +13,7 @@ const { registrarRutasAdministracion } = require('./administracion');
 const { registrarRutasCodigoQr } = require('./codigo-qr');
 const { registrarRutasMultimedia } = require('./multimedia');
 const { registrarRutasTraerPagina } = require('./traer-pagina');
+const { registrarRutasBuscarYoutube } = require('./buscar-youtube');
 const { registrarSockets } = require('./sockets');
 const { porteroDePedidos, porteroDeConexiones } = require('./portero-pedidos');
 
@@ -61,6 +62,7 @@ registrarRutasAdministracion(app);
 registrarRutasCodigoQr(app);
 registrarRutasMultimedia(app, io);
 registrarRutasTraerPagina(app);
+registrarRutasBuscarYoutube(app);
 porteroDeConexiones(io);
 registrarSockets(io);
 

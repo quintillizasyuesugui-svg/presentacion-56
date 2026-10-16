@@ -84,3 +84,14 @@ test('foto en vivo: el menú de la página llega limpio para las cajas del celul
   assert.strictEqual(limpiarMenuWeb(muchas).length, 12);
   assert.ok(limpiarMenuWeb(muchas).every(caja => caja.texto.length <= 30));
 });
+
+test('orden «medio»: el video de la página, con segundo y velocidad acotados', () => {
+  const { limpiarOrdenWeb } = require('../servidor/validadores-pagina');
+  assert.deepStrictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '#video-guia', t: 12.5, reproduciendo: true, vel: 1.5 }),
+    { accion: 'medio', ruta: '#video-guia', t: 12.5, reproduciendo: true, vel: 1.5 });
+  assert.strictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '#v', t: 3, vel: 99 }).vel, 4);
+  assert.strictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '#v', t: 3 }).reproduciendo, false);
+  assert.strictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '<script>', t: 3 }), null);
+  assert.strictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '#v', t: -1 }), null);
+  assert.strictEqual(limpiarOrdenWeb({ accion: 'medio', ruta: '#v', t: 'x' }), null);
+});

@@ -86,6 +86,14 @@
   </section>
   <!-- Espejo: cuando la pantalla muestra una página web, acá se ve la misma página en chico.
        Lo que se toca acá pasa también en la pantalla (ver «Espejo» en control.js). -->
+  <section class="tarjeta-youtube" id="tarjetaYoutube" aria-label="Video de YouTube en la pantalla" hidden>
+    <div class="espejo-rotulo"><span>▶ YouTube</span></div>
+    <div class="tarjeta-youtube-portada"><img id="tarjetaYoutubeFoto" alt="" hidden><span id="tarjetaYoutubeTexto">Buscá un video: sale en tu pantalla y lo manejás desde acá.</span></div>
+    <div class="tarjeta-youtube-botones">
+      <button type="button" class="btn primary" id="tarjetaYoutubePoner" hidden>▶ Poner video</button>
+      <button type="button" class="btn secondary" id="tarjetaYoutubeBuscar">🔍 Buscar un video</button>
+    </div>
+  </section>
   <section class="espejo-web" id="espejoWeb" aria-label="Página web en la pantalla" hidden>
     <div class="espejo-rotulo">
       <span id="espejoTitulo">🌐 Página web</span>

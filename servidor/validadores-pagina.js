@@ -34,6 +34,15 @@ function limpiarOrdenWeb(datos) {
     if (typeof ruta !== 'string' || !ruta || ruta.length > 400 || /[\u0000-\u001f<]/.test(ruta)) return null;
     return { accion: 'clic', ruta, navega: datos.navega === true };
   }
+  // Un video o audio de la página se movió en el espejo del celular (▶, ⏸, salto, velocidad):
+  // la pantalla pone el mismo en el mismo segundo.
+  if (datos.accion === 'medio') {
+    const ruta = datos.ruta;
+    if (typeof ruta !== 'string' || !ruta || ruta.length > 400 || /[\u0000-\u001f<]/.test(ruta)) return null;
+    if (typeof datos.t !== 'number' || !Number.isFinite(datos.t) || datos.t < 0 || datos.t > 86400) return null;
+    const vel = typeof datos.vel === 'number' && Number.isFinite(datos.vel) ? Math.min(4, Math.max(0.25, datos.vel)) : 1;
+    return { accion: 'medio', ruta, t: datos.t, reproduciendo: datos.reproduciendo === true, vel };
+  }
   if (datos.accion === 'ir') {
     const url = limpiarDireccion(datos.url);
     return url ? { accion: 'ir', url } : null;

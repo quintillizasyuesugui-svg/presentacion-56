@@ -974,9 +974,10 @@
       cerrarBanda();
       pintarInvitacion();
     } else if (accion === 'siguiente') {
-      // Una página web con menú no se pasa de largo: «Siguiente» (o el reloj) recorre antes cada
-      // parte del menú. Cuando no queda ninguna, sigue la diapositiva siguiente o la frase final.
-      if (!showingFinal && pasarParteDelMenu()) { scheduleAutoAdvance(); return; }
+      // Con el temporizador, una página web con menú no se pasa de largo: el reloj recorre antes
+      // cada parte del menú y recién después sigue la diapositiva siguiente o la frase final.
+      // «Siguiente» tocado (botón o voz) pasa directo: para el menú están «Página anterior/siguiente».
+      if (!showingFinal && fromAuto && pasarParteDelMenu()) { scheduleAutoAdvance(); return; }
       if (showingFinal) {
         // Si era sólo una prueba ("Enviar a PC"), no tocó el índice — al
         // cerrarla, lo de abajo ya es la diapositiva correcta, no hay que
@@ -1125,7 +1126,8 @@
   let paginaBase = '';   // la dirección que se agregó en Gestionar
   let paginaActual = ''; // en cuál de sus páginas va ahora
   // Cómo se maneja desde el celular: «espejo» si la página lleva el puente; «vivo» si no lo lleva
-  // y esta pantalla es la app de PC, que la abre de verdad y manda fotos; vacío: sólo se ve.
+  // y esta pantalla es la app de PC, que la abre de verdad y manda fotos; «youtube» si es un
+  // enlace de YouTube (ver más abajo); vacío: sólo se ve.
   let paginaModo = '';
   const appPC = window.ConexionesPC && window.ConexionesPC.pagina ? window.ConexionesPC.pagina : null;
   const ESPERA_DEL_PUENTE = 700;  // después de que el recuadro terminó de cargar
@@ -1171,11 +1173,64 @@
     return paginaTraer ? '*' : origenDe(paginaBase);
   }
 
+  // ---- Enlace de YouTube ----
+  // YouTube no se deja mostrar adentro ni traer, y por fotos (app de PC) va con atraso. En su
+  // lugar la pantalla muestra una portada y desde el celular se busca y se elige el video, que lo
+  // pone el reproductor de videos (multimedia-pantalla.js) con el reproductor de YouTube: entre
+  // el celular y la pantalla sólo viajan órdenes, así va fluido también sin la app.
+  const portadaYoutube = document.getElementById('portadaYoutube');
+  const portadaYoutubeFoto = document.getElementById('portadaYoutubeFoto');
+  const portadaYoutubeTitulo = document.getElementById('portadaYoutubeTitulo');
+  const ID_YOUTUBE = /^[A-Za-z0-9_-]{11}$/;
+  function esYoutube(direccion) {
+    try { return /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(new URL(direccion).hostname); } catch { return false; }
+  }
+  // El video del enlace («watch?v=…», «youtu.be/…», «shorts/…»), o '' si es otra página de YouTube.
+  function videoDeYoutube(direccion) {
+    try {
+      const url = new URL(direccion);
+      const host = url.hostname.replace(/^(www\.|m\.|music\.)/, '');
+      let id = '';
+      if (host === 'youtu.be') id = url.pathname.split('/')[1];
+      else if (url.pathname === '/watch') id = url.searchParams.get('v');
+      else {
+        const [, tipo, valor] = url.pathname.split('/');
+        if (['shorts', 'embed', 'live', 'v'].includes(tipo)) id = valor;
+      }
+      return ID_YOUTUBE.test(id || '') ? id : '';
+    } catch { return ''; }
+  }
+  function mostrarPortadaYoutube(direccion) {
+    const id = videoDeYoutube(direccion);
+    portadaYoutubeFoto.hidden = !id;
+    if (id) portadaYoutubeFoto.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+    else portadaYoutubeFoto.removeAttribute('src');
+    portadaYoutubeTitulo.textContent = id ? 'Tocá ▶ en el celular para ponerlo' : 'Elegí un video desde el celular';
+    portadaYoutube.hidden = false;
+    marcoPagina.hidden = true;
+  }
+  function ocultarPortadaYoutube() {
+    portadaYoutube.hidden = true;
+    marcoPagina.hidden = false;
+  }
+
   function mostrarPagina(direccion) {
     // Conexiones adentro de Conexiones no se muestra: el recuadro quedaría con los mismos permisos.
     if (!origenDe(direccion) || origenDe(direccion) === location.origin) { contarEstado(); return; }
-    if (direccion !== paginaBase) {
+    if (direccion !== paginaBase && esYoutube(direccion)) {
       dejarVivo();
+      clearTimeout(esperaPuente);
+      paginaBase = direccion;
+      paginaActual = direccion;
+      paginaModo = 'youtube';
+      menuPuente = null;
+      paginaTraer = '';
+      probadaTraida = true;
+      marcoPagina.removeAttribute('src');
+      mostrarPortadaYoutube(direccion);
+    } else if (direccion !== paginaBase) {
+      dejarVivo();
+      ocultarPortadaYoutube();
       paginaBase = direccion;
       paginaActual = direccion;
       paginaModo = '';
@@ -1203,6 +1258,7 @@
     menuPuente = null;
     paginaTraer = '';
     probadaTraida = false;
+    ocultarPortadaYoutube();
     marcoPagina.removeAttribute('src'); // corta también el sonido que tuviera la página
   }
 
@@ -1430,6 +1486,11 @@
     if (evento.source !== marcoPagina.contentWindow || capaPagina.hidden) return;
     const aviso = evento.data;
     if (aviso && aviso.conexiones === true && aviso.tipo === 'noTraida' && paginaTraer && evento.origin === 'null') { volverSinTraer(); return; }
+    if (aviso && aviso.conexiones === true && aviso.tipo === 'medioCallado') {
+      const pastilla = document.getElementById('avisoPermiso');
+      if (pastilla) pastilla.hidden = false;
+      return;
+    }
     if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
     if (paginaTraer ? evento.origin !== 'null' : evento.origin !== origenDe(paginaBase)) return;
     clearTimeout(recargaSinRespuesta); // la página contestó: se volvió a cargar por su cuenta
@@ -1482,6 +1543,8 @@
 
   socket.on('web', (orden) => {
     if (!orden || capaPagina.hidden) return;
+    // Enlace de YouTube: no hay página que manejar (el video va por «medios»).
+    if (paginaModo === 'youtube') { contarEstado(); return; }
     if (orden.accion === 'recargar') { recargarPagina(); return; }
     if (paginaModo === 'vivo') {
       if (['toque', 'rueda', 'volver', 'texto', 'tecla', 'ir'].includes(orden.accion)) {
@@ -1498,8 +1561,19 @@
       return;
     }
     if (!marcoPagina.contentWindow) return;
-    marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: orden.accion, ruta: orden.ruta, navega: orden.navega, y: orden.y }, destinoDeOrdenes());
+    marcoPagina.contentWindow.postMessage({
+      conexiones: true, tipo: orden.accion, ruta: orden.ruta, navega: orden.navega, y: orden.y,
+      t: orden.t, reproduciendo: orden.reproduciendo, vel: orden.vel
+    }, destinoDeOrdenes());
   });
+
+  // Un video de la página tuvo que arrancar callado (nadie tocó la PC todavía): sale la pastilla
+  // «Sonido apagado». Con cualquier toque en la PC, la página lo vuelve a escuchar.
+  document.addEventListener('pointerdown', () => {
+    if (!capaPagina.hidden && paginaModo === 'espejo' && marcoPagina.contentWindow) {
+      marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: 'sonido' }, destinoDeOrdenes());
+    }
+  }, { capture: true });
 
   // «Cerrar pantalla» desde el celular: esta pantalla cierra la sesión y queda libre (con
   // «🔑 Iniciar sesión») para la siguiente persona.
@@ -1522,7 +1596,9 @@
       paginaTraida: Boolean(slide && slide.pagina && paginaTraer && paginaModo === 'espejo'),
       paginaMenu: slide && slide.pagina && paginaModo === 'vivo' ? paginaMenu : null,
       // En «vivo» agranda la app de PC; las apps anteriores a la 1.3.0 no saben hacerlo.
-      paginaZoom: Boolean(slide && slide.pagina && (paginaModo !== 'vivo' || (appPC && appPC.zoom))),
+      paginaZoom: Boolean(slide && slide.pagina && paginaModo !== 'youtube' && (paginaModo !== 'vivo' || (appPC && appPC.zoom))),
+      // Enlace de YouTube: el video del enlace, para «▶ Poner este video» en el celular.
+      paginaVideo: slide && slide.pagina && paginaModo === 'youtube' ? videoDeYoutube(slide.pagina) : '',
       paginaPaso: pasoSolo,
       ancho: window.innerWidth,
       alto: window.innerHeight,

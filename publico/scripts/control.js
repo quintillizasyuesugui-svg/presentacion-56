@@ -505,7 +505,42 @@
     espejoMarco.style.transform = 'scale(' + escala + ')';
   }
 
+  // ---- Enlace de YouTube ----
+  // YouTube no se deja mostrar adentro: en lugar del espejo, una tarjeta para buscar el video (o
+  // poner el del enlace). El video lo maneja el control grande de reproductor-celular.js.
+  const tarjetaYoutube = document.getElementById('tarjetaYoutube');
+  const tarjetaYoutubeFoto = document.getElementById('tarjetaYoutubeFoto');
+  const tarjetaYoutubePoner = document.getElementById('tarjetaYoutubePoner');
+  let tarjetaYoutubeVideo = '';
+  tarjetaYoutubePoner.addEventListener('click', () => {
+    if (tarjetaYoutubeVideo && window.youtubeCelular) window.youtubeCelular.ponerYoutube(tarjetaYoutubeVideo);
+  });
+  document.getElementById('tarjetaYoutubeBuscar').addEventListener('click', () => {
+    if (window.youtubeCelular) window.youtubeCelular.abrirBuscador();
+  });
+  function youtubeMostrar(estado) {
+    espejoOcultar();
+    zoomControl.hidden = true;
+    tarjetaYoutube.hidden = false;
+    const id = estado.paginaVideo || '';
+    if (id === tarjetaYoutubeVideo) return;
+    tarjetaYoutubeVideo = id;
+    tarjetaYoutubeFoto.hidden = !id;
+    if (id) tarjetaYoutubeFoto.src = 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg';
+    else tarjetaYoutubeFoto.removeAttribute('src');
+    tarjetaYoutubePoner.hidden = !id;
+    document.getElementById('tarjetaYoutubeBuscar').textContent = id ? '🔍 Buscar' : '🔍 Buscar un video';
+  }
+  function youtubeOcultar() {
+    if (tarjetaYoutube.hidden) return;
+    tarjetaYoutube.hidden = true;
+    tarjetaYoutubeVideo = '';
+    zoomControl.hidden = !espejoWeb.hidden;
+  }
+
   function espejoMostrar(estado) {
+    if (estado.paginaModo === 'youtube') { youtubeMostrar(estado); return; }
+    youtubeOcultar();
     if (!origenDe(estado.pagina) || origenDe(estado.pagina) === location.origin) return;
     const forma = estado.ancho > 0 && estado.alto > 0 ? estado.alto / estado.ancho : 9 / 16;
     espejoAlto = Math.round(ESPEJO_ANCHO * Math.min(1, Math.max(0.4, forma)));
@@ -979,6 +1014,8 @@
     if (!aviso || aviso.conexiones !== true || evento.origin !== (espejoTraer ? 'null' : origenDe(espejoBase))) return;
     if (aviso.tipo === 'listo' && typeof aviso.url === 'string') {
       espejoPreparada = true;
+      // Los videos de la página: acá se ven callados y mandan; suenan en la pantalla.
+      espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'soyEspejo' }, destinoEspejo());
       espejoAyuda.textContent = AYUDA_ESPEJO;
       if (typeof aviso.titulo === 'string' && aviso.titulo.trim()) {
         document.getElementById('espejoTitulo').textContent = '🌐 ' + aviso.titulo.trim().slice(0, 60);
@@ -992,6 +1029,8 @@
       socket.emit('web', { accion: 'clic', ruta: aviso.ruta, navega: aviso.navega === true });
     } else if (aviso.tipo === 'desplazar') {
       socket.emit('web', { accion: 'desplazar', y: aviso.y });
+    } else if (aviso.tipo === 'medio' && typeof aviso.ruta === 'string') {
+      socket.emit('web', { accion: 'medio', ruta: aviso.ruta, t: aviso.t, reproduciendo: aviso.reproduciendo === true, vel: aviso.vel });
     }
   });
 
@@ -1067,6 +1106,7 @@
           paginaContesto();
         } else {
           espejoOcultar();
+          youtubeOcultar();
           zoomMostrarFoto(estado.src, estado.zoom);
         }
       } else if (showStarted && estado.total === 0) {
@@ -1074,6 +1114,7 @@
         showStarted = false;
         fotoPantalla = { foto: 0, total: 0 };
         espejoOcultar();
+        youtubeOcultar();
         zoomApagar();
         updateNavButtonsState();
         pintarPasos();
@@ -1097,6 +1138,7 @@
         showStarted = false;
         fotoPantalla = { foto: 0, total: 0 };
         espejoOcultar();
+        youtubeOcultar();
         zoomApagar();
         if (estabaMostrando) showToast(esperandoPantalla ? '📺 Se cerró la pantalla. Abrila: sigue sola.' : '📺 Se cerró la pantalla. Abrila otra vez.');
       }

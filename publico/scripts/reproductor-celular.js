@@ -190,9 +190,65 @@
   vAyudaVacia.innerHTML = 'Todavía no tenés videos. <a href="multimedia.html#videos">Subí uno o guardá un enlace de YouTube</a>.';
   const hojaVideo = conVideo ? hoja('🎬 Video', [
     crear('p', { class: 'hoja-nota', text: 'Al mandarlo, tu pantalla pausa todo: la música, el avance automático y el texto en vivo. Cuando el video termina, todo sigue donde estaba.' }),
+    crear('button', { type: 'button', class: 'btn secondary', text: '🔍 Buscar en YouTube', onclick: () => abrirBuscador() }),
     vAyudaVacia,
     vLista
   ]) : null;
+
+  // ---------- buscar en YouTube (sólo en el control) ----------
+  // Se busca en el servidor (servidor/buscar-youtube.js) y el video elegido lo pone la pantalla.
+  // Al elegir, la hoja se cierra sola y queda el control grande del video.
+  const bTexto = crear('input', { type: 'search', id: 'buscarYoutubeTexto', class: 'buscar-youtube-texto', placeholder: 'Buscar en YouTube', 'aria-label': 'Qué video buscar', maxlength: '100', enterkeyhint: 'search', autocomplete: 'off' });
+  const bBoton = crear('button', { type: 'submit', class: 'btn primary', text: 'Buscar' });
+  const bForm = crear('form', { class: 'buscar-youtube', role: 'search' }, [bTexto, bBoton]);
+  const bEstado = crear('p', { class: 'hoja-nota', 'aria-live': 'polite', text: 'Escribí qué querés ver: el video sale en tu pantalla.' });
+  const bLista = crear('ul', { class: 'resultados-youtube' });
+  const hojaBuscar = conVideo ? hoja('🔍 Buscar en YouTube', [bForm, bEstado, bLista]) : null;
+  let buscando = 0;
+  bForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const busqueda = bTexto.value.trim();
+    if (!busqueda) { bTexto.focus(); return; }
+    bTexto.blur(); // baja el teclado para ver los resultados
+    const esta = ++buscando;
+    bEstado.textContent = 'Buscando…';
+    bBoton.disabled = true;
+    let datos = null;
+    try {
+      const res = await authFetch('/api/youtube/buscar?q=' + encodeURIComponent(busqueda));
+      datos = await res.json().catch(() => ({}));
+      if (!res.ok) datos = { error: datos.error || 'No se pudo buscar. Probá de nuevo.' };
+    } catch { datos = { error: 'Sin conexión. Revisá el internet del celular.' }; }
+    if (esta !== buscando) return;
+    bBoton.disabled = false;
+    if (datos.error) { bEstado.textContent = datos.error; return; }
+    const encontrados = datos.videos || [];
+    bEstado.textContent = encontrados.length ? 'Tocá un video y sale en tu pantalla.' : 'No encontré videos. Probá con otras palabras.';
+    bLista.replaceChildren(...encontrados.map(v => crear('li', {}, [crear('button', {
+      type: 'button',
+      class: 'resultado-youtube',
+      'aria-label': 'Poner en la pantalla: ' + v.titulo,
+      onclick: () => ponerYoutube(v.id, v.titulo)
+    }, [
+      crear('span', { class: 'resultado-foto' }, [
+        crear('img', { src: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', alt: '', loading: 'lazy' }),
+        crear('span', { class: 'resultado-duracion', text: v.duracion })
+      ]),
+      crear('span', { class: 'resultado-datos' }, [crear('b', { text: v.titulo }), crear('span', { text: v.canal })])
+    ])])));
+  });
+  function abrirBuscador() {
+    if (!hojaBuscar) return;
+    abrirHoja(hojaBuscar);
+    // Con resultados de antes se los deja a la vista; sin nada, directo a escribir.
+    if (!bLista.children.length) setTimeout(() => bTexto.focus(), 60);
+  }
+  function ponerYoutube(id, nombre) {
+    cerrarHoja();
+    mandar('video', 'youtube', nombre ? { id, nombre } : { id });
+  }
+  // Para la tarjeta de YouTube del control (control.js).
+  window.youtubeCelular = { abrirBuscador, ponerYoutube };
 
   // ---------- mini reproductor ----------
   const miniNombre = crear('b', { text: '' });
@@ -232,7 +288,10 @@
         crear('button', { type: 'button', class: 'mando', 'aria-label': 'Adelantar 10 segundos', onclick: () => mandar('video', 'saltar', 10) }, ['⏩', crear('br'), '10'])
       ]),
       pvVolumen.fila,
-      crear('button', { type: 'button', class: 'btn secondary', text: '⏹ Terminar video y volver', onclick: () => mandar('video', 'terminar') })
+      crear('div', { class: 'fila-video-botones' }, [
+        crear('button', { type: 'button', class: 'btn secondary', text: '🔍 Buscar otro', 'aria-label': 'Buscar otro video', onclick: () => abrirBuscador() }),
+        crear('button', { type: 'button', class: 'btn secondary', text: '⏹ Terminar', 'aria-label': 'Terminar video y volver', onclick: () => mandar('video', 'terminar') })
+      ])
     ]);
     panelVideo.hidden = true;
     panelNavegacion.after(panelVideo);

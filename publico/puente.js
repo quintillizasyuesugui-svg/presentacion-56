@@ -80,15 +80,84 @@
     return enlace.origin === ORIGEN && enlace.pathname === AQUI.pathname && enlace.search === AQUI.search;
   }
 
+  // ---- Videos y audios de la página ----
+  // El espejo del celular manda: lo que se hace con un video allá (▶, ⏸, mover la barra, la
+  // velocidad) se repite en la pantalla, en el mismo segundo. En el celular se ve callado: el
+  // sonido sale por la pantalla. Mientras suena, cada 2 s se avisa en qué segundo va, así la
+  // pantalla se corrige sola si se atrasó (internet lento, el video tardó en cargar).
+  var MEDIOS = 'video,audio';
+  var soyEspejo = false;          // este puente está en el celular (lo avisa el control)
+  var LATIDO_MEDIO = 2000;
+  var DEMORA_AVISO = 0.25;        // lo que tarda un aviso en llegar a la pantalla, en segundos
+  var DESFASE_TOLERADO = 0.5;     // más que esto de diferencia: la pantalla salta al segundo justo
+  var latidoMedio = null;
+  var callados = [];              // en la pantalla: los que arrancaron callados porque nadie tocó la PC
+
+  function medioDe(elemento) {
+    if (!elemento || !elemento.matches) return null;
+    return elemento.matches(MEDIOS) ? elemento : elemento.querySelector(MEDIOS);
+  }
+  function avisarMedio(medio) {
+    avisar({ tipo: 'medio', ruta: rutaDe(medio), t: medio.currentTime || 0, reproduciendo: !medio.paused && !medio.ended, vel: medio.playbackRate || 1 });
+  }
+  function latir() {
+    if (latidoMedio) return;
+    latidoMedio = setInterval(function () {
+      var sonando = Array.prototype.filter.call(document.querySelectorAll(MEDIOS), function (m) { return !m.paused && !m.ended; });
+      if (!sonando.length) { clearInterval(latidoMedio); latidoMedio = null; return; }
+      sonando.forEach(avisarMedio);
+    }, LATIDO_MEDIO);
+  }
+  ['play', 'pause', 'seeked', 'ratechange'].forEach(function (tipo) {
+    document.addEventListener(tipo, function (evento) {
+      var medio = evento.target;
+      if (!soyEspejo || !(medio instanceof HTMLMediaElement)) return;
+      if (tipo === 'play') { medio.muted = true; latir(); }
+      avisarMedio(medio);
+    }, true);
+  });
+
+  // En la pantalla: pone el video como está en el celular.
+  function ponerMedio(orden) {
+    var elemento = null;
+    try { elemento = document.querySelector(orden.ruta); } catch (error) { /* camino que no sirve */ }
+    var medio = medioDe(elemento);
+    if (!medio) return;
+    var vel = orden.vel || 1;
+    if (medio.playbackRate !== vel) medio.playbackRate = vel;
+    var destino = orden.t + (orden.reproduciendo ? DEMORA_AVISO * vel : 0);
+    if (Math.abs((medio.currentTime || 0) - destino) > DESFASE_TOLERADO) medio.currentTime = destino;
+    if (orden.reproduciendo && medio.paused) {
+      var arranque = medio.play();
+      if (arranque && arranque.catch) arranque.catch(function (error) {
+        // El navegador no deja sonar hasta que alguien toque la PC: arranca callado y se avisa.
+        if (!error || error.name !== 'NotAllowedError' || medio.muted) return;
+        medio.muted = true;
+        if (callados.indexOf(medio) === -1) callados.push(medio);
+        medio.play().catch(function () { /* ni callado: queda quieto */ });
+        avisar({ tipo: 'medioCallado' });
+      });
+    } else if (!orden.reproduciendo && !medio.paused) {
+      medio.pause();
+    }
+  }
+
   // Lo que la persona toca de verdad se avisa. Los toques repetidos por el puente no vuelven
   // a avisarse (no son «de confianza» para el navegador).
   document.addEventListener('click', function (evento) {
     if (!evento.isTrusted || !(evento.target instanceof Element)) return;
+    // Tocar un video (sus botones) no se repite como clic: va por «medio», arriba.
+    if (evento.target.closest(MEDIOS)) return;
     var elemento = evento.target.closest(TOCABLES) || evento.target;
     var enlace = elemento.closest('a[href]');
-    // Un enlace que lleva a otra página no se repite: la pantalla va directo a esa página.
-    var navega = !!enlace && !mismaPagina(enlace);
-    avisar({ tipo: 'clic', ruta: rutaDe(elemento), navega: navega });
+    // Un enlace que lleva a otra página no se repite: la pantalla va directo a esa página. Se
+    // mira al terminar el toque: si la página lo atajó (un enlace que abre una ventana, como el
+    // «Video» del Resumidor), no se va a ningún lado y la pantalla tiene que repetir el toque.
+    var ruta = rutaDe(elemento);
+    setTimeout(function () {
+      var navega = !!enlace && !mismaPagina(enlace) && !evento.defaultPrevented;
+      avisar({ tipo: 'clic', ruta: ruta, navega: navega });
+    }, 0);
   }, true);
 
   var ultimoAviso = 0;
@@ -147,6 +216,18 @@
     var orden = evento.data;
     if (!orden || orden.conexiones !== true) return;
     if (orden.tipo === 'recargar') { recargar(); return; }
+    if (orden.tipo === 'soyEspejo') {
+      soyEspejo = true;
+      Array.prototype.forEach.call(document.querySelectorAll(MEDIOS), function (m) { m.muted = true; });
+      return;
+    }
+    if (orden.tipo === 'medio' && typeof orden.ruta === 'string' && isFinite(orden.t)) { ponerMedio(orden); return; }
+    if (orden.tipo === 'sonido') {
+      // Alguien tocó la PC: los que arrancaron callados ya se pueden escuchar.
+      callados.forEach(function (m) { m.muted = false; });
+      callados = [];
+      return;
+    }
     if (orden.tipo === 'clic' && typeof orden.ruta === 'string') {
       var elemento = null;
       try { elemento = document.querySelector(orden.ruta); } catch (error) { /* camino que no sirve */ }

@@ -4,7 +4,8 @@
 // puede mandar cualquier cosa a la pantalla de otro ni textos gigantes.
 
 const ACCIONES_MUSICA = ['reproducir', 'pausar', 'alternar', 'siguiente', 'anterior', 'ir', 'saltar', 'volumen', 'elegir', 'bucle'];
-const ACCIONES_VIDEO = ['mandar', 'reproducir', 'pausar', 'alternar', 'ir', 'saltar', 'volumen', 'terminar'];
+const ACCIONES_VIDEO = ['mandar', 'youtube', 'reproducir', 'pausar', 'alternar', 'ir', 'saltar', 'volumen', 'terminar'];
+const ID_YOUTUBE = /^[A-Za-z0-9_-]{11}$/;
 const LARGO_ID = 200;
 const LARGO_NOMBRE = 200;
 const SEGUNDOS_MAXIMOS = 24 * 60 * 60;
@@ -35,6 +36,12 @@ function limpiarOrdenMedios(datos) {
   if (accion === 'bucle') {
     if (typeof valor !== 'boolean') return null;
     return { para, accion, valor };
+  }
+  // «youtube»: un video buscado desde el celular, que no está en la lista de la persona.
+  if (accion === 'youtube') {
+    if (!valor || typeof valor !== 'object' || typeof valor.id !== 'string' || !ID_YOUTUBE.test(valor.id)) return null;
+    const nombre = typeof valor.nombre === 'string' ? valor.nombre.trim().slice(0, LARGO_NOMBRE) : '';
+    return { para, accion, valor: { id: valor.id, nombre: nombre || 'Video de YouTube' } };
   }
   if (accion === 'elegir' || accion === 'mandar') {
     if (!esTexto(valor, LARGO_ID)) return null;

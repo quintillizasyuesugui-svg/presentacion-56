@@ -221,7 +221,10 @@ function registrarSockets(io) {
         pagina: limpiarDireccion(datos.pagina) || '',
         paginaActual: limpiarDireccion(datos.paginaActual) || '',
         // «espejo»: la página lleva el puente. «vivo»: la abrió la app de PC y manda fotos.
-        paginaModo: datos.paginaModo === 'espejo' || datos.paginaModo === 'vivo' ? datos.paginaModo : '',
+        // «youtube»: enlace de YouTube; el video se busca y se maneja desde el celular.
+        paginaModo: ['espejo', 'vivo', 'youtube'].includes(datos.paginaModo) ? datos.paginaModo : '',
+        // Con «youtube»: el video del enlace (si el enlace es de un video).
+        paginaVideo: datos.paginaModo === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(datos.paginaVideo || '') ? datos.paginaVideo : '',
         // La pantalla la muestra traída por Conexiones (no se deja mostrar adentro): el espejo también.
         paginaTraida: datos.paginaTraida === true,
         // En «vivo»: el menú que la app de PC le leyó a la página, para las cajas del celular.

@@ -351,9 +351,17 @@
     return promesaYoutube;
   }
 
+  // Un video de YouTube buscado desde el celular: no está en la lista de la persona. Su id
+  // empieza con «yt:» (así se reconoce también al volver a abrir la pantalla).
+  function videoBuscado(youtubeId, nombre) {
+    return { id: 'yt:' + youtubeId, nombre: nombre || 'Video de YouTube', origen: 'youtube', youtubeId, buscado: true };
+  }
+  const esBuscado = (id) => typeof id === 'string' && id.startsWith('yt:');
+
   // «desde» y «pausado»: al volver a abrir la pantalla, el video sigue en el segundo en que iba.
-  function mandarVideo(id, { desde = 0, pausado = false } = {}) {
-    const v = videos.find(x => x.id === id);
+  // «cual» es el id de un video de la lista o el video mismo (uno buscado en YouTube).
+  function mandarVideo(cual, { desde = 0, pausado = false } = {}) {
+    const v = typeof cual === 'object' ? cual : videos.find(x => x.id === cual);
     if (!v) return avisarAlCelular('Ese video ya no está.');
     if (video) terminarVideo({ avisar: false, reanudar: false });
     else {
@@ -383,6 +391,9 @@
           },
           events: {
             onReady: (e) => {
+              // El enlace de la diapositiva no trae el título: lo dice el reproductor.
+              const datos = e.target.getVideoData ? e.target.getVideoData() : null;
+              if (v.sinTitulo && datos && datos.title) { v.nombre = datos.title; v.sinTitulo = false; tituloVideo.textContent = '🎬 ' + v.nombre; }
               if (pausado) {
                 // YouTube no deja ponerse en un segundo sin arrancar: arranca callado y se frena.
                 e.target.setVolume(volumenVideo);
@@ -526,6 +537,13 @@
       if (!permitido) pedirPermiso();
       return mandarVideo(valor);
     }
+    if (accion === 'youtube') {
+      if (!permitido) pedirPermiso();
+      const v = videoBuscado(valor.id, valor.nombre);
+      // Desde el enlace de una diapositiva llega sin título: lo dice el reproductor al cargar.
+      v.sinTitulo = valor.nombre === 'Video de YouTube';
+      return mandarVideo(v);
+    }
     if (!video) return;
     if (accion === 'terminar') return terminarVideo();
     if (accion === 'reproducir') reanudarVideo();
@@ -574,7 +592,9 @@
     if (!r || !soyLaActiva) return publicarEstado();
     const paso = Math.max(0, (Number(r.hace) || 0) / 1000);
     const m = r.musica && musicas.find(x => x.id === r.musica.id);
-    const v = r.video && videos.find(x => x.id === r.video.id);
+    const v = r.video && (esBuscado(r.video.id)
+      ? videoBuscado(r.video.id.slice(3), r.video.nombre)
+      : videos.find(x => x.id === r.video.id));
     if (r.musica) volumenMusica = r.musica.volumen;
     if (r.video) volumenVideo = r.video.volumen;
     audio.volume = volumenMusica / 100;
@@ -601,7 +621,7 @@
     }
 
     if (v && quedaVideo) {
-      mandarVideo(v.id, { desde, pausado: !r.video.sonando });
+      mandarVideo(v, { desde, pausado: !r.video.sonando });
       musicaAntesDelVideo = Boolean(m && (r.musicaDespues || r.musica.sonando));
     } else if (m && (r.musica.sonando || (r.video && r.musicaDespues))) {
       reproducirMusica({ seguida: true });
@@ -624,7 +644,7 @@
           musicaId = null;
           quiereSonar = false;
         }
-        if (video && !videos.some(v => v.id === video.id)) terminarVideo();
+        if (video && !video.buscado && !videos.some(v => v.id === video.id)) terminarVideo();
         listaCargada = true;
         seguirDondeIba();
         publicarEstado();

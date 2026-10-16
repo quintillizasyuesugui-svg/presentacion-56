@@ -111,12 +111,26 @@ Lo que se toca en el espejo pasa también en la pantalla.
   cajas debajo de la foto; tocar una lleva la pantalla a esa parte. Si la página no tiene un
   menú que se pueda leer, el celular avisa «No detecté cajas de menú en esta página» y se
   maneja tocando la foto.
-- **«Siguiente» recorre el menú de la página:** con una página web en pantalla, «Siguiente» (el
-  botón, la voz o el avance automático) pasa primero por cada parte de su menú, sin repetir la
-  portada ni lo que ya se vio; cuando no queda ninguna sigue la diapositiva siguiente, y si no
-  hay más, la frase final. Con el avance automático cada parte dura el tiempo completo. Lo que
-  se agrandó vuelve a su tamaño cuando se acaba el tiempo. Si no se puede leer el menú (página
-  sin puente en un navegador), la página dura un turno, como una foto.
+- **El temporizador recorre el menú de la página:** con una página web en pantalla y el avance
+  automático prendido, el reloj pasa primero por cada parte de su menú, sin repetir la portada ni
+  lo que ya se vio; cuando no queda ninguna sigue la diapositiva siguiente, y si no hay más, la
+  frase final. Cada parte dura el tiempo completo. Lo que se agrandó vuelve a su tamaño cuando se
+  acaba el tiempo. Si no se puede leer el menú (página sin puente en un navegador), la página
+  dura un turno, como una foto. «Siguiente» y «Atrás» tocados (botón o voz) pasan directo a la
+  otra diapositiva; para moverse por el menú están «Página anterior/siguiente» y las cajas.
+- **Videos de la página, sincronizados:** si la página (con puente o traída) tiene un video o un
+  audio, lo que se hace con él en el espejo del celular (▶, ⏸, mover la barra, la velocidad) pasa
+  también en la pantalla, en el mismo segundo; cada 2 s se corrige si se atrasó. En el celular se
+  ve callado: el sonido sale por la pantalla. Si nadie tocó la PC todavía, arranca callado y sale
+  la pastilla «Sonido apagado».
+- **Enlace de YouTube:** YouTube no se deja mostrar adentro ni traer. Con un enlace de YouTube como
+  diapositiva, la pantalla muestra una portada (la foto del video, si el enlace es de un video) y
+  el celular una tarjeta con «▶ Poner video» y «🔍 Buscar». La búsqueda la hace el servidor
+  (`servidor/buscar-youtube.js`, sin clave ni costo; la misma búsqueda se guarda 15 min y hay
+  hasta 20 por minuto por persona); al tocar un resultado la pantalla lo pone con el reproductor
+  de YouTube y el celular queda con el control grande (▶ ⏸, ±10 s, barra, volumen, «🔍 Buscar
+  otro», «⏹ Terminar»). Sólo viajan órdenes, no fotos: va fluido también sin la app. También se
+  busca desde «🎬 Video» → «🔍 Buscar en YouTube».
 - **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
   «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
   llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»
