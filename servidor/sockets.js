@@ -112,8 +112,17 @@ function registrarSockets(io) {
     socket.on('cambiar', (accion) => {
       if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('cambiar', accion);
     });
-    socket.on('cine', () => {
-      if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('cine');
+    // Pantalla completa pedida desde el celular ({ salir: true } la quita). La pantalla contesta
+    // si quedó completa o si le falta un toque en la PC (el navegador no deja sin un toque).
+    socket.on('cine', (pedido) => {
+      if (socket.ownerName) io.to('owner:' + socket.ownerName).emit('cine', pedido && pedido.salir === true ? { salir: true } : undefined);
+    });
+    socket.on('pantallaCompletaEstado', (datos) => {
+      if (!socket.ownerName || !datos || typeof datos !== 'object') return;
+      socket.to('owner:' + socket.ownerName).emit('pantallaCompletaEstado', {
+        completa: datos.completa === true,
+        ...(datos.falta === 'toque' ? { falta: 'toque' } : {})
+      });
     });
 
     // Vincula este socket a la "sala" de su dueño (según el PIN) — así se le

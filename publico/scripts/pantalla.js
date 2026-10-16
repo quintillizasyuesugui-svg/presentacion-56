@@ -862,11 +862,58 @@
     }
   });
 
-  socket.on('cine', () => {
-    requestFullscreenNow();
-    fsIndicator.classList.add('show');
-    setTimeout(() => fsIndicator.classList.remove('show'), 2000);
+  // ---- Pantalla completa pedida desde el celular ----
+  // Primero se intenta directo (la app de PC lo permite, y a veces el navegador también). Si el
+  // navegador no deja sin un toque en la PC, sale la pastilla «⛶ Pantalla completa · Tocá para
+  // activar» y con cualquier toque en la PC se pone completa (ese toque activa también el sonido).
+  // La pantalla le cuenta al celular cómo quedó.
+  const avisoCompleta = document.getElementById('avisoCompleta');
+  let completaPendiente = false;
+  const esCompleta = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  function contarCompleta(extra = {}) {
+    socket.emit('pantallaCompletaEstado', { completa: esCompleta(), ...extra });
+  }
+  function intentarCompleta() {
+    const el = document.documentElement;
+    try {
+      if (el.requestFullscreen) return Promise.resolve(el.requestFullscreen());
+      if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return Promise.resolve(); }
+    } catch (error) { return Promise.reject(error); }
+    return Promise.reject(new Error('Este navegador no tiene pantalla completa.'));
+  }
+  function completaConToque() {
+    if (!completaPendiente || esCompleta()) return;
+    completaPendiente = false;
+    avisoCompleta.hidden = true;
+    intentarCompleta().catch(() => contarCompleta());
+  }
+  // Cualquier toque o tecla en la PC sirve (también el de la pastilla del sonido).
+  document.addEventListener('click', completaConToque, true);
+  document.addEventListener('keydown', completaConToque, true);
+
+  socket.on('cine', (pedido) => {
+    if (pedido && pedido.salir) {
+      completaPendiente = false;
+      avisoCompleta.hidden = true;
+      if (esCompleta()) (document.exitFullscreen ? document.exitFullscreen() : Promise.resolve()).catch(() => contarCompleta());
+      else contarCompleta();
+      return;
+    }
+    if (esCompleta()) { contarCompleta(); return; }
+    intentarCompleta().then(() => {
+      fsIndicator.classList.add('show');
+      setTimeout(() => fsIndicator.classList.remove('show'), 2000);
+    }).catch(() => {
+      completaPendiente = true;
+      avisoCompleta.hidden = false;
+      contarCompleta({ falta: 'toque' });
+    });
   });
+  document.addEventListener('fullscreenchange', () => {
+    if (esCompleta()) { completaPendiente = false; avisoCompleta.hidden = true; }
+    contarCompleta();
+  });
+  socket.on('pantallaPedirEstado', () => contarCompleta(completaPendiente ? { falta: 'toque' } : {}));
 
   // "aplicarCambio" es la única función que mueve diapositivas — la llama
   // tanto el socket (control remoto compartido) como el temporizador local

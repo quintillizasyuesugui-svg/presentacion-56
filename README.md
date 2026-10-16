@@ -131,6 +131,11 @@ Lo que se toca en el espejo pasa también en la pantalla.
   de YouTube y el celular queda con el control grande (▶ ⏸, ±10 s, barra, volumen, «🔍 Buscar
   otro», «⏹ Terminar»). Sólo viajan órdenes, no fotos: va fluido también sin la app. También se
   busca desde «🎬 Video» → «🔍 Buscar en YouTube».
+- **⛶ Pantalla completa desde el celular:** con un video en pantalla, el cartel del control tiene
+  un botón chico «⛶ Pantalla completa». Si la PC puede (app de PC, o el navegador lo deja) se pone
+  completa directo; si el navegador pide un toque, la PC muestra la pastilla «⛶ Pantalla completa ·
+  Tocá para activar» y el celular avisa. Con la PC completa el botón queda verde; tocado de nuevo,
+  la quita. «📺 Pantalla → La PC» hace lo mismo.
 - **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
   «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
   llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»

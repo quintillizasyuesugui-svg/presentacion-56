@@ -276,15 +276,42 @@
 
   // ---------- panel del video en el control (reemplaza Atrás/Siguiente) ----------
   let panelVideo = null;
-  let pvNombre, pvBarra, pvPlay, pvVolumen;
+  let pvNombre, pvBarra, pvPlay, pvVolumen, pvCompleta;
+
+  // ---- Pantalla completa en la PC ----
+  // Se pide a la pantalla; ella contesta si quedó completa o si falta un toque en la PC (en un
+  // navegador, sin un toque no se puede). Tocado de nuevo, la quita.
+  let pantallaCompleta = false;
+  let pidiendoCompleta = false;
+  function pedirCompleta() {
+    pidiendoCompleta = true;
+    socket.emit('cine', pantallaCompleta ? { salir: true } : undefined);
+  }
+  function pintarCompleta() {
+    if (!pvCompleta) return;
+    pvCompleta.textContent = pantallaCompleta ? '✓ Pantalla completa' : '⛶ Pantalla completa';
+    pvCompleta.classList.toggle('completa', pantallaCompleta);
+    pvCompleta.setAttribute('aria-label', pantallaCompleta ? 'Quitar la pantalla completa de la PC' : 'Poner la PC en pantalla completa');
+  }
+  socket.on('pantallaCompletaEstado', (e) => {
+    if (!e) return;
+    const antes = pantallaCompleta;
+    pantallaCompleta = e.completa === true;
+    pintarCompleta();
+    if (e.falta === 'toque' && pidiendoCompleta) avisar('👆 Tocá una vez la pantalla de la PC y se pone completa.');
+    else if (pantallaCompleta && !antes) avisar('✓ La PC está en pantalla completa.');
+    else if (!pantallaCompleta && antes && pidiendoCompleta) avisar('La PC salió de pantalla completa.');
+    if (e.falta !== 'toque') pidiendoCompleta = false;
+  });
   const panelNavegacion = document.querySelector('.panel.nav-panel');
   if (conVideo && panelNavegacion) {
     pvNombre = crear('span', { text: '' });
     pvBarra = barraArrastrable('Arrastrá para ir a otra parte del video', (t) => mandar('video', 'ir', t));
     pvPlay = crear('button', { type: 'button', class: 'mando grande', 'aria-label': 'Pausar video', text: '⏸', onclick: () => mandar('video', 'alternar') });
     pvVolumen = deslizadorVolumen('Volumen del video', (v) => mandar('video', 'volumen', v));
+    pvCompleta = crear('button', { type: 'button', class: 'boton-completa', text: '⛶ Pantalla completa', onclick: pedirCompleta });
     panelVideo = crear('div', { class: 'panel video-activo', 'aria-live': 'polite' }, [
-      crear('div', { class: 'cartel-video' }, [crear('span', { class: 'punto-vivo', 'aria-hidden': 'true' }), pvNombre]),
+      crear('div', { class: 'cartel-video' }, [crear('span', { class: 'punto-vivo', 'aria-hidden': 'true' }), pvNombre, pvCompleta]),
       pvBarra.caja,
       crear('div', { class: 'mandos' }, [
         crear('button', { type: 'button', class: 'mando', 'aria-label': 'Retroceder 10 segundos', onclick: () => mandar('video', 'saltar', -10) }, ['⏪', crear('br'), '10']),
