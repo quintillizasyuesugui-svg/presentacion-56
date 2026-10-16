@@ -22,11 +22,11 @@ function olvidarTodo(nombre) {
   recuerdosVivo.delete(nombre);
 }
 
-// Hasta dos fotos en camino a cada celular: con el servidor lejos, mientras una va llegando ya
+// Hasta tres fotos en camino a cada celular: con el servidor lejos, mientras una va llegando ya
 // sale la otra (con una sola, la ida y vuelta del aviso dejaba al celular esperando).
 // Si el celular no avisa en este tiempo (se cortó, quedó en segundo plano), se le manda igual.
-const FOTOS_EN_CAMINO = 2;
-const FOTO_SIN_AVISO_MS = 4000;
+const FOTOS_EN_CAMINO = 3;
+const FOTO_SIN_AVISO_MS = 2000;
 function mandarFotoWeb(celular, foto) {
   const ahora = Date.now();
   celular.fotosEnCamino = (celular.fotosEnCamino || []).filter(t => ahora - t < FOTO_SIN_AVISO_MS);

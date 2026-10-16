@@ -1145,7 +1145,7 @@
   const FOTO_APURADA = 160;    // mientras se la maneja: unas 6 por segundo
   const APURO_TRAS_ORDEN = 1500;
   const APURO_MAXIMO = 4000;   // una página que se mueve sola no deja las fotos seguidas para siempre
-  const SUBIDA_MAXIMA = 3000;  // si el servidor no confirma una foto, a los 3 s se manda otra igual
+  const SUBIDA_MAXIMA = 1500;  // si el servidor no confirma una foto, a los 1,5 s se manda otra igual
   const SUBIDAS_A_LA_VEZ = 2;  // con el servidor lejos, mientras una sube ya sale la otra
   let subiendo = [];           // cuándo salieron las fotos que todavía no llegaron al servidor
   let cambiandoHasta = 0;      // la página se mueve sola (sin órdenes del celular)
