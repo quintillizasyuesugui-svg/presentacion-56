@@ -1130,6 +1130,7 @@
   const appPC = window.ConexionesPC && window.ConexionesPC.pagina ? window.ConexionesPC.pagina : null;
   const ESPERA_DEL_PUENTE = 700;  // después de que el recuadro terminó de cargar
   const ESPERA_MAXIMA = 12000;
+  const ESPERA_TRAIDA = 10000;   // la página traída tiene que contestar en este tiempo
   let esperaPuente = null;
   let relojVivo = null;
   let ticsVivo = 0;
@@ -1149,9 +1150,25 @@
   const SUBIDAS_A_LA_VEZ = 2;  // con el servidor lejos, mientras una sube ya sale la otra
   let subiendo = [];           // cuándo salieron las fotos que todavía no llegaron al servidor
   let cambiandoHasta = 0;      // la página se mueve sola (sin órdenes del celular)
+  // Página traída por Conexiones (servidor/traer-pagina.js): cuando no se deja mostrar adentro, el
+  // servidor la trae con el puente puesto. Así la pantalla y el celular muestran la página de
+  // verdad (fluida) también en un navegador. Las aplicaciones grandes no se traen: con esas no
+  // funcionaría y siguen con la app de PC.
+  const SIN_TRAER = /(^|\.)(youtube\.com|youtu\.be|google\.[a-z.]+|facebook\.com|instagram\.com|tiktok\.com|x\.com|twitter\.com)$/i;
+  let paginaTraer = '';        // comienzo de la dirección para pedirla traída ('' si no está traída)
+  let probadaTraida = false;   // ya se intentó traerla (si no anduvo, no se insiste)
 
   function origenDe(direccion) {
     try { return new URL(direccion).origin; } catch { return ''; }
+  }
+
+  // Dónde se abre en el recuadro una dirección de la página (traída o tal cual).
+  function marcoPara(direccion) {
+    return paginaTraer ? paginaTraer + encodeURIComponent(direccion) : direccion;
+  }
+  // A quién se le mandan las órdenes: la página traída no tiene origen propio (está encerrada).
+  function destinoDeOrdenes() {
+    return paginaTraer ? '*' : origenDe(paginaBase);
   }
 
   function mostrarPagina(direccion) {
@@ -1163,6 +1180,8 @@
       paginaActual = direccion;
       paginaModo = '';
       menuPuente = null;
+      paginaTraer = '';
+      probadaTraida = false;
       marcoPagina.src = direccion;
       // En la app de PC: si la página termina de cargar y no contestó con el puente, la abre la
       // app (ver el aviso «load» más abajo). El tope es por si nunca termina de cargar.
@@ -1182,6 +1201,8 @@
     paginaActual = '';
     paginaModo = '';
     menuPuente = null;
+    paginaTraer = '';
+    probadaTraida = false;
     marcoPagina.removeAttribute('src'); // corta también el sonido que tuviera la página
   }
 
@@ -1244,7 +1265,7 @@
       apurarFotos(APURO_MAXIMO);
     } else {
       paginaActual = parte.url;
-      marcoPagina.src = parte.url;
+      marcoPagina.src = marcoPara(parte.url);
     }
     contarEstado();
     return true;
@@ -1254,15 +1275,56 @@
   // El puente avisa apenas arranca la página, antes de que el recuadro termine de cargar. Si
   // terminó de cargar y no avisó, es una página sin puente (o que no se deja mostrar acá).
   marcoPagina.addEventListener('load', () => {
-    if (!appPC || capaPagina.hidden || paginaModo || !marcoPagina.getAttribute('src')) return;
+    if (capaPagina.hidden || paginaModo || !marcoPagina.getAttribute('src')) return;
     const cual = paginaBase;
     clearTimeout(esperaPuente);
-    esperaPuente = setTimeout(() => { if (cual === paginaBase) pasarAVivo(); }, ESPERA_DEL_PUENTE);
+    esperaPuente = setTimeout(() => { if (cual === paginaBase) sinPuente(); }, ESPERA_DEL_PUENTE);
   });
+
+  function sePuedeTraer(direccion) {
+    try { return !SIN_TRAER.test(new URL(direccion).hostname); } catch { return false; }
+  }
+
+  function sinPuente() {
+    if (capaPagina.hidden || paginaModo) return;
+    if (!probadaTraida && sePuedeTraer(paginaBase)) { traerPagina(); return; }
+    paginaTraer = '';
+    pasarAVivo();
+  }
+
+  async function traerPagina() {
+    probadaTraida = true;
+    const cual = paginaBase;
+    let firma = '';
+    try {
+      const res = await authFetch('/api/traer/firma?u=' + encodeURIComponent(paginaBase));
+      if (res.ok) firma = (await res.json()).firma || '';
+    } catch { /* sin conexión: queda como estaba */ }
+    if (cual !== paginaBase || paginaModo || capaPagina.hidden) return;
+    if (!firma) { pasarAVivo(); return; }
+    paginaTraer = location.origin + '/traer?f=' + encodeURIComponent(firma) + '&u=';
+    marcoPagina.src = marcoPara(paginaActual || paginaBase);
+    // Si la traída no contesta (no se pudo traer: avisa «noTraida», o se queda callada), se
+    // vuelve a mostrar como antes.
+    clearTimeout(esperaPuente);
+    esperaPuente = setTimeout(() => { if (cual === paginaBase && !paginaModo) volverSinTraer(); }, ESPERA_TRAIDA);
+  }
+
+  // No se pudo traer: en la app de PC la abre la app (fotos en vivo); en un navegador se vuelve a
+  // la página tal cual (se ve, aunque sin manejarla desde el celular).
+  function volverSinTraer() {
+    if (!paginaTraer || capaPagina.hidden || paginaModo) return;
+    paginaTraer = '';
+    clearTimeout(esperaPuente);
+    if (appPC) pasarAVivo();
+    else marcoPagina.src = paginaActual || paginaBase;
+    contarEstado();
+  }
 
   function pasarAVivo() {
     if (!appPC || capaPagina.hidden || paginaModo) return;
     paginaModo = 'vivo';
+    paginaTraer = '';
     marcoPagina.removeAttribute('src');
     ultimaFoto = '';
     ticsVivo = 0;
@@ -1367,8 +1429,9 @@
   window.addEventListener('message', (evento) => {
     if (evento.source !== marcoPagina.contentWindow || capaPagina.hidden) return;
     const aviso = evento.data;
+    if (aviso && aviso.conexiones === true && aviso.tipo === 'noTraida' && paginaTraer && evento.origin === 'null') { volverSinTraer(); return; }
     if (!aviso || aviso.conexiones !== true || aviso.tipo !== 'listo' || typeof aviso.url !== 'string') return;
-    if (evento.origin !== origenDe(paginaBase)) return;
+    if (paginaTraer ? evento.origin !== 'null' : evento.origin !== origenDe(paginaBase)) return;
     clearTimeout(recargaSinRespuesta); // la página contestó: se volvió a cargar por su cuenta
     menuPuente = Array.isArray(aviso.menu)
       ? aviso.menu.slice(0, PARTES_TOPE).filter(caja => caja && typeof caja.url === 'string' && caja.url.length <= 500)
@@ -1405,13 +1468,13 @@
       if (appPC && appPC.limpiar) {
         await appPC.limpiar();
         if (!sigueIgual()) return; // mientras tanto se pasó a otra
-        marcoPagina.src = direccion;
+        marcoPagina.src = marcoPara(direccion);
       } else if (paginaModo === 'espejo' && marcoPagina.contentWindow) {
-        marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, origenDe(paginaBase));
+        marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, destinoDeOrdenes());
         // Una página con un puente anterior no sabe recargarse sola: si no contesta, se la abre con la marca.
-        recargaSinRespuesta = setTimeout(() => { if (sigueIgual()) marcoPagina.src = conMarca(direccion); }, 9000);
+        recargaSinRespuesta = setTimeout(() => { if (sigueIgual()) marcoPagina.src = marcoPara(conMarca(direccion)); }, 9000);
       } else {
-        marcoPagina.src = conMarca(direccion);
+        marcoPagina.src = marcoPara(conMarca(direccion));
       }
     }
     contarEstado(); // así el celular sabe que la pantalla ya la pidió de nuevo
@@ -1431,11 +1494,11 @@
       // Sólo a otras páginas del mismo sitio que se agregó.
       if (origenDe(orden.url) !== origenDe(paginaBase) || orden.url === paginaActual) return;
       paginaActual = orden.url;
-      marcoPagina.src = orden.url;
+      marcoPagina.src = marcoPara(orden.url);
       return;
     }
     if (!marcoPagina.contentWindow) return;
-    marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: orden.accion, ruta: orden.ruta, navega: orden.navega, y: orden.y }, origenDe(paginaBase));
+    marcoPagina.contentWindow.postMessage({ conexiones: true, tipo: orden.accion, ruta: orden.ruta, navega: orden.navega, y: orden.y }, destinoDeOrdenes());
   });
 
   // «Cerrar pantalla» desde el celular: esta pantalla cierra la sesión y queda libre (con
@@ -1456,6 +1519,7 @@
       pagina: slide && slide.pagina ? slide.pagina : '',
       paginaActual: slide && slide.pagina ? paginaActual : '',
       paginaModo: slide && slide.pagina ? paginaModo : '',
+      paginaTraida: Boolean(slide && slide.pagina && paginaTraer && paginaModo === 'espejo'),
       paginaMenu: slide && slide.pagina && paginaModo === 'vivo' ? paginaMenu : null,
       // En «vivo» agranda la app de PC; las apps anteriores a la 1.3.0 no saben hacerlo.
       paginaZoom: Boolean(slide && slide.pagina && (paginaModo !== 'vivo' || (appPC && appPC.zoom))),

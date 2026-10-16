@@ -87,13 +87,18 @@ muestra la página y el celular lo detecta solo y abre el **espejo**: la misma p
 Lo que se toca en el espejo pasa también en la pantalla.
 
 - Debajo del espejo aparecen los botones del menú de la página, «Página anterior» y
-  «Página siguiente». «🔍 Acercar» agranda el espejo en el celular.
+  «Página siguiente». «−», «+» y «↩ Normal» agrandan sólo lo que se ve en el celular (lupa;
+  en foto en vivo también con dos dedos).
 - Para poder manejarla, la página tiene que llevar el puente: copiar `publico/puente.js` a la
   página (por ejemplo como `puente-conexiones.js`) y agregarle
   `<script src="puente-conexiones.js" defer></script>`. Abierta sola, la página no cambia en nada.
-- Una página sin el puente, con la pantalla abierta en un navegador, se ve pero no se maneja
-  desde el celular; las que no se dejan mostrar dentro de otra (Google, Facebook, bancos) no
-  aparecen.
+- **Páginas traídas por Conexiones (sin app):** si la página no lleva el puente o no se deja
+  mostrar dentro de otra, el servidor la trae y le pone el puente (`servidor/traer-pagina.js`).
+  La pantalla y el celular muestran la página de verdad, fluida, y se mueven juntos, también en un
+  navegador. Pensado para páginas informativas; YouTube, Google, Facebook y parecidas no se traen.
+  La página traída queda encerrada (sin acceso a lo guardado por Conexiones), sólo se entrega
+  adentro de Conexiones y sólo para sitios que la persona tiene en su lista. Si no se puede traer,
+  se muestra como antes.
 - **Cualquier página, con la app de PC (Conexiones Pantalla 1.1.0 o más nueva):** si la página
   no lleva el puente, la app la abre de verdad, como un navegador, y el celular pasa solo a
   **foto en vivo**: muestra una foto de la pantalla que se renueva sola (640 px, sólo cuando

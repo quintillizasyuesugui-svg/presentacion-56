@@ -472,6 +472,28 @@
     try { return new URL(direccion).origin; } catch { return ''; }
   }
 
+  // Página traída por Conexiones (la que no se deja mostrar adentro): si la pantalla la muestra
+  // traída, el espejo también la pide así (ver servidor/traer-pagina.js). No tiene origen propio:
+  // los avisos llegan con origen «null» y las órdenes van a «*» (sólo a este recuadro).
+  let espejoTraer = '';
+  let espejoTraerDe = '';
+  const marcoDe = (direccion) => (espejoTraer ? espejoTraer + encodeURIComponent(direccion) : direccion);
+  const destinoEspejo = () => (espejoTraer ? '*' : origenDe(espejoBase));
+
+  async function espejoPedirTraida(estado) {
+    if (!estado.paginaTraida || espejoTraer || espejoTraerDe === estado.pagina) return;
+    espejoTraerDe = estado.pagina;
+    let firma = '';
+    try {
+      const res = await authFetch('/api/traer/firma?u=' + encodeURIComponent(estado.pagina));
+      if (res.ok) firma = (await res.json()).firma || '';
+    } catch { /* sin conexión */ }
+    if (!firma || espejoBase !== estado.pagina || enVivo) return;
+    espejoTraer = location.origin + '/traer?f=' + encodeURIComponent(firma) + '&u=';
+    espejoPreparada = false;
+    espejoMarco.src = marcoDe(espejoUrl || espejoBase);
+  }
+
   function espejoAjustar() {
     if (espejoWeb.hidden) return;
     const escala = espejoCaja.clientWidth * lupaZ / ESPEJO_ANCHO;
@@ -499,6 +521,8 @@
       espejoAyuda.textContent = AYUDA_ESPEJO;
       espejoPintarMenu(null);
       document.getElementById('espejoTitulo').textContent = '🌐 Página web';
+      espejoTraer = '';
+      espejoTraerDe = '';
       espejoMarco.src = espejoUrl;
       clearTimeout(espejoEspera);
       espejoEspera = setTimeout(() => {
@@ -510,9 +534,10 @@
       espejoPaso = estado.paginaPaso;
       if (estado.paginaActual && origenDe(estado.paginaActual) === origenDe(espejoBase) && estado.paginaActual !== espejoUrl) {
         espejoUrl = estado.paginaActual;
-        espejoMarco.src = espejoUrl;
+        espejoMarco.src = marcoDe(espejoUrl);
       }
     }
+    espejoPedirTraida(estado);
     espejoAjustar();
   }
 
@@ -923,8 +948,8 @@
     // El espejo de este celular también: con el puente, la página trae sus archivos nuevos y se
     // recarga sola; sin puente, se la vuelve a pedir.
     if (!enVivo && espejoUrl) {
-      if (espejoPreparada && espejoMarco.contentWindow) espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, origenDe(espejoBase));
-      else espejoMarco.src = espejoUrl;
+      if (espejoPreparada && espejoMarco.contentWindow) espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'recargar' }, destinoEspejo());
+      else espejoMarco.src = marcoDe(espejoUrl);
     }
     clearTimeout(esperandoPagina);
     esperandoPagina = setTimeout(() => { esperandoPagina = null; showToast('📺 La pantalla no contestó. Probá otra vez.'); }, 6000);
@@ -951,7 +976,7 @@
   window.addEventListener('message', (evento) => {
     if (evento.source !== espejoMarco.contentWindow || espejoWeb.hidden) return;
     const aviso = evento.data;
-    if (!aviso || aviso.conexiones !== true || evento.origin !== origenDe(espejoBase)) return;
+    if (!aviso || aviso.conexiones !== true || evento.origin !== (espejoTraer ? 'null' : origenDe(espejoBase))) return;
     if (aviso.tipo === 'listo' && typeof aviso.url === 'string') {
       espejoPreparada = true;
       espejoAyuda.textContent = AYUDA_ESPEJO;
@@ -975,7 +1000,7 @@
   const espejoMenu = document.getElementById('espejoMenu');
   // «origen»: de qué sitio tienen que ser las cajas. «alTocar»: qué hace cada una (en el espejo
   // lleva el recuadro del celular a esa página; en vivo se lo pide a la app de PC).
-  function espejoPintarMenu(menu, origen = origenDe(espejoBase), alTocar = (url) => { if (url !== espejoUrl) espejoMarco.src = url; }) {
+  function espejoPintarMenu(menu, origen = origenDe(espejoBase), alTocar = (url) => { if (url !== espejoUrl) espejoMarco.src = marcoDe(url); }) {
     espejoMenu.textContent = '';
     const enlaces = Array.isArray(menu) ? menu.slice(0, 12).filter(e => e && typeof e.url === 'string' && typeof e.texto === 'string' && origen && origenDe(e.url) === origen) : [];
     espejoMenu.hidden = enlaces.length === 0;
@@ -999,7 +1024,7 @@
   function espejoPasarPagina(cuanto) {
     if (!espejoMarco.contentWindow || !espejoBase) return;
     if (!espejoPreparada) { showToast('Esta página no está preparada para Conexiones.'); return; }
-    espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'pagina', valor: cuanto }, origenDe(espejoBase));
+    espejoMarco.contentWindow.postMessage({ conexiones: true, tipo: 'pagina', valor: cuanto }, destinoEspejo());
   }
   document.getElementById('espejoAnterior').addEventListener('click', () => espejoPasarPagina(-1));
   document.getElementById('espejoSiguiente').addEventListener('click', () => espejoPasarPagina(1));

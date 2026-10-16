@@ -446,4 +446,9 @@ function registrarRutasDiapositivas(app, io) {
   });
 }
 
-module.exports = { registrarRutasDiapositivas, subirImagen, borrarImagenSubida, agregarDiapositivas, nubeDisponible, contarPorDueno, quitarDiapositivasDe, ERROR_SIN_NUBE };
+// Las páginas web de la lista de una persona (el admin ve las de todos): para traer-pagina.js.
+function paginasDe(persona) {
+  return almacenOrden.actual().filter(r => r.pagina && (persona.isAdmin || r.owner === persona.name)).map(r => r.pagina);
+}
+
+module.exports = { paginasDe, registrarRutasDiapositivas, subirImagen, borrarImagenSubida, agregarDiapositivas, nubeDisponible, contarPorDueno, quitarDiapositivasDe, ERROR_SIN_NUBE };

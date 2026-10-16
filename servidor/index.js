@@ -12,6 +12,7 @@ const { iniciarAlmacenes, vaciarRespaldos } = require('./almacen');
 const { registrarRutasAdministracion } = require('./administracion');
 const { registrarRutasCodigoQr } = require('./codigo-qr');
 const { registrarRutasMultimedia } = require('./multimedia');
+const { registrarRutasTraerPagina } = require('./traer-pagina');
 const { registrarSockets } = require('./sockets');
 const { porteroDePedidos, porteroDeConexiones } = require('./portero-pedidos');
 
@@ -59,6 +60,7 @@ registrarRutasDocumentos(app, io);
 registrarRutasAdministracion(app);
 registrarRutasCodigoQr(app);
 registrarRutasMultimedia(app, io);
+registrarRutasTraerPagina(app);
 porteroDeConexiones(io);
 registrarSockets(io);
 

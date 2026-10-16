@@ -12,6 +12,15 @@
     /^https:\/\/presentacion-56\.onrender\.com$/,
     /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
   ];
+  // Página traída por Conexiones (servidor/traer-pagina.js): se ve desde el servidor de Conexiones
+  // pero es de otro sitio. Las direcciones y el menú se cuentan con las del sitio de verdad, y
+  // para pasar a otra de sus páginas se la vuelve a pedir traída.
+  var TRAIDA = window.CONEXIONES_TRAIDA || null;
+  var ORIGEN = TRAIDA ? TRAIDA.origen : location.origin;
+  var AQUI = TRAIDA ? new URL(TRAIDA.direccion) : location;
+  function ir(direccion) {
+    location.href = TRAIDA ? TRAIDA.abrir + encodeURIComponent(direccion) : direccion;
+  }
   var TOCABLES = 'a[href],button,summary,label,input,select,textarea,[role="button"],[role="tab"],[onclick]';
 
   // Adentro de un recuadro las transiciones entre páginas no funcionan y dejan un error en la
@@ -68,7 +77,7 @@
   }
 
   function mismaPagina(enlace) {
-    return enlace.origin === location.origin && enlace.pathname === location.pathname && enlace.search === location.search;
+    return enlace.origin === ORIGEN && enlace.pathname === AQUI.pathname && enlace.search === AQUI.search;
   }
 
   // Lo que la persona toca de verdad se avisa. Los toques repetidos por el puente no vuelven
@@ -105,7 +114,7 @@
     var actual = enlaces.findIndex(function (enlace) { return enlace.hasAttribute('aria-current'); });
     if (actual === -1) actual = enlaces.findIndex(mismaPagina);
     var destino = enlaces[actual + cuanto];
-    if (actual !== -1 && destino) location.href = destino.href;
+    if (actual !== -1 && destino) ir(destino.href);
   }
 
   // «🔄» en el celular: la página cambió en internet y el navegador tiene guardada la de antes.
@@ -115,6 +124,8 @@
   var recargando = false;
   function recargar() {
     if (recargando) return;
+    // Traída: el servidor la vuelve a pedir cada vez, no hay nada guardado que saltear.
+    if (TRAIDA) { location.reload(); return; }
     recargando = true;
     var direcciones = [location.href];
     var piezas = document.querySelectorAll('link[rel~="stylesheet"][href], script[src], img[src]');
@@ -152,7 +163,7 @@
   // Los enlaces del menú de la página, para que el celular los muestre como botones.
   function menuDeLaPagina() {
     return Array.prototype.slice.call(document.querySelectorAll('nav a[href]'))
-      .filter(function (enlace) { return enlace.origin === location.origin && enlace.textContent.trim(); })
+      .filter(function (enlace) { return enlace.origin === ORIGEN && enlace.textContent.trim(); })
       .slice(0, 12)
       .map(function (enlace) {
         var dibujo = enlace.querySelector('img');
@@ -166,7 +177,7 @@
   }
 
   function avisarLista() {
-    avisar({ tipo: 'listo', url: location.href, titulo: document.title, menu: menuDeLaPagina() });
+    avisar({ tipo: 'listo', url: AQUI.href, titulo: document.title, menu: menuDeLaPagina() });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avisarLista);
   else avisarLista();

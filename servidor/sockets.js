@@ -222,6 +222,8 @@ function registrarSockets(io) {
         paginaActual: limpiarDireccion(datos.paginaActual) || '',
         // «espejo»: la página lleva el puente. «vivo»: la abrió la app de PC y manda fotos.
         paginaModo: datos.paginaModo === 'espejo' || datos.paginaModo === 'vivo' ? datos.paginaModo : '',
+        // La pantalla la muestra traída por Conexiones (no se deja mostrar adentro): el espejo también.
+        paginaTraida: datos.paginaTraida === true,
         // En «vivo»: el menú que la app de PC le leyó a la página, para las cajas del celular.
         paginaMenu: datos.paginaModo === 'vivo' ? limpiarMenuWeb(datos.paginaMenu) : null,
         // ¿Esta pantalla puede agrandar una parte de la página? (la app de PC, desde la 1.3.0)
