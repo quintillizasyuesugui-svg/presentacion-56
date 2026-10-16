@@ -548,3 +548,8 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
   .hoja-medios, .hoja-velo, .capa-video, .sello-musica { transition: none; }
   .sonando .ondas i, .punto-vivo, .punto-rojo, .titulo-video { animation: none; }
 }
+
+/* Subir música y videos: «Volver» chico y la lista destacada */
+.fila-volver { gap: 10px; }
+.fila-volver #volverControl { flex: 0 0 auto; }
+.fila-volver #verLista { flex: 1; text-align: center; }
