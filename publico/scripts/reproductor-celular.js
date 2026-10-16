@@ -64,7 +64,11 @@
     clearTimeout(esperandoRespuesta);
     const antes = recibido;
     esperandoRespuesta = setTimeout(() => {
-      if (recibido === antes) avisar('📺 No hay ninguna pantalla abierta con tu PIN. Abrí la pantalla en la PC y entrá con el mismo PIN.');
+      if (recibido !== antes) return;
+      // Hay una pantalla abierta pero no contestó (por ejemplo, abierta desde antes de una versión
+      // nueva): no es que falte, hay que recargarla.
+      if (typeof hayPantalla !== 'undefined' && hayPantalla === true) avisar('📺 Tu pantalla no contestó. Recargala en la PC (tecla F5) y probá de nuevo.');
+      else avisar('📺 No hay ninguna pantalla abierta con tu PIN. Abrí la pantalla en la PC y entrá con el mismo PIN.');
     }, 2500);
   }
 

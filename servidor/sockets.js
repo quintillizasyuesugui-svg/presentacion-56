@@ -39,9 +39,14 @@ function mandarFotoWeb(celular, foto) {
   celular.emit('webFoto', foto);
 }
 
+const ARRANQUE = Date.now().toString(36);
+
 function registrarSockets(io) {
   io.on('connection', (socket) => {
     console.log('✨ Dispositivo vinculado');
+    // Cada arranque del servidor (por ejemplo al publicar una versión nueva) tiene su marca: las
+    // páginas abiertas desde antes la comparan y se recargan con el programa nuevo.
+    socket.emit('versionServidor', ARRANQUE);
 
     // 📺 Guardián de Pantallas: cada conexión puede mandar hasta cierta cantidad de mensajes por
     // segundo; lo que pase de ahí se descarta, así nadie tapa el tiempo real de los demás.

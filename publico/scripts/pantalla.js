@@ -1607,6 +1607,27 @@
   }
   socket.on('pantallaPedirEstado', contarEstado);
 
+  // ---- Versión nueva de Conexiones ----
+  // Al publicar una versión nueva el servidor se reinicia y avisa otra «versionServidor». Una
+  // pantalla abierta desde antes seguiría con el programa viejo y no entendería las órdenes nuevas
+  // del celular (el celular creería que no hay pantalla): se recarga sola. Antes vuelve a contar
+  // dónde iba, así sigue en la misma foto con la misma música, y espera a que no suene nada, para
+  // no cortar el sonido en medio.
+  let versionVista = '';
+  socket.on('versionServidor', (version) => {
+    if (typeof version !== 'string' || !version) return;
+    if (!versionVista) { versionVista = version; return; }
+    if (version === versionVista) return;
+    versionVista = version;
+    const recargar = () => {
+      if (window.mediosSonando && window.mediosSonando()) { setTimeout(recargar, 5000); return; }
+      contarEstado();
+      window.dispatchEvent(new Event('conexiones:contarMedios'));
+      setTimeout(() => location.reload(), 1500);
+    };
+    setTimeout(recargar, 2500); // primero se vuelve a identificar con el servidor nuevo
+  });
+
   // ---- Zoom desde el celular ----
   // El control manda cuánto agrandar (z: 1 a 4) y qué punto de la foto queda en el centro
   // (cx, cy: de 0 a 1). Al pasar de foto vuelve a la foto entera.

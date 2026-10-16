@@ -570,6 +570,10 @@
     else if (orden.para === 'video') ordenVideo(orden);
   });
   socket.on('mediosPedirEstado', publicarEstado);
+  // Para recargarse con una versión nueva (pantalla.js): espera a que no suene nada y antes cuenta
+  // lo que había, así sigue igual después.
+  window.mediosSonando = () => (!audio.paused && quiereSonar) || videoSonando();
+  window.addEventListener('conexiones:contarMedios', publicarEstado);
 
   // ---------- seguir donde iba ----------
   // La pantalla se cerró o se recargó con música o un video: el servidor cuenta qué sonaba, en

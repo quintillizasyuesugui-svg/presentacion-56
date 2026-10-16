@@ -13,6 +13,15 @@
     statusText.textContent = 'Sin conexión';
   });
 
+  // Versión nueva de Conexiones (el servidor se reinició al publicarla): el control se recarga
+  // solo, así siempre tiene los mismos botones y órdenes que la pantalla.
+  let versionVista = '';
+  socket.on('versionServidor', (version) => {
+    if (typeof version !== 'string' || !version) return;
+    if (!versionVista) { versionVista = version; return; }
+    if (version !== versionVista) location.reload();
+  });
+
   function enviar(accion) {
     // Sin una pantalla abierta no hay dónde mostrar: se avisa en vez de hacer como que anda.
     if (!hayPantalla) {
