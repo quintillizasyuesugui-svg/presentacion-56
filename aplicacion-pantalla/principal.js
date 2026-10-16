@@ -2,6 +2,7 @@
 // Los celulares siguen manejándola con el control, como en el navegador.
 const { app, BrowserWindow, WebContentsView, ipcMain, shell, session } = require('electron');
 const path = require('path');
+const volumen = require('./volumen');
 
 const DIRECCION = process.env.CONEXIONES_DIRECCION || 'https://presentacion-56.onrender.com';
 const PANTALLA = DIRECCION.replace(/\/$/, '') + '/pantalla.html';
@@ -301,6 +302,10 @@ function registrarPedidosDePagina() {
   atender('pagina:zoom', zoomDeLaPagina);
   // Las páginas preparadas para Conexiones se ven adentro de la pantalla: lo guardado está en la ventana.
   atender('pagina:limpiar', () => ventana.webContents.session.clearCache().then(() => true, () => false));
+  // Volumen de Windows, manejado desde el celular.
+  atender('volumen:leer', () => volumen.leer());
+  atender('volumen:poner', (valor) => volumen.poner(valor));
+  atender('volumen:mudo', (siNo) => volumen.silenciar(siNo === true));
 }
 
 app.on('second-instance', () => {
@@ -324,3 +329,4 @@ app.whenReady().then(() => {
   crearVentana();
 });
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', () => volumen.cerrar());

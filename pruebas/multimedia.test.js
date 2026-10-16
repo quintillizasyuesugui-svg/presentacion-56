@@ -29,6 +29,13 @@ test('orden de medios: acepta las válidas y rechaza el resto', () => {
   assert.equal(limpiarOrdenMedios({ para: 'musica', accion: 'mandar', valor: 'x' }), null);
   assert.equal(limpiarOrdenMedios({ para: 'video', accion: 'siguiente' }), null);
   assert.equal(limpiarOrdenMedios({ para: 'otro', accion: 'alternar' }), null);
+  // Volumen de Windows
+  assert.deepEqual(limpiarOrdenMedios({ para: 'pc', accion: 'volumen', valor: 40.4 }), { para: 'pc', accion: 'volumen', valor: 40 });
+  assert.deepEqual(limpiarOrdenMedios({ para: 'pc', accion: 'subir', valor: 10 }), { para: 'pc', accion: 'subir', valor: 10 });
+  assert.deepEqual(limpiarOrdenMedios({ para: 'pc', accion: 'mudo', valor: true }), { para: 'pc', accion: 'mudo', valor: true });
+  assert.equal(limpiarOrdenMedios({ para: 'pc', accion: 'bajar', valor: 0 }), null);
+  assert.equal(limpiarOrdenMedios({ para: 'pc', accion: 'mudo', valor: 'si' }), null);
+  assert.equal(limpiarOrdenMedios({ para: 'pc', accion: 'alternar' }), null);
   assert.equal(limpiarOrdenMedios({ para: 'video', accion: 'mandar', valor: 'x'.repeat(500) }), null);
   assert.equal(limpiarOrdenMedios(null), null);
 });

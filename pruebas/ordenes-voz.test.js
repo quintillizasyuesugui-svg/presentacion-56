@@ -39,6 +39,13 @@ const CASOS = [
   ['bolumen treinta', { tipo: 'medios', para: null, accion: 'volumen', valor: 30 }],
   ['silencio', { tipo: 'medios', para: null, accion: 'volumen', valor: 0 }],
   ['baja el volumen del video', { tipo: 'medios', para: 'video', accion: 'bajarVolumen' }],
+  // Volumen de Windows (con la app de PC)
+  ['sube el volumen de la PC', { tipo: 'medios', para: 'pc', accion: 'subirVolumen' }],
+  ['baja la compu', { tipo: 'medios', para: 'pc', accion: 'bajarVolumen' }],
+  ['volumen de la computadora a 40', { tipo: 'medios', para: 'pc', accion: 'volumen', valor: 40 }],
+  ['PC al máximo', { tipo: 'medios', para: 'pc', accion: 'volumen', valor: 100 }],
+  ['silencia la pc', { tipo: 'medios', para: 'pc', accion: 'mudo', valor: true }],
+  ['quita el silencio de la PC', { tipo: 'medios', para: 'pc', accion: 'mudo', valor: false }],
   // Video
   ['pon video 1', { tipo: 'medios', para: 'video', accion: 'elegir', numero: 1 }],
   ['video dos', { tipo: 'medios', para: 'video', accion: 'elegir', numero: 2 }],

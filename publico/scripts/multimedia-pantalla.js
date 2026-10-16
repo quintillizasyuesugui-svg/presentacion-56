@@ -93,6 +93,7 @@
 
   // ---------- estado para el celular ----------
   let aviso = null;
+  let volumenPC = null; // volumen de Windows { volumen, mudo }, sólo con la app de PC
   // Hasta saber si hay que seguir con la música o el video de antes (ver «mediosSeguir»), la
   // pantalla no cuenta nada: si contara «no suena nada», el servidor se olvidaría de lo que iba.
   let contando = false;
@@ -128,6 +129,7 @@
       } : null,
       musicaDespues: Boolean(video && musicaAntesDelVideo)
     };
+    if (volumenPC) estado.pc = volumenPC;
     if (aviso) { estado.aviso = aviso; aviso = null; }
     emitir('mediosEstado', estado);
   }
@@ -563,11 +565,44 @@
     setTimeout(publicarEstado, 150);
   }
 
+  // ---------- volumen de Windows (sólo con la app de PC) ----------
+  // El navegador no puede tocarlo; la app sí (ver aplicacion-pantalla/volumen.js). Se lee cada
+  // tanto por si alguien lo cambió con las teclas de la PC, así el celular muestra lo de verdad.
+  const windows = window.ConexionesPC && window.ConexionesPC.volumen;
+  function anotarPC(r, avisar = true) {
+    if (!r || !Number.isFinite(r.volumen)) return;
+    const cambio = !volumenPC || volumenPC.volumen !== r.volumen || volumenPC.mudo !== (r.mudo === true);
+    volumenPC = { volumen: r.volumen, mudo: r.mudo === true };
+    if (cambio && avisar) publicarEstado();
+  }
+  // Las órdenes van de a una: dos «−» seguidos tienen que bajar 20, no leer los dos el mismo número.
+  let colaPC = Promise.resolve();
+  function ordenPC(orden) {
+    colaPC = colaPC.then(() => cumplirOrdenPC(orden), () => {});
+    return colaPC;
+  }
+  async function cumplirOrdenPC({ accion, valor }) {
+    if (!windows) return;
+    if (!volumenPC) anotarPC(await windows.leer(), false);
+    const ahora = volumenPC ? volumenPC.volumen : 50;
+    if (accion === 'volumen') anotarPC(await windows.poner(valor), false);
+    else if (accion === 'subir') anotarPC(await windows.poner(ahora + valor), false);
+    else if (accion === 'bajar') anotarPC(await windows.poner(ahora - valor), false);
+    else if (accion === 'mudo') anotarPC(await windows.mudo(valor), false);
+    // Siempre contesta, aunque no cambie (ya estaba al máximo): así el celular sabe que llegó.
+    publicarEstado();
+  }
+  if (windows) {
+    windows.leer().then(anotarPC, () => {});
+    setInterval(() => { if (soyLaActiva) windows.leer().then(anotarPC, () => {}); }, 4000);
+  }
+
   // ---------- órdenes del celular ----------
   socket.on('medios', (orden) => {
     if (!orden || !soyLaActiva) return;
     if (orden.para === 'musica') ordenMusica(orden);
     else if (orden.para === 'video') ordenVideo(orden);
+    else if (orden.para === 'pc') ordenPC(orden);
   });
   socket.on('mediosPedirEstado', publicarEstado);
   // Para recargarse con una versión nueva (pantalla.js): espera a que no suene nada y antes cuenta

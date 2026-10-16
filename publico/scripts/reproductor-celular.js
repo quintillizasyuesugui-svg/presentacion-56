@@ -126,6 +126,60 @@
     return { fila, pintar(v) { if (!tocando) { barra.value = String(v); pintar(); } } };
   }
 
+  // Volumen de Windows: una fila «🖥 PC» con −, la barra, + y silencio. Está siempre a la vista,
+  // pero sólo funciona si la pantalla es la app de PC (un navegador no puede tocar el volumen de
+  // Windows): con la pantalla en un navegador, tocarla avisa eso en vez de no hacer nada.
+  const filasPC = [];
+  let hayAppPC = false;
+  const AVISO_SIN_APP = '🖥 Esto sólo funciona con la app de PC. En la página web no se puede.';
+  function mandarPC(accion, valor) {
+    if (!hayAppPC) { avisar(AVISO_SIN_APP); return; }
+    mandar('pc', accion, valor);
+  }
+  function filaVolumenPC() {
+    const barra = crear('input', { type: 'range', class: 'deslizador', min: '0', max: '100', step: '1', value: '50', 'aria-label': 'Volumen de la PC' });
+    let tocando = false;
+    let ultimoEnvio = 0;
+    const pintarBarra = () => barra.style.setProperty('--lleno', barra.value + '%');
+    barra.addEventListener('input', () => {
+      if (!hayAppPC) return;
+      tocando = true;
+      pintarBarra();
+      if (Date.now() - ultimoEnvio > 150) { ultimoEnvio = Date.now(); mandar('pc', 'volumen', Number(barra.value)); }
+    });
+    barra.addEventListener('change', () => {
+      tocando = false;
+      if (!hayAppPC) { barra.value = '50'; pintarBarra(); avisar(AVISO_SIN_APP); return; }
+      mandar('pc', 'volumen', Number(barra.value));
+    });
+    let mudo = false;
+    const botonMudo = crear('button', { type: 'button', class: 'mas-menos mudo-pc', 'aria-label': 'Silenciar la PC', 'aria-pressed': 'false', text: '🔇', onclick: () => mandarPC('mudo', !mudo) });
+    const rotulo = crear('span', { class: 'rotulo-pc', title: 'Volumen de la PC', text: '🖥' });
+    const fila = crear('div', { class: 'volumen-fila volumen-pc' }, [
+      rotulo,
+      crear('button', { type: 'button', class: 'mas-menos', 'aria-label': 'Bajar el volumen de la PC', text: '−', onclick: () => mandarPC('bajar', 10) }),
+      barra,
+      crear('button', { type: 'button', class: 'mas-menos', 'aria-label': 'Subir el volumen de la PC', text: '+', onclick: () => mandarPC('subir', 10) }),
+      botonMudo
+    ]);
+    const yo = {
+      fila,
+      pintar(pc) {
+        fila.classList.toggle('sin-app', !pc);
+        barra.setAttribute('aria-label', pc ? 'Volumen de la PC' : 'Volumen de la PC (sólo con la app de PC)');
+        if (!pc) return;
+        mudo = pc.mudo;
+        botonMudo.classList.toggle('activo', mudo);
+        botonMudo.setAttribute('aria-pressed', String(mudo));
+        botonMudo.setAttribute('aria-label', mudo ? 'Quitar el silencio de la PC' : 'Silenciar la PC');
+        barra.setAttribute('aria-valuetext', mudo ? 'En silencio' : pc.volumen + ' %');
+        if (!tocando) { barra.value = String(pc.volumen); pintarBarra(); }
+      }
+    };
+    filasPC.push(yo);
+    return yo;
+  }
+
   // ---------- hojas ----------
   const velo = crear('div', { class: 'hoja-velo' });
   velo.hidden = true;
@@ -184,6 +238,7 @@
       crear('button', { type: 'button', class: 'mando', 'aria-label': 'Siguiente canción', text: '⏭', onclick: () => mandar('musica', 'siguiente') })
     ]),
     mVolumen.fila,
+    filaVolumenPC().fila,
     mAyudaVacia,
     crear('details', { class: 'lista-pistas' }, [crear('summary', {}, [mResumen, crear('span', { class: 'flecha', 'aria-hidden': 'true', text: '▾' })]), mLista])
   ]);
@@ -319,6 +374,7 @@
         crear('button', { type: 'button', class: 'mando', 'aria-label': 'Adelantar 10 segundos', onclick: () => mandar('video', 'saltar', 10) }, ['⏩', crear('br'), '10'])
       ]),
       pvVolumen.fila,
+      filaVolumenPC().fila,
       crear('div', { class: 'fila-video-botones' }, [
         crear('button', { type: 'button', class: 'btn secondary', text: '🔍 Buscar otro', 'aria-label': 'Buscar otro video', onclick: () => abrirBuscador() }),
         crear('button', { type: 'button', class: 'btn secondary', text: '⏹ Terminar', 'aria-label': 'Terminar video y volver', onclick: () => mandar('video', 'terminar') })
@@ -409,6 +465,8 @@
         pvVolumen.pintar(v.volumen);
       }
     }
+    hayAppPC = Boolean(estado && estado.pc);
+    filasPC.forEach((f) => f.pintar(estado && estado.pc));
   }
   setInterval(() => { if (estado && ((estado.musica && estado.musica.sonando) || (estado.video && estado.video.sonando))) pintar(); }, 500);
 
@@ -426,6 +484,19 @@
   window.ordenDeVozMedios = function ordenDeVozMedios(orden) {
     const v = estado && estado.video;
     const m = estado && estado.musica;
+    // Volumen de Windows: sólo si la pantalla es la app de PC.
+    if (orden.para === 'pc') {
+      const pc = estado && estado.pc;
+      if (!pc) return AVISO_SIN_APP;
+      if (orden.accion === 'mudo') { mandar('pc', 'mudo', orden.valor); return orden.valor ? '🔇 PC en silencio' : '🔊 PC con sonido'; }
+      if (orden.accion === 'subirVolumen' || orden.accion === 'bajarVolumen') {
+        const subir = orden.accion === 'subirVolumen';
+        mandar('pc', subir ? 'subir' : 'bajar', 20);
+        return `🖥 Volumen de la PC ${Math.max(0, Math.min(100, pc.volumen + (subir ? 20 : -20)))} %`;
+      }
+      if (orden.accion === 'volumen') { mandar('pc', 'volumen', orden.valor); return `🖥 Volumen de la PC ${orden.valor} %`; }
+      return null;
+    }
     // Sin decir «música» ni «video», la orden va a lo que está en la pantalla ahora.
     const para = orden.para || (v ? 'video' : 'musica');
     const lista = para === 'video' ? videos : musicas;

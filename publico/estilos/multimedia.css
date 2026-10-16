@@ -315,6 +315,29 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
 .mando:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
 
 .volumen-fila { display: flex; align-items: center; gap: 10px; }
+/* Fila del volumen de Windows: 🖥 − barra + 🔇 (debajo de la barra de la música o del video) */
+.volumen-pc { gap: 8px; }
+.rotulo-pc { flex: none; font-size: 1rem; }
+.volumen-pc .mas-menos {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--gray-600);
+  background: var(--gray-800);
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.volumen-pc .mudo-pc { font-size: 1rem; }
+.volumen-pc .mudo-pc.activo { border-color: var(--red-400); background: rgba(255, 90, 90, 0.15); }
+.volumen-pc .mas-menos:active { transform: scale(0.94); }
+.volumen-pc.sin-app { opacity: 0.45; }
+.volumen-pc .mas-menos:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
 .volumen-fila output { flex: none; width: 3.6em; text-align: right; color: var(--text-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .lista-pistas summary {
@@ -380,6 +403,8 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
 /* Control mientras hay un video: reemplaza Atrás/Siguiente */
 .panel.video-activo { border-color: rgba(255, 203, 77, 0.45); }
 .panel.video-activo[hidden] { display: none; }
+/* En el control, menos aire entre las partes: así entra también la fila del volumen de la PC. */
+body[data-reproductor="control"] .panel.video-activo { padding: 16px; gap: 14px; }
 .cartel-video { display: flex; align-items: center; gap: 8px; color: var(--amber-300); font-size: 0.88rem; font-weight: 700; min-width: 0; }
 .cartel-video span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .punto-vivo { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber-400); animation: punto-late 1.2s ease-in-out infinite; }

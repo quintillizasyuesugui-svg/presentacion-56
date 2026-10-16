@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.3.1.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.4.0.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -26,6 +26,7 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
 | «pon video 1», «siguiente video», «quita el video» | Video |
 | «pausa», «reproducir» | Pausa o sigue lo que esté en la pantalla |
 | «sube el volumen», «baja el volumen», «volumen a la mitad», «volumen al máximo», «volumen 30», «silencio» | Volumen |
+| «sube el volumen de la PC», «baja la compu», «PC al máximo», «silencia la PC» | Volumen de Windows (sólo con la app de PC) |
 | «agranda la imagen», «más grande», «achica la imagen», «más chico», «tamaño normal» | Agranda o achica la imagen de la pantalla |
 | «derecha», «izquierda», «arriba», «abajo» | Corre la imagen agrandada (si está entera, la agranda al doble) |
 | «adelanta la música», «adelanta el video», «adelanta 10», «adelanta 30 segundos», «retrocede la canción» | Adelanta o atrasa lo que suena (10 segundos si no se dice cuánto) |
@@ -136,6 +137,12 @@ Lo que se toca en el espejo pasa también en la pantalla.
   completa directo; si el navegador pide un toque, la PC muestra la pastilla «⛶ Pantalla completa ·
   Tocá para activar» y el celular avisa. Con la PC completa el botón queda verde; tocado de nuevo,
   la quita. «📺 Pantalla → La PC» hace lo mismo.
+- **🖥 Volumen de la PC desde el celular:** debajo de la barra de volumen de la música y del video
+  hay una fila «🖥 − barra + 🔇» que mueve el volumen de Windows (el de la barrita de la PC). Sólo
+  funciona con la app de PC (1.4.0 o más nueva): un navegador no puede tocar el volumen de Windows,
+  así que con la pantalla en una página web la fila se ve apagada y al tocarla avisa «Esto sólo
+  funciona con la app de PC». Si alguien cambia el volumen con las teclas de la PC, el celular se
+  entera en unos segundos.
 - **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
   «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
   llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»

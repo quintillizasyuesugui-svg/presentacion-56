@@ -9,6 +9,7 @@
     anterior: ['anterior', 'atras', 'regresa', 'regresar', 'retrocede', 'retroceder', 'vuelve'],
     musica: ['musica', 'cancion', 'canciones'],
     video: ['video', 'videos'],
+    pc: ['pc', 'computadora', 'compu', 'computador', 'ordenador', 'windows', 'parlante', 'parlantes', 'bocina', 'bocinas'],
     poner: ['pon', 'pone', 'poner', 'ponme', 'poneme', 'ponle', 'ponga', 'ponlo', 'ponela', 'ponelo'],
     pausar: ['pausa', 'pausar', 'pausalo', 'pausala', 'detener', 'detene', 'deten', 'detenlo', 'parar', 'paralo', 'parala'],
     reproducir: ['reproduce', 'reproducir', 'reproducilo', 'reproducila', 'reproduci', 'play', 'continua', 'continuar', 'reanudar', 'reanuda'],
@@ -93,7 +94,8 @@
 
   // Lo que quiere decir UNA frase, o null si no es ninguna orden.
   // { tipo: 'diapositiva', accion: 'mostrar' | 'siguiente' | 'anterior' | '3' }
-  // { tipo: 'medios', para: 'musica' | 'video' | null, accion, numero?, valor? }
+  // { tipo: 'medios', para: 'musica' | 'video' | 'pc' | null, accion, numero?, valor? }
+  //   («pc» es el volumen de Windows: sólo volumen, subir/bajar y silencio con accion 'mudo')
   // { tipo: 'repetir' } — «un poco más»: lo último otra vez
   // { tipo: 'cerrar' } — «cierra la pantalla»: terminar y dejarla libre
   // { tipo: 'zoom', accion: 'acercar' | 'alejar' | 'normal' | 'derecha' | 'izquierda' | 'arriba' | 'abajo' }
@@ -105,6 +107,17 @@
     const deVideo = dice(palabras, 'video');
     const para = deVideo ? 'video' : deMusica ? 'musica' : null;
     const deVolumen = dice(palabras, 'volumen');
+
+    // Volumen de la PC: «sube el volumen de la PC», «baja la compu», «silencia la PC».
+    if (dice(palabras, 'pc')) {
+      const pc = (accion, valor) => (valor === undefined ? { tipo: 'medios', para: 'pc', accion } : { tipo: 'medios', para: 'pc', accion, valor });
+      if (dice(palabras, 'silencio')) return pc('mudo', !dice(palabras, 'apagar'));
+      if (dice(palabras, 'maximo')) return pc('volumen', 100);
+      if (dice(palabras, 'mitad')) return pc('volumen', 50);
+      if (dice(palabras, 'subir')) return pc('subirVolumen');
+      if (dice(palabras, 'bajar')) return pc('bajarVolumen');
+      if (deVolumen && numero !== null && numero <= 100) return pc('volumen', numero);
+    }
     // Una orden suelta («bajale», «pausa», «a la mitad») se acepta si la frase es corta. En una
     // frase larga esas palabras suelen ser parte de lo que la persona está explicando («la
     // temperatura baja…»), así que ahí hace falta nombrar el volumen, la música o el video.
@@ -226,7 +239,7 @@
   const FRASES_DE_AYUDA = [
     'mostrar', 'siguiente', 'atrás', 'anterior', 'pon música', 'música uno', 'música dos', 'siguiente canción',
     'canción anterior', 'pausa', 'reproducir', 'sube el volumen', 'baja el volumen', 'volumen a la mitad',
-    'volumen al máximo', 'silencio', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
+    'volumen al máximo', 'silencio', 'sube el volumen de la PC', 'baja el volumen de la PC', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
     'agranda la imagen', 'achica la imagen', 'más grande', 'más chico', 'tamaño normal',
     'derecha', 'izquierda', 'arriba', 'abajo'
   ];
