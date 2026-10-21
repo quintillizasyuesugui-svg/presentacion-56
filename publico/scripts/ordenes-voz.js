@@ -15,11 +15,25 @@
     reproducir: ['reproduce', 'reproducir', 'reproducilo', 'reproducila', 'reproduci', 'play', 'continua', 'continuar', 'reanudar', 'reanuda'],
     quitar: ['quita', 'quitar', 'quitalo', 'saca', 'sacar', 'sacalo', 'termina', 'terminar', 'cierra', 'cerrar'],
     volumen: ['volumen', 'sonido'],
-    subir: ['sube', 'subi', 'subir', 'subele', 'subile', 'subilo', 'aumenta', 'aumentar'],
-    bajar: ['baja', 'bajar', 'bajale', 'bajalo', 'bajala', 'disminuye', 'disminuir'],
+    subir: ['sube', 'subi', 'subir', 'subele', 'subile', 'subilo', 'aumenta', 'aumentar', 'fuerte'],
+    bajar: ['baja', 'bajar', 'bajale', 'bajalo', 'bajala', 'disminuye', 'disminuir', 'suave', 'bajito'],
+    azar: ['azar', 'aleatoria', 'aleatorio', 'cualquiera', 'random', 'sorpresa'],
+    actualizar: ['actualiza', 'actualizar', 'actualizala', 'recarga', 'recargar', 'recargala', 'refresca', 'refrescar'],
+    abrir: ['abre', 'abrir', 'abri', 'lista', 'menu', 'muestrame', 'elegir', 'elige'],
+    ayuda: ['ayuda', 'comandos', 'ordenes'],
     mitad: ['mitad'],
     maximo: ['maximo', 'tope'],
-    silencio: ['silencio', 'silenciar', 'silencia', 'mudo'],
+    silencio: ['silencio', 'silenciar', 'silencia', 'mudo', 'mutea', 'mutear', 'mutealo'],
+    // «activa el sonido», «quita el silencio», «desmutea»: vuelve el volumen que tenía.
+    activar: ['activa', 'activar', 'activalo', 'prende', 'prender', 'enciende', 'encender', 'devuelve', 'desmutea', 'desmutear', 'desmutealo', 'desilencia'],
+    ultima: ['ultima', 'ultimo'],
+    doble: ['doble'],
+    triple: ['triple'],
+    // Formas para mostrar sólo una parte, como «✂ Zona»: «un cuadrado», «un rectángulo alto».
+    cuadrado: ['cuadrado', 'cuadrada', 'cuadradito'],
+    rectangulo: ['rectangulo', 'rectangular'],
+    vertical: ['alto', 'vertical', 'parado'],
+    zona: ['zona', 'recorte', 'recorta', 'recortar'],
     imagen: ['imagen', 'foto', 'diapositiva', 'zoom'],
     agrandar: ['agranda', 'agrandar', 'agrandala', 'agrandalo', 'acerca', 'acercar', 'acercala', 'acercalo', 'amplia', 'ampliar', 'grande'],
     achicar: ['achica', 'achicar', 'achicala', 'achicalo', 'aleja', 'alejar', 'alejala', 'alejalo', 'reduce', 'reducir', 'chico', 'chica', 'pequeno', 'pequena'],
@@ -49,8 +63,14 @@
     tres: 3, tercera: 3, tercero: 3, tercer: 3, cuatro: 4, cuarta: 4, cuarto: 4, cinco: 5, quinta: 5, quinto: 5,
     seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15,
     dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, treinta: 30, cuarenta: 40,
-    cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80, noventa: 90, cien: 100
+    cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80, noventa: 90, cien: 100,
+    veintiuno: 21, veintiuna: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25,
+    veintiseis: 26, veintisiete: 27, veintiocho: 28, veintinueve: 29
   };
+  // Palabras que, justo antes del número, dicen «hasta ese número»: «baja a 10», «sube al 80».
+  const HASTA = ['a', 'al', 'en', 'hasta'];
+  // Palabras que no cuentan al buscar una canción o un video por su nombre.
+  const RELLENO = ['la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'que', 'se', 'llama', 'mi', 'me', 'por', 'favor'];
 
   // Quita tildes y signos: «¡Atrás!» y «atras» valen lo mismo.
   function normalizar(texto) {
@@ -84,12 +104,42 @@
     return palabras.some(p => PALABRAS[grupo].some(clave => parecidas(p, clave)));
   }
 
-  function numeroDe(palabras) {
-    for (const p of palabras) {
-      if (/^[0-9]{1,3}$/.test(p)) return parseInt(p, 10);
-      if (NUMEROS[p] !== undefined) return NUMEROS[p];
+  // El primer número de la frase y en qué palabra empieza. Junta «treinta y cinco» (35).
+  function numeroCon(palabras) {
+    for (let i = 0; i < palabras.length; i++) {
+      const p = palabras[i];
+      if (/^[0-9]{1,3}$/.test(p)) return { valor: parseInt(p, 10), en: i };
+      if (NUMEROS[p] === undefined) continue;
+      // «al segundo treinta»: ahí «segundo» es la unidad, no el número 2.
+      if ((p === 'segundo' || p === 'segunda') && palabras.slice(i + 1).some(x => /^[0-9]{1,3}$/.test(x) || NUMEROS[x] !== undefined)) continue;
+      let valor = NUMEROS[p];
+      const unidad = NUMEROS[palabras[i + 2]];
+      if (valor >= 30 && valor < 100 && valor % 10 === 0 && palabras[i + 1] === 'y' && unidad >= 1 && unidad <= 9) valor += unidad;
+      return { valor, en: i };
     }
     return null;
+  }
+  function numeroDe(palabras) {
+    const n = numeroCon(palabras);
+    return n ? n.valor : null;
+  }
+
+  // Volumen con número: «volumen 30» o «baja a 10» lo dejan en ese número; «sube 20» o
+  // «baja el volumen 15» lo mueven esa cantidad; «baja 0» lo deja en cero.
+  // Sin número, sube o baja un paso (lo decide el control).
+  function volumenConNumero(palabras, hacer) {
+    const n = numeroCon(palabras);
+    const subir = dice(palabras, 'subir');
+    const bajar = dice(palabras, 'bajar');
+    if (dice(palabras, 'maximo')) return hacer('volumen', 100);
+    if (!n || n.valor > 100) {
+      if (subir) return hacer('subirVolumen');
+      if (bajar) return hacer('bajarVolumen');
+      return null;
+    }
+    const hasta = HASTA.includes(palabras[n.en - 1]);
+    if ((subir || bajar) && !hasta && n.valor > 0) return hacer(subir ? 'subirVolumen' : 'bajarVolumen', n.valor);
+    return hacer('volumen', n.valor);
   }
 
   // Lo que quiere decir UNA frase, o null si no es ninguna orden.
@@ -107,16 +157,46 @@
     const deVideo = dice(palabras, 'video');
     const para = deVideo ? 'video' : deMusica ? 'musica' : null;
     const deVolumen = dice(palabras, 'volumen');
+    const corta4 = palabras.length <= 4;
+
+    // Filo contesta hablando: «Filo cállate», «no hables» la callan; «Filo habla» la prende.
+    if (palabras.length <= 4) {
+      const callar = palabras.some(p => ['callate', 'calla', 'callada', 'shh', 'shhh'].includes(p)) ||
+        (palabras.includes('no') && palabras.some(p => ['hables', 'hable', 'hablas'].includes(p)));
+      if (callar) return { tipo: 'filo', habla: false };
+      if (palabras.includes('filo') && palabras.some(p => ['habla', 'hablame', 'responde', 'contesta', 'vuelve'].includes(p))) return { tipo: 'filo', habla: true };
+    }
+
+    // «busca Camilo», «búscame en YouTube la canción de Camilo»: busca videos en YouTube.
+    if (['busca', 'buscar', 'buscame', 'buscale', 'encuentra', 'encuentrame'].includes(palabras[0]) && palabras.length >= 2) {
+      const texto = palabras.slice(1).filter((p, i, todas) =>
+        !(i < 3 && ['en', 'youtube', 'un', 'una', 'el', 'la', 'video', 'videos', 'de'].includes(p) && todas.slice(0, i).every(q => ['en', 'youtube', 'un', 'una', 'el', 'la', 'video', 'videos', 'de'].includes(q))));
+      if (texto.length) return { tipo: 'youtube', texto: texto.join(' ') };
+    }
+
+    // Botones del control por voz (frases cortas): pantalla completa, actualizar, listas, ayuda.
+    if (palabras.length <= 6 && dice(palabras, 'lugar') && palabras.includes('completa')) {
+      return { tipo: 'boton', id: palabras.some(p => ['celular', 'telefono', 'mio', 'mi'].includes(p)) ? 'fsPhoneBtn' : 'fsPcBtn' };
+    }
+    if (corta4 && dice(palabras, 'actualizar')) return { tipo: 'boton', id: 'actualizarBtn' };
+    if (corta4 && dice(palabras, 'ayuda')) return { tipo: 'ayuda' };
+    if (palabras.length <= 5 && ['que', 'cual', 'como'].includes(palabras[0]) &&
+        ['es', 'suena', 'sonando', 'llama', 'esta', 'decir'].some(p => palabras.includes(p)) || (palabras.length === 2 && palabras[0] === 'que' && para)) {
+      return palabras.includes('decir') ? { tipo: 'ayuda' } : { tipo: 'medios', para, accion: 'cual' };
+    }
+    if (corta4 && para && dice(palabras, 'abrir') && !dice(palabras, 'poner')) return { tipo: 'boton', id: para === 'video' ? 'videoBtn' : 'musicaBtn' };
+    if (corta4 && dice(palabras, 'zona') && !dice(palabras, 'cuadrado') && !dice(palabras, 'rectangulo')) return { tipo: 'boton', id: 'zonaBtn' };
 
     // Volumen de la PC: «sube el volumen de la PC», «baja la compu», «silencia la PC».
     if (dice(palabras, 'pc')) {
       const pc = (accion, valor) => (valor === undefined ? { tipo: 'medios', para: 'pc', accion } : { tipo: 'medios', para: 'pc', accion, valor });
-      if (dice(palabras, 'silencio')) return pc('mudo', !dice(palabras, 'apagar'));
-      if (dice(palabras, 'maximo')) return pc('volumen', 100);
+      if (dice(palabras, 'silencio')) return pc('mudo', !dice(palabras, 'apagar') && !dice(palabras, 'activar'));
+      if (deVolumen && dice(palabras, 'activar')) return pc('mudo', false);
       if (dice(palabras, 'mitad')) return pc('volumen', 50);
-      if (dice(palabras, 'subir')) return pc('subirVolumen');
-      if (dice(palabras, 'bajar')) return pc('bajarVolumen');
-      if (deVolumen && numero !== null && numero <= 100) return pc('volumen', numero);
+      if (deVolumen || dice(palabras, 'subir') || dice(palabras, 'bajar') || dice(palabras, 'maximo')) {
+        const orden = volumenConNumero(palabras, pc);
+        if (orden) return orden;
+      }
     }
     // Una orden suelta («bajale», «pausa», «a la mitad») se acepta si la frase es corta. En una
     // frase larga esas palabras suelen ser parte de lo que la persona está explicando («la
@@ -147,29 +227,45 @@
 
     // Tamaño de la imagen: «agranda», «acerca la foto», «más chico», «tamaño normal».
     // Lo mismo: suelto vale en una frase corta; en una larga hay que nombrar la imagen.
-    if (!deVolumen && para === null && (palabras.length <= 4 || deImagen)) {
-      // «centra», «al centro»: deja la imagen agrandada en el medio, sin cambiarle el tamaño.
-      if (dice(palabras, 'centrar')) return { tipo: 'zoom', accion: 'centrar' };
-      if (dice(palabras, 'agrandar')) return { tipo: 'zoom', accion: 'acercar' };
-      if (dice(palabras, 'achicar')) return { tipo: 'zoom', accion: 'alejar' };
-      if (dice(palabras, 'normal')) return { tipo: 'zoom', accion: 'normal' };
-      // Mover la imagen agrandada: «derecha», «a la izquierda», «arriba», «abajo», «sube la imagen».
-      if (dice(palabras, 'derecha')) return { tipo: 'zoom', accion: 'derecha' };
-      if (dice(palabras, 'izquierda')) return { tipo: 'zoom', accion: 'izquierda' };
-      if (dice(palabras, 'arriba') || (deImagen && dice(palabras, 'subir'))) return { tipo: 'zoom', accion: 'arriba' };
-      if (dice(palabras, 'abajo') || (deImagen && dice(palabras, 'bajar'))) return { tipo: 'zoom', accion: 'abajo' };
+    // Mostrar sólo una forma en el medio, como «✂ Zona»: «un cuadrado», «agranda un rectángulo»,
+    // «rectángulo alto», «cuadrado 30» (30 % de la página). En una frase larga («en este cuadro…»)
+    // hace falta decir agrandar, zona o la imagen.
+    const forma = dice(palabras, 'cuadrado') ? 'cuadrado' : dice(palabras, 'rectangulo') ? (dice(palabras, 'vertical') ? 'alto' : 'largo') : null;
+    if (!deVolumen && para === null && forma && (palabras.length <= 5 || dice(palabras, 'agrandar') || dice(palabras, 'zona') || deImagen)) {
+      const n = numeroCon(palabras);
+      return n && n.valor >= 5 && n.valor <= 95 ? { tipo: 'zoom', accion: 'forma', forma, valor: n.valor } : { tipo: 'zoom', accion: 'forma', forma };
     }
 
-    // Volumen: «baja el volumen», «volumen a la mitad», «volumen 30», «silencio».
-    if (clara && dice(palabras, 'silencio')) return { tipo: 'medios', para, accion: 'volumen', valor: 0 };
-    if (clara && dice(palabras, 'mitad')) return { tipo: 'medios', para, accion: 'volumen', valor: 50 };
-    if (deVolumen || (clara && (dice(palabras, 'subir') || dice(palabras, 'bajar')))) {
-      if (dice(palabras, 'maximo')) return { tipo: 'medios', para, accion: 'volumen', valor: 100 };
-      if (dice(palabras, 'subir')) return { tipo: 'medios', para, accion: 'subirVolumen' };
-      if (dice(palabras, 'bajar')) return { tipo: 'medios', para, accion: 'bajarVolumen' };
-      if (numero !== null && numero <= 100) return { tipo: 'medios', para, accion: 'volumen', valor: numero };
-      return null;
+    if (!deVolumen && para === null && (palabras.length <= 4 || deImagen || (palabras.length <= 6 && palabras.includes('ciento')))) {
+      const n = numeroCon(palabras);
+      const conNumero = (orden) => (n && n.valor > 0 && n.valor <= 400 ? { ...orden, valor: n.valor } : orden);
+      // «centra», «al centro»: deja la imagen agrandada en el medio, sin cambiarle el tamaño.
+      if (dice(palabras, 'centrar')) return { tipo: 'zoom', accion: 'centrar' };
+      // Tamaño exacto: «al doble», «al triple», «agranda al 150» (150 %).
+      if (dice(palabras, 'doble')) return { tipo: 'zoom', accion: 'escala', valor: 200 };
+      if (dice(palabras, 'triple')) return { tipo: 'zoom', accion: 'escala', valor: 300 };
+      if (dice(palabras, 'agrandar') && n && n.valor >= 100 && HASTA.includes(palabras[n.en - 1])) return { tipo: 'zoom', accion: 'escala', valor: Math.min(400, n.valor) };
+      // «agranda 50», «achica 30 por ciento»: ese porcentaje más grande o más chica.
+      if (dice(palabras, 'agrandar')) return conNumero({ tipo: 'zoom', accion: 'acercar' });
+      if (dice(palabras, 'achicar')) return n && n.valor < 100 ? conNumero({ tipo: 'zoom', accion: 'alejar' }) : { tipo: 'zoom', accion: 'alejar' };
+      if (dice(palabras, 'normal')) return { tipo: 'zoom', accion: 'normal' };
+      // Mover la imagen agrandada: «derecha», «a la izquierda», «arriba», «abajo», «sube la imagen»;
+      // con número, ese porcentaje de la página: «derecha 20».
+      const mover = (accion) => (n && n.valor > 0 && n.valor <= 100 ? { tipo: 'zoom', accion, valor: n.valor } : { tipo: 'zoom', accion });
+      if (dice(palabras, 'derecha')) return mover('derecha');
+      if (dice(palabras, 'izquierda')) return mover('izquierda');
+      if (dice(palabras, 'arriba') || (deImagen && dice(palabras, 'subir'))) return mover('arriba');
+      if (dice(palabras, 'abajo') || (deImagen && dice(palabras, 'bajar'))) return mover('abajo');
     }
+
+    // Volumen: «baja el volumen», «volumen a la mitad», «volumen 30», «sube 20», «baja a 0»,
+    // «silencio», «sin sonido»; «quita el silencio» o «activa el sonido» lo devuelven.
+    const medio = (accion, valor) => (valor === undefined ? { tipo: 'medios', para, accion } : { tipo: 'medios', para, accion, valor });
+    if (clara && dice(palabras, 'silencio')) return dice(palabras, 'apagar') || dice(palabras, 'activar') ? medio('conSonido') : medio('volumen', 0);
+    if (clara && deVolumen && palabras.includes('sin')) return medio('volumen', 0);
+    if (clara && deVolumen && (dice(palabras, 'activar') || palabras.includes('con'))) return medio('conSonido');
+    if (clara && dice(palabras, 'mitad')) return medio('volumen', 50);
+    if (deVolumen || (clara && (dice(palabras, 'subir') || dice(palabras, 'bajar')))) return volumenConNumero(palabras, medio);
 
     if (clara && dice(palabras, 'pausar')) return { tipo: 'medios', para, accion: 'pausar' };
 
@@ -178,6 +274,15 @@
       return { tipo: 'medios', para: 'musica', accion: 'bucle', valor: !dice(palabras, 'apagar') };
     }
     if (deVideo && dice(palabras, 'quitar')) return { tipo: 'medios', para: 'video', accion: 'terminar' };
+    // «termina la música», «quita la canción»: la corta (no sigue sola después).
+    if (deMusica && dice(palabras, 'quitar') && !dice(palabras, 'bucle')) return { tipo: 'medios', para: 'musica', accion: 'terminar' };
+    // «canción al azar», «pon cualquier video».
+    if (para && dice(palabras, 'azar')) return { tipo: 'medios', para, accion: 'azar' };
+    // Ir a un momento justo: «ve al minuto 2», «al segundo 30 del video».
+    if (dice(palabras, 'irA') && !dice(palabras, 'adelantar') && !dice(palabras, 'atrasar') && numero !== null &&
+        (dice(palabras, 'minutos') || dice(palabras, 'segundos'))) {
+      return { tipo: 'medios', para, accion: 'ir', valor: Math.min(36000, numero * (dice(palabras, 'minutos') ? 60 : 1)) };
+    }
 
     // Adelantar o atrasar lo que suena: «adelanta la música», «adelanta 30 segundos»,
     // «retrocede la canción». Sin nombrar la música, el video ni los segundos, «adelante» y
@@ -201,6 +306,11 @@
       if (dice(palabras, 'siguiente')) return { tipo: 'medios', para, accion: 'siguiente' };
       if (dice(palabras, 'anterior')) return { tipo: 'medios', para, accion: 'anterior' };
       if (numero !== null && numero >= 1) return { tipo: 'medios', para, accion: 'elegir', numero };
+      // «pon la canción despacito», «pon el video del volcán»: busca por el nombre.
+      if (dice(palabras, 'poner') || dice(palabras, 'reproducir')) {
+        const resto = palabras.filter(p => !RELLENO.includes(p) && !['poner', 'reproducir', 'musica', 'video'].some(g => dice([p], g)));
+        if (resto.length) return { tipo: 'medios', para, accion: 'buscar', texto: resto.join(' ') };
+      }
       if (dice(palabras, 'poner') || dice(palabras, 'reproducir') || palabras.length <= 2) {
         return { tipo: 'medios', para, accion: 'reproducir' };
       }
@@ -218,7 +328,11 @@
     if (dice(palabras, 'anterior')) return { tipo: 'diapositiva', accion: 'anterior' };
     // Un número suelto («tres», «diapositiva 7») va a esa diapositiva; dentro de una frase larga
     // es parte de lo que se está contando («hay una razón…»), no una orden.
-    if (palabras.length <= 4 && numero !== null && numero >= 1 && numero <= totalDiapositivas) return { tipo: 'diapositiva', accion: String(numero) };
+    // Nombrando la diapositiva se acepta más larga: «ve a la diapositiva treinta y dos».
+    const corta = palabras.length <= 4 || (deImagen && palabras.length <= 8);
+    if (corta && numero !== null && numero >= 1 && numero <= totalDiapositivas) return { tipo: 'diapositiva', accion: String(numero) };
+    // «última», «la última diapositiva»: la del final.
+    if ((palabras.length <= 2 || (deImagen && corta)) && dice(palabras, 'ultima') && totalDiapositivas > 0) return { tipo: 'diapositiva', accion: String(totalDiapositivas) };
     // «un poco más», «más», «otro poco»: repite lo último que se pidió (subir, bajar, adelantar,
     // agrandar, correr la imagen…). El control sabe cuál fue.
     if (palabras.length <= 4 && ['mas', 'poco', 'poquito'].some(p => palabras.includes(p))) return { tipo: 'repetir' };
@@ -239,12 +353,19 @@
   const FRASES_DE_AYUDA = [
     'mostrar', 'siguiente', 'atrás', 'anterior', 'pon música', 'música uno', 'música dos', 'siguiente canción',
     'canción anterior', 'pausa', 'reproducir', 'sube el volumen', 'baja el volumen', 'volumen a la mitad',
-    'volumen al máximo', 'silencio', 'sube el volumen de la PC', 'baja el volumen de la PC', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
+    'volumen al máximo', 'silencio', 'quita el silencio', 'volumen cero', 'volumen cincuenta', 'baja a cero', 'sube veinte', 'baja diez',
+    'última diapositiva', 'primera diapositiva', 'sube el volumen de la PC', 'baja el volumen de la PC', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
     'agranda la imagen', 'achica la imagen', 'más grande', 'más chico', 'tamaño normal',
     'derecha', 'izquierda', 'arriba', 'abajo'
   ];
 
-  const publico = { interpretarVoz, normalizar, FRASES_DE_AYUDA };
+  // El número que se dijo en una frase corta («el segundo», «pon el tres»), o null.
+  function numeroDicho(frase) {
+    const palabras = normalizar(frase).split(/\s+/).filter(Boolean);
+    return palabras.length && palabras.length <= 5 ? numeroDe(palabras) : null;
+  }
+
+  const publico = { interpretarVoz, normalizar, numeroDicho, FRASES_DE_AYUDA };
   if (typeof module !== 'undefined' && module.exports) module.exports = publico;
   else raiz.OrdenesVoz = publico;
 })(typeof window !== 'undefined' ? window : globalThis);

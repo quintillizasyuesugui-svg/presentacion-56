@@ -307,8 +307,25 @@
     cerrarHoja();
     mandar('video', 'youtube', nombre ? { id, nombre } : { id });
   }
-  // Para la tarjeta de YouTube del control (control.js).
-  window.youtubeCelular = { abrirBuscador, ponerYoutube };
+  // Por voz: «busca Camilo» abre el buscador con los resultados; después «uno», «el segundo»…
+  // pone ese video en la pantalla.
+  function buscarPorVoz(texto) {
+    if (!hojaBuscar) return false;
+    abrirHoja(hojaBuscar);
+    bTexto.value = texto.slice(0, 100);
+    bForm.requestSubmit();
+    return true;
+  }
+  function resultadosALaVista() { return hojaAbierta === hojaBuscar && bLista.children.length; }
+  function elegirResultado(n) {
+    const boton = bLista.children[n - 1] && bLista.children[n - 1].querySelector('button');
+    if (!boton) return null;
+    const titulo = boton.querySelector('b').textContent;
+    boton.click();
+    return titulo;
+  }
+  // Para la tarjeta de YouTube del control (control.js) y la voz.
+  window.youtubeCelular = { abrirBuscador, ponerYoutube, buscarPorVoz, resultadosALaVista, elegirResultado };
 
   // ---------- mini reproductor ----------
   const miniNombre = crear('b', { text: '' });
@@ -482,6 +499,7 @@
   // ---------- órdenes por voz ----------
   // control.js entiende lo que se dijo (ordenes-voz.js) y le pasa acá la orden de música o
   // video. Devuelve un texto corto con lo que hizo, para mostrarlo en el control.
+  const volumenAntesDelSilencio = { musica: 0, video: 0 };
   window.ordenDeVozMedios = function ordenDeVozMedios(orden) {
     const v = estado && estado.video;
     const m = estado && estado.musica;
@@ -492,8 +510,9 @@
       if (orden.accion === 'mudo') { mandar('pc', 'mudo', orden.valor); return orden.valor ? '🔇 PC en silencio' : '🔊 PC con sonido'; }
       if (orden.accion === 'subirVolumen' || orden.accion === 'bajarVolumen') {
         const subir = orden.accion === 'subirVolumen';
-        mandar('pc', subir ? 'subir' : 'bajar', 20);
-        return `🖥 Volumen de la PC ${Math.max(0, Math.min(100, pc.volumen + (subir ? 20 : -20)))} %`;
+        const paso = orden.valor || 20;
+        mandar('pc', subir ? 'subir' : 'bajar', paso);
+        return `🖥 Volumen de la PC ${Math.max(0, Math.min(100, pc.volumen + (subir ? paso : -paso)))} %`;
       }
       if (orden.accion === 'volumen') { mandar('pc', 'volumen', orden.valor); return `🖥 Volumen de la PC ${orden.valor} %`; }
       return null;
@@ -504,12 +523,18 @@
     const cual = para === 'video' ? 'video' : 'canción';
     const actual = para === 'video' ? v : m;
 
-    if (orden.accion === 'volumen' || orden.accion === 'subirVolumen' || orden.accion === 'bajarVolumen') {
+    if (orden.accion === 'volumen' || orden.accion === 'subirVolumen' || orden.accion === 'bajarVolumen' || orden.accion === 'conSonido') {
       const ahoraVolumen = actual ? actual.volumen : 70;
-      const nuevo = orden.accion === 'volumen' ? orden.valor : ahoraVolumen + (orden.accion === 'subirVolumen' ? 20 : -20);
+      // «sube 20» / «baja 15»: esa cantidad; sin número, 20.
+      const paso = orden.valor || 20;
+      const nuevo = orden.accion === 'volumen' ? orden.valor
+        : orden.accion === 'conSonido' ? (ahoraVolumen > 0 ? ahoraVolumen : volumenAntesDelSilencio[para] || 70)
+          : ahoraVolumen + (orden.accion === 'subirVolumen' ? paso : -paso);
       const volumen = Math.max(0, Math.min(100, Math.round(nuevo)));
+      // Al dejarlo en cero se recuerda cuánto tenía, para «quita el silencio».
+      if (volumen === 0 && ahoraVolumen > 0) volumenAntesDelSilencio[para] = ahoraVolumen;
       mandar(para, 'volumen', volumen);
-      return `🔊 Volumen ${volumen} %`;
+      return volumen === 0 ? '🔇 Volumen 0 %' : `🔊 Volumen ${volumen} %`;
     }
     if (orden.accion === 'pausar') { mandar(para, 'pausar'); return '⏸ Pausa'; }
     if (orden.accion === 'bucle') {
@@ -537,12 +562,48 @@
       mandar(para, 'reproducir');
       return '⏮ Desde el inicio';
     }
-    if (orden.accion === 'terminar') { mandar('video', 'terminar'); return '⏹ Video terminado'; }
+    if (orden.accion === 'terminar') {
+      if (para === 'musica') { mandar('musica', 'terminar'); return '⏹ Música terminada'; }
+      mandar('video', 'terminar');
+      return '⏹ Video terminado';
+    }
+    // «¿qué canción es?»: dice el nombre de lo que está en la pantalla.
+    if (orden.accion === 'cual') {
+      if (!actual) return para === 'video' ? 'No hay ningún video en la pantalla.' : 'No hay ninguna canción puesta.';
+      const nombre = actual.nombre || (lista.find(e => e.id === actual.id) || {}).nombre || 'sin nombre';
+      return (para === 'video' ? '🎬 ' : '🎵 ') + nombre + (actual.sonando ? '' : ' (en pausa)');
+    }
+    // «ve al minuto 2»: a ese momento de lo que suena.
+    if (orden.accion === 'ir') {
+      if (!actual) return para === 'video' ? 'No hay ningún video en la pantalla.' : 'No hay ninguna canción puesta.';
+      const destino = actual.duracion ? Math.min(orden.valor, Math.max(0, actual.duracion - 1)) : orden.valor;
+      mandar(para, 'ir', destino);
+      return `⏱ ${Math.floor(destino / 60)}:${String(Math.round(destino % 60)).padStart(2, '0')}`;
+    }
 
     const poner = (elemento) => {
       mandar(para, para === 'video' ? 'mandar' : 'elegir', elemento.id);
       return (para === 'video' ? '🎬 ' : '🎵 ') + elemento.nombre;
     };
+    if (orden.accion === 'azar') {
+      if (!lista.length) return para === 'video' ? 'Todavía no tenés videos.' : 'Todavía no tenés música.';
+      const otros = lista.length > 1 && actual ? lista.filter(e => e.id !== actual.id) : lista;
+      return '🎲 ' + poner(otros[Math.floor(Math.random() * otros.length)]);
+    }
+    // «pon la canción despacito»: la de la lista cuyo nombre tiene más de las palabras dichas.
+    if (orden.accion === 'buscar') {
+      const limpiar = t => window.OrdenesVoz.normalizar(t).split(/\s+/).filter(p => p.length > 1);
+      const buscadas = limpiar(orden.texto);
+      let mejor = null;
+      let puntos = 0;
+      for (const e of lista) {
+        const nombre = limpiar(e.nombre || '');
+        const n = buscadas.filter(b => nombre.some(p => p === b || (b.length >= 4 && (p.startsWith(b) || b.startsWith(p))))).length;
+        if (n > puntos) { puntos = n; mejor = e; }
+      }
+      if (mejor) return poner(mejor);
+      return `No encontré «${orden.texto}» en tu ${para === 'video' ? 'lista de videos' : 'música'}.`;
+    }
     if (orden.accion === 'elegir') {
       const elemento = lista[orden.numero - 1];
       return elemento ? poner(elemento) : `No tenés ${cual} ${orden.numero} (hay ${lista.length}).`;

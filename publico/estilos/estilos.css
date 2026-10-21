@@ -1172,6 +1172,21 @@ body.control {
 }
 
 .voice-status[hidden] { display: none; }
+.voice-status .voice-texto { flex: 1; min-width: 0; }
+
+/* Filo contesta hablando; tocado, queda callada */
+.voz-habla {
+  flex: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.voz-habla[aria-pressed="false"] { opacity: 0.55; text-decoration: line-through; }
 
 .voice-dot {
   flex: none;

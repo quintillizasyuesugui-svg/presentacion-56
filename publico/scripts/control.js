@@ -1196,7 +1196,94 @@
   let ultimaOrdenDeVoz = null;
   const SE_REPITE = ['subirVolumen', 'bajarVolumen', 'saltar', 'acercar', 'alejar', 'derecha', 'izquierda', 'arriba', 'abajo'];
 
+  // ---- Filo contesta hablando ----
+  // Frases cortas grabadas una sola vez con la voz de Filo (publico/voz-filo/, Fish Audio): no
+  // gastan nada al usarlas. «🗣️ Filo» las apaga o prende y se recuerda en este celular.
+  const vozHablaBtn = document.getElementById('vozHablaBtn');
+  const filoAudio = new Audio();
+  let filoHabla = true;
+  try { filoHabla = localStorage.getItem('filoHabla') !== 'no'; } catch { /* sin almacenamiento */ }
+  let filoCallaHasta = 0;      // mientras Filo habla, lo que oye el micrófono no son órdenes
+  let ordenParaFilo = null;
+  let hechoParaFilo = null;
+  function pintarFilo() {
+    vozHablaBtn.setAttribute('aria-pressed', String(filoHabla));
+    vozHablaBtn.textContent = filoHabla ? '🗣️ Filo' : '🔇 Filo';
+    vozHablaBtn.setAttribute('aria-label', filoHabla ? 'Filo responde hablando: tocar para que no hable' : 'Filo no habla: tocar para que responda');
+  }
+  function ponerFiloHabla(si) {
+    filoHabla = si;
+    try { localStorage.setItem('filoHabla', filoHabla ? 'si' : 'no'); } catch { /* sin almacenamiento */ }
+    if (!filoHabla) { filoAudio.pause(); filoCallaHasta = 0; }
+    pintarFilo();
+  }
+  vozHablaBtn.addEventListener('click', () => ponerFiloHabla(!filoHabla));
+  pintarFilo();
+  filoAudio.addEventListener('ended', () => { filoCallaHasta = Date.now() + 350; });
+  filoAudio.addEventListener('error', () => { filoCallaHasta = 0; });
+  function filoDice(clave) {
+    if (!filoHabla || !clave) return;
+    filoAudio.src = 'voz-filo/' + clave + '.mp3';
+    filoCallaHasta = Date.now() + 4000;
+    filoAudio.play().catch(() => { filoCallaHasta = 0; });
+  }
+  // Qué frase dice Filo según lo que se pidió y lo que se hizo.
+  function claveDeFilo(orden, hecho) {
+    const texto = String(hecho || '');
+    if (!orden) return /no entend/i.test(texto) ? 'no_entendi' : null;
+    if (/^(No |Todavía|primero|ese botón|el buscador|decime|no hay)/i.test(texto) || /sólo está/.test(texto)) return 'no_puedo';
+    const a = orden.accion;
+    switch (orden.tipo) {
+      case 'cerrarRespuesta': return orden.si ? 'cerrada' : 'sigues';
+      case 'ytElegido': return 'video';
+      case 'cerrar': return 'cerrar';
+      case 'ayuda': return 'ayuda';
+      case 'youtube': return 'buscar';
+      case 'boton': return orden.id === 'actualizarBtn' ? 'actualizo' : /^fs/.test(orden.id) ? 'pantalla_completa' : 'listo';
+      case 'diapositiva':
+        if (a === 'mostrar' || a === 'siguiente' || a === 'anterior') return a;
+        return Number(a) === totalSlides && totalSlides > 1 ? 'ultima' : 'diapositiva';
+      case 'zoom':
+        if (a === 'acercar' || a === 'escala') return 'agrando';
+        if (a === 'alejar') return 'achico';
+        if (a === 'normal') return 'normal';
+        return a === 'forma' ? 'forma' : 'muevo';
+      case 'medios': {
+        const video = orden.para === 'video' || /🎬/.test(texto);
+        if (a === 'volumen') {
+          if (orden.valor === 0) return 'silencio';
+          return orden.valor % 10 === 0 ? 'volumen_' + orden.valor : 'listo';
+        }
+        if (a === 'mudo') return orden.valor ? 'silencio' : 'sonido';
+        if (a === 'conSonido') return 'sonido';
+        if (a === 'subirVolumen') return 'subir';
+        if (a === 'bajarVolumen') return 'bajar';
+        if (a === 'pausar') return 'pausa';
+        if (a === 'reproducir') return /🎬/.test(texto) ? 'video' : 'seguir';
+        if (a === 'elegir' || a === 'buscar') return video ? 'video' : 'cancion';
+        if (a === 'azar') return video ? 'video' : 'azar';
+        if (a === 'siguiente' || a === 'anterior') return video ? 'video' : a + '_cancion';
+        if (a === 'terminar') return orden.para === 'musica' ? 'musica_fin' : 'video_fin';
+        if (a === 'saltar') return orden.valor > 0 ? 'adelanto' : 'atraso';
+        if (a === 'bucle') return orden.valor ? 'bucle' : 'listo';
+        if (a === 'cual') return null; // el nombre se lee en la pantalla del control
+        return ['ir', 'irMitad', 'irFinal', 'irCasiFinal', 'reiniciar'].includes(a) ? 'momento' : 'listo';
+      }
+      default: return 'listo';
+    }
+  }
+
   function hacerOrdenDeVoz(alternativas) {
+    // Lo que se oye mientras habla Filo es su propia voz, no una orden.
+    if (Date.now() < filoCallaHasta) return;
+    ordenParaFilo = null;
+    hechoParaFilo = null;
+    const antes = voiceHeard.textContent;
+    cumplirOrdenDeVoz(alternativas);
+    if (voiceHeard.textContent !== antes || hechoParaFilo !== null) filoDice(claveDeFilo(ordenParaFilo, hechoParaFilo));
+  }
+
+  function cumplirOrdenDeVoz(alternativas) {
     const oido = String(alternativas[0] || '').trim();
     // Con la pregunta «¿Cerrar tu pantalla?» abierta sólo se escucha la respuesta: «sí» (o
     // «cerrar») cierra, «no» (o «seguir») la deja como está.
@@ -1204,12 +1291,25 @@
       const dichas = alternativas.flatMap(a => window.OrdenesVoz.normalizar(a).split(/\s+/));
       if (['si', 'confirmar', 'confirmo', 'cerrar', 'cierra', 'cerrala'].some(p => dichas.includes(p))) {
         cerrarPantalla();
+        ordenParaFilo = { tipo: 'cerrarRespuesta', si: true };
         showHeard(oido, '✅ pantalla cerrada');
       } else if (['no', 'seguir', 'sigue', 'cancelar', 'cancela'].some(p => dichas.includes(p))) {
         ocultarHojaCerrar();
+        ordenParaFilo = { tipo: 'cerrarRespuesta', si: false };
         showHeard(oido, 'seguís mostrando');
       }
       return;
+    }
+    // Con los resultados de YouTube a la vista, «uno», «el segundo», «pon el tres» elige ese video.
+    const yt = window.youtubeCelular;
+    if (yt && yt.resultadosALaVista()) {
+      const n = alternativas.map(a => window.OrdenesVoz.numeroDicho(a)).find(x => x !== null && x !== undefined);
+      if (n && n >= 1) {
+        const titulo = yt.elegirResultado(n);
+        ordenParaFilo = titulo ? { tipo: 'ytElegido' } : { tipo: 'medios', accion: 'elegir' };
+        showHeard(oido, titulo ? '🎬 ' + titulo : 'no hay video ' + n + ' en los resultados');
+        return;
+      }
     }
     let orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
     if (!orden) {
@@ -1223,10 +1323,40 @@
       orden = ultimaOrdenDeVoz;
     }
     ultimaOrdenDeVoz = SE_REPITE.includes(orden.accion) ? orden : null;
+    ordenParaFilo = orden;
     if (orden.tipo === 'cerrar') {
       if (!showStarted) { showHeard(oido, 'no hay nada en pantalla para cerrar'); return; }
       preguntarCerrarPantalla();
       showHeard(oido, 'decí «sí» para cerrar o «no» para seguir');
+      return;
+    }
+    // Botones del control por voz: se tocan igual que con el dedo, si están a la vista.
+    if (orden.tipo === 'boton') {
+      const boton = document.getElementById(orden.id);
+      if (!boton || boton.hidden || boton.disabled || !boton.offsetParent) {
+        showHeard(oido, orden.id === 'zonaBtn' ? '«✂ Zona» sólo está con una página web en pantalla' : 'ese botón no está ahora');
+        return;
+      }
+      boton.click();
+      showHeard(oido, '👆 ' + (boton.textContent || '').trim().slice(0, 30));
+      return;
+    }
+    if (orden.tipo === 'filo') {
+      ponerFiloHabla(orden.habla);
+      ordenParaFilo = orden.habla ? { tipo: 'filoVuelve' } : null;
+      showHeard(oido, orden.habla ? '🗣️ Filo vuelve a responder' : '🔇 Filo ya no habla');
+      return;
+    }
+    if (orden.tipo === 'youtube') {
+      if (!yt || !yt.buscarPorVoz(orden.texto)) { showHeard(oido, 'el buscador de YouTube no está disponible'); return; }
+      showHeard(oido, '🔍 Buscando «' + orden.texto + '»… después decí «uno», «dos»… para ponerlo');
+      return;
+    }
+    if (orden.tipo === 'ayuda') {
+      showHeard(oido, '«siguiente», «atrás», «diapositiva 5», «última» · «pon música», «pon la canción …», ' +
+        '«canción al azar», «¿qué canción es?», «ve al minuto 2», «termina la música» · «volumen 30», «sube 20», ' +
+        '«baja a 0», «quita el silencio» · «agranda 50», «achica 30», «al doble», «derecha 20», «un cuadrado» · ' +
+        '«pantalla completa», «actualiza», «zona»');
       return;
     }
     if (orden.tipo === 'diapositiva') {
@@ -1252,19 +1382,43 @@
         showHeard(oido, borde[1]);
         return;
       }
+      if (orden.accion === 'forma') {
+        // Sólo una forma en el medio, como dibujarla con «✂ Zona»: cuadrado, rectángulo largo o alto.
+        // Con número, su ancho en % de la página («cuadrado 30»).
+        const lugar = (espejoWeb.hidden ? zoomFoto : zonaLugar()).getBoundingClientRect();
+        const proporcion = lugar.width && lugar.height ? lugar.width / lugar.height : 16 / 9;
+        const lado = orden.valor ? orden.valor / 100 : orden.forma === 'cuadrado' ? 0.4 : orden.forma === 'largo' ? 0.6 : 0.35;
+        let w = lado;
+        let h = orden.forma === 'cuadrado' ? lado * proporcion : orden.forma === 'largo' ? lado * 0.5 * proporcion : lado * 1.8 * proporcion;
+        if (h > 1) { w = w / h; h = 1; }
+        Object.assign(zoom, { z: Math.min(4, 1 / Math.max(w, h)), w, h, cx: zoom.z > 1.01 ? zoom.cx : 0.5, cy: zoom.z > 1.01 ? zoom.cy : 0.5 });
+        acotarZoom();
+        pintarZoom();
+        if (!espejoWeb.hidden) zonaPintar();
+        mandarZoom(true);
+        showHeard(oido, orden.forma === 'cuadrado' ? '⬛ Cuadrado' : orden.forma === 'largo' ? '▬ Rectángulo' : '▮ Rectángulo alto');
+        return;
+      }
       const MOVER = { derecha: [1, 0, '➡️ Derecha'], izquierda: [-1, 0, '⬅️ Izquierda'], arriba: [0, -1, '⬆️ Arriba'], abajo: [0, 1, '⬇️ Abajo'] };
       const mover = MOVER[orden.accion];
       if (mover) {
         // Sólo se puede correr una imagen agrandada: si está entera, primero se agranda al doble.
         const z = zoom.z > 1.01 ? zoom.z : 2;
-        const paso = 0.5 / z; // media ventana de lo que se ve
+        // Sin número, media ventana de lo que se ve; con número, ese % de la página («derecha 20»).
+        const paso = orden.valor ? orden.valor / 100 : 0.5 / z;
         cambiarZoom({ z, cx: zoom.cx + mover[0] * paso, cy: zoom.cy + mover[1] * paso }, true);
-        showHeard(oido, mover[2]);
+        showHeard(oido, mover[2] + (orden.valor ? ' ' + orden.valor + ' %' : ''));
         return;
       }
-      const nuevo = orden.accion === 'normal' ? { z: 1, cx: 0.5, cy: 0.5 } : { z: zoom.z * (orden.accion === 'acercar' ? 1.5 : 1 / 1.5) };
+      // «agranda 50» = 50 % más grande; «achica 30» = 30 % más chica; sin número, ×1,5.
+      // «al doble», «agranda al 150»: ese tamaño justo.
+      let nuevo;
+      if (orden.accion === 'normal') nuevo = { z: 1, cx: 0.5, cy: 0.5 };
+      else if (orden.accion === 'escala') nuevo = { z: orden.valor / 100 };
+      else if (orden.accion === 'acercar') nuevo = { z: zoom.z * (orden.valor ? 1 + orden.valor / 100 : 1.5) };
+      else nuevo = { z: zoom.z * (orden.valor ? Math.max(0.05, 1 - orden.valor / 100) : 1 / 1.5) };
       cambiarZoom(nuevo, true);
-      showHeard(oido, zoom.z > 1.01 ? '🔍 ×' + zoom.z.toFixed(1) : '🔍 Tamaño normal');
+      showHeard(oido, zoom.z > 1.01 ? '🔍 ' + Math.round(zoom.z * 100) + ' %' : '🔍 Tamaño normal');
       return;
     }
     const hecho = typeof window.ordenDeVozMedios === 'function' ? window.ordenDeVozMedios(orden) : null;
@@ -1291,6 +1445,7 @@
 
   // Muestra en verde lo último que se reconoció por voz y, si hay, lo que se hizo con eso
   function showHeard(text, hecho) {
+    hechoParaFilo = hecho || '';
     voiceHeard.textContent = '🎙️ "' + text + '"' + (hecho ? ' · ' + hecho : '');
     voiceHeard.hidden = false;
     voiceHeard.classList.remove('pulse');
