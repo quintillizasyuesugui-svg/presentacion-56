@@ -117,8 +117,32 @@
     }, true);
   });
 
+  // Pantalla abierta en un celular o tablet: al apagarla o cambiar de app, los videos de la página
+  // se pausan donde iban y siguen solos al volver. Mientras está apagada, lo que mande el celular
+  // se guarda y se aplica al volver. En la PC no (una ventana tapada también cuenta como oculta).
+  var esCelular = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  var pausadosAlOcultar = [];
+  var ordenesAlVolver = {};
+  document.addEventListener('visibilitychange', function () {
+    if (soyEspejo || !esCelular) return;
+    if (document.hidden) {
+      Array.prototype.forEach.call(document.querySelectorAll(MEDIOS), function (m) {
+        if (!m.paused && !m.ended) { pausadosAlOcultar.push(m); m.pause(); }
+      });
+      return;
+    }
+    var seguir = pausadosAlOcultar;
+    pausadosAlOcultar = [];
+    var pendientes = ordenesAlVolver;
+    ordenesAlVolver = {};
+    seguir.forEach(function (m) { if (m.isConnected && m.paused) { var p = m.play(); if (p && p.catch) p.catch(function () {}); } });
+    Object.keys(pendientes).forEach(function (ruta) { ponerMedio(pendientes[ruta]); });
+  });
+
   // En la pantalla: pone el video como está en el celular.
   function ponerMedio(orden) {
+    if (esCelular && document.hidden && !soyEspejo) { ordenesAlVolver[orden.ruta] = orden; return; }
     var elemento = null;
     try { elemento = document.querySelector(orden.ruta); } catch (error) { /* camino que no sirve */ }
     var medio = medioDe(elemento);

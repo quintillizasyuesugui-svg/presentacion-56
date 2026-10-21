@@ -615,11 +615,50 @@
   // ---------- órdenes del celular ----------
   socket.on('medios', (orden) => {
     if (!orden || !soyLaActiva) return;
+    // Con la pantalla del celular apagada no suena nada: ▶ / ⏸ sólo dicen si sigue al volver.
+    if (ocultaEnCelular() && ['reproducir', 'pausar', 'alternar'].includes(orden.accion) &&
+        (orden.para === 'musica' || orden.para === 'video')) {
+      const seguir = orden.accion === 'reproducir' || (orden.accion === 'alternar' && !alVolver[orden.para]);
+      alVolver[orden.para] = seguir;
+      return avisarAlCelular(seguir ? '▶ Sigue sola al prender la pantalla.' : '⏸ Queda en pausa al prender la pantalla.');
+    }
     if (orden.para === 'musica') ordenMusica(orden);
     else if (orden.para === 'video') ordenVideo(orden);
     else if (orden.para === 'pc') ordenPC(orden);
   });
   socket.on('mediosPedirEstado', publicarEstado);
+
+  // ---------- pantalla abierta en un celular o tablet ----------
+  // Al apagar la pantalla o cambiar de app, el navegador del celular sigue conectado y seguiría
+  // sonando: se pausa donde iba y, al volver a verla, sigue sola desde ahí. En la PC no se hace,
+  // porque una ventana tapada por otra también cuenta como «oculta» y cortaría la presentación.
+  const esCelular = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && matchMedia('(pointer: coarse)').matches);
+  const alVolver = { musica: false, video: false };
+  let pausadaPorOcultar = false;
+  function ocultaEnCelular() { return esCelular && pausadaPorOcultar; }
+  document.addEventListener('visibilitychange', () => {
+    if (!esCelular || !soyLaActiva) return;
+    if (document.hidden) {
+      if (pausadaPorOcultar) return;
+      pausadaPorOcultar = true;
+      alVolver.video = Boolean(video) && videoSonando();
+      alVolver.musica = !audio.paused && quiereSonar;
+      if (alVolver.video) pausarVideo();
+      // Sin fundido: con la pantalla apagada los temporizadores casi no corren.
+      if (alVolver.musica) pausarMusica({ fundido: false });
+      publicarEstado();
+      return;
+    }
+    if (!pausadaPorOcultar) return;
+    pausadaPorOcultar = false;
+    const seguia = (alVolver.video && video) || (alVolver.musica && !video);
+    if (alVolver.video && video) reanudarVideo();
+    else if (alVolver.musica && !video) reproducirMusica();
+    alVolver.musica = alVolver.video = false;
+    if (seguia) mostrarSello('▶ Sigue donde iba');
+    publicarEstado();
+  });
   // Para recargarse con una versión nueva (pantalla.js): espera a que no suene nada y antes cuenta
   // lo que había, así sigue igual después.
   window.mediosSonando = () => (!audio.paused && quiereSonar) || videoSonando();
