@@ -156,7 +156,10 @@
     var ruta = rutaDe(elemento);
     setTimeout(function () {
       var navega = !!enlace && !mismaPagina(enlace) && !evento.defaultPrevented;
-      avisar({ tipo: 'clic', ruta: ruta, navega: navega });
+      var aviso = { tipo: 'clic', ruta: ruta, navega: navega };
+      // Adónde va: así la pantalla empieza a cargarla ya, sin esperar a que el celular termine.
+      if (navega && enlace.origin === ORIGEN) aviso.url = enlace.href;
+      avisar(aviso);
     }, 0);
   }, true);
 
@@ -235,7 +238,9 @@
       marcar(elemento);
       if (!orden.navega) elemento.click();
     } else if (orden.tipo === 'desplazar' && isFinite(orden.y)) {
-      scrollTo(0, orden.y * (document.documentElement.scrollHeight - innerHeight));
+      // Sin animar aunque la página use «scroll-behavior: smooth»: con los avisos seguidos la
+      // animación volvía a empezar cada vez y la pantalla quedaba segundos atrás del celular.
+      scrollTo({ top: orden.y * (document.documentElement.scrollHeight - innerHeight), behavior: 'instant' });
     } else if (orden.tipo === 'pagina') {
       pasarPagina(orden.valor > 0 ? 1 : -1);
     }

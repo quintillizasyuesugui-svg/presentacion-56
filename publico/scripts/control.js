@@ -1036,6 +1036,7 @@
       espejoPintarMenu(aviso.menu);
     } else if (aviso.tipo === 'clic' && typeof aviso.ruta === 'string') {
       socket.emit('web', { accion: 'clic', ruta: aviso.ruta, navega: aviso.navega === true });
+      if (aviso.navega === true && typeof aviso.url === 'string') espejoIrYa(aviso.url);
     } else if (aviso.tipo === 'desplazar') {
       socket.emit('web', { accion: 'desplazar', y: aviso.y });
     } else if (aviso.tipo === 'medio' && typeof aviso.ruta === 'string') {
@@ -1048,7 +1049,14 @@
   const espejoMenu = document.getElementById('espejoMenu');
   // «origen»: de qué sitio tienen que ser las cajas. «alTocar»: qué hace cada una (en el espejo
   // lleva el recuadro del celular a esa página; en vivo se lo pide a la app de PC).
-  function espejoPintarMenu(menu, origen = origenDe(espejoBase), alTocar = (url) => { if (url !== espejoUrl) espejoMarco.src = marcoDe(url); }) {
+  // La pantalla empieza a cargar la otra página en el mismo momento que el celular, sin esperar
+  // a que el espejo termine de cargarla (antes se sumaban las dos cargas).
+  function espejoIrYa(url) {
+    if (url === espejoUrl || origenDe(url) !== origenDe(espejoBase)) return;
+    espejoUrl = url;
+    socket.emit('web', { accion: 'ir', url });
+  }
+  function espejoPintarMenu(menu, origen = origenDe(espejoBase), alTocar = (url) => { if (url !== espejoUrl) { espejoMarco.src = marcoDe(url); espejoIrYa(url); } }) {
     espejoMenu.textContent = '';
     const enlaces = Array.isArray(menu) ? menu.slice(0, 12).filter(e => e && typeof e.url === 'string' && typeof e.texto === 'string' && origen && origenDe(e.url) === origen) : [];
     espejoMenu.hidden = enlaces.length === 0;
