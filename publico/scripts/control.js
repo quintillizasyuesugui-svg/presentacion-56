@@ -356,8 +356,22 @@
     document.getElementById('zoomAyuda').hidden = true;
   }
 
+  // Copia del zoom que llega. Con «✂ Zona» trae también el ancho y el alto del cuadro dibujado
+  // (w, h: de 0 a 1): la pantalla muestra sólo esa parte, con la forma que se dibujó.
+  function copiarZoom(z) {
+    const copia = { z: z.z, cx: z.cx, cy: z.cy };
+    if (Number.isFinite(z.w) && Number.isFinite(z.h)) { copia.w = z.w; copia.h = z.h; }
+    return copia;
+  }
+
   function acotarZoom() {
     zoom.z = Math.min(4, Math.max(1, zoom.z));
+    if (Number.isFinite(zoom.w)) {
+      // El cuadro dibujado no se sale de la página.
+      zoom.cx = Math.min(1 - zoom.w / 2, Math.max(zoom.w / 2, zoom.cx));
+      zoom.cy = Math.min(1 - zoom.h / 2, Math.max(zoom.h / 2, zoom.cy));
+      return;
+    }
     const m = 0.5 / zoom.z;
     zoom.cx = Math.min(1 - m, Math.max(m, zoom.cx));
     zoom.cy = Math.min(1 - m, Math.max(m, zoom.cy));
@@ -378,7 +392,7 @@
     clearTimeout(zoomPendiente);
     if (alFinal || ahora - zoomUltimoEnvio >= ZOOM_PAUSA) {
       zoomUltimoEnvio = ahora;
-      socket.emit('zoom', { z: zoom.z, cx: zoom.cx, cy: zoom.cy });
+      socket.emit('zoom', copiarZoom(zoom));
     } else {
       zoomPendiente = setTimeout(() => mandarZoom(true), ZOOM_PAUSA - (ahora - zoomUltimoEnvio));
     }
@@ -391,6 +405,9 @@
 
   function cambiarZoom(nuevo, alFinal) {
     if (!puedeZoom()) return;
+    // Pellizcar o pedir zoom con la voz deja de mostrar sólo el cuadro dibujado.
+    delete zoom.w;
+    delete zoom.h;
     Object.assign(zoom, nuevo);
     acotarZoom();
     pintarZoom();
@@ -401,7 +418,7 @@
   // Otro celular de la misma persona hizo zoom: se ve acá también.
   socket.on('zoom', (z) => {
     if (!z) return;
-    zoom = { z: z.z, cx: z.cx, cy: z.cy };
+    zoom = copiarZoom(z);
     pintarZoom();
     if (!espejoWeb.hidden) zonaPintar();
   });
@@ -866,12 +883,14 @@
     const lugar = zonaLugar();
     if (zonaVisor.parentElement !== lugar) lugar.append(zonaVisor, zonaCapa);
     const agrandada = zoom.z > 1.01;
-    const lado = 100 / zoom.z;
+    // El cuadro amarillo tiene la forma que se dibujó; sin cuadro dibujado, la de la pantalla.
+    const ancho = Number.isFinite(zoom.w) ? zoom.w * 100 : 100 / zoom.z;
+    const alto = Number.isFinite(zoom.h) ? zoom.h * 100 : 100 / zoom.z;
     zonaVisor.hidden = !agrandada;
-    zonaVisor.style.width = lado + '%';
-    zonaVisor.style.height = lado + '%';
-    zonaVisor.style.left = (zoom.cx * 100 - lado / 2) + '%';
-    zonaVisor.style.top = (zoom.cy * 100 - lado / 2) + '%';
+    zonaVisor.style.width = ancho + '%';
+    zonaVisor.style.height = alto + '%';
+    zonaVisor.style.left = (zoom.cx * 100 - ancho / 2) + '%';
+    zonaVisor.style.top = (zoom.cy * 100 - alto / 2) + '%';
     zonaCapa.hidden = !zonaMarcando;
     zonaBtn.textContent = agrandada ? '↩ Entera' : '✂ Zona';
     zonaBtn.setAttribute('aria-pressed', String(zonaMarcando));
@@ -895,7 +914,7 @@
     zonaBtn.hidden = estado.paginaZoom !== true;
     if (zonaBtn.hidden) zonaMarcando = false;
     const z = estado.zoom;
-    zoom = z && Number.isFinite(z.z) && !zonaBtn.hidden ? { z: z.z, cx: z.cx, cy: z.cy } : { z: 1, cx: 0.5, cy: 0.5 };
+    zoom = z && Number.isFinite(z.z) && !zonaBtn.hidden ? copiarZoom(z) : { z: 1, cx: 0.5, cy: 0.5 };
     zonaPintar();
   }
 
@@ -909,6 +928,8 @@
   zonaBtn.addEventListener('click', () => {
     if (zoom.z > 1.01) {
       zonaMarcando = false;
+      delete zoom.w;
+      delete zoom.h;
       zonaMandar({ z: 1, cx: 0.5, cy: 0.5 }, true);
     } else {
       zonaMarcando = !zonaMarcando;
@@ -952,7 +973,8 @@
     // Un cuadro muy chico es un toque sin querer: se sigue esperando el cuadro.
     if (e.type === 'pointercancel' || ancho < 0.06 || alto < 0.06) return;
     zonaMarcando = false;
-    zonaMandar({ z: 1 / Math.max(ancho, alto), cx: (p.x + zonaInicio.x) / 2, cy: (p.y + zonaInicio.y) / 2 }, true);
+    // Se agranda lo más posible sin deformar; lo de afuera del cuadro queda oscuro en la pantalla.
+    zonaMandar({ z: 1 / Math.max(ancho, alto), cx: (p.x + zonaInicio.x) / 2, cy: (p.y + zonaInicio.y) / 2, w: ancho, h: alto }, true);
   }
   zonaCapa.addEventListener('pointerup', zonaSoltar);
   zonaCapa.addEventListener('pointercancel', zonaSoltar);

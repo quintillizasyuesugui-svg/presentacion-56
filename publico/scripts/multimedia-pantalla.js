@@ -248,6 +248,20 @@
     if (m) mostrarSello('⏸ ' + m.nombre);
   }
 
+  // «⏹» del celular: la música se corta y vuelve al principio; no sigue sola después de un video.
+  function terminarMusica() {
+    quiereSonar = false;
+    musicaAntesDelVideo = false;
+    const alFinal = () => {
+      audio.pause();
+      try { audio.currentTime = 0; } catch { /* sin datos todavía */ }
+      audio.volume = volumenMusica / 100;
+      publicarEstado();
+    };
+    if (audio.paused) alFinal(); else fundir(0, alFinal);
+    mostrarSello('⏹ Música terminada');
+  }
+
   function cambiarCancion(paso) {
     if (!musicas.length) return reproducirMusica();
     const actual = musicas.findIndex(m => m.id === musicaId);
@@ -281,6 +295,7 @@
   function ordenMusica({ accion, valor }) {
     if (accion === 'reproducir') return reproducirMusica();
     if (accion === 'pausar') return pausarMusica();
+    if (accion === 'terminar') return terminarMusica();
     if (accion === 'alternar') return (audio.paused ? reproducirMusica() : pausarMusica());
     if (accion === 'bucle') {
       bucleMusica = valor === true;

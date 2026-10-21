@@ -1,6 +1,6 @@
 // Abre la pantalla de Conexiones (la misma de Render) en una ventana propia de Windows.
 // Los celulares siguen manejándola con el control, como en el navegador.
-const { app, BrowserWindow, WebContentsView, ipcMain, shell, session } = require('electron');
+const { app, BrowserWindow, WebContentsView, View, ipcMain, shell, session } = require('electron');
 const path = require('path');
 const volumen = require('./volumen');
 
@@ -104,15 +104,52 @@ function esPaginaWeb(direccion) {
 // (cx, cy: de 0 a 1). El recuadro se hace z veces más grande que la ventana y la página se dibuja
 // z veces más grande adentro: se ve igual, sólo que de cerca, y la ventana recorta lo que sobra.
 const ZOOM_MAXIMO = 4;
+// Con «✂ Zona» llegan también el ancho y el alto del cuadro dibujado (w, h): sólo se ve esa parte,
+// y cuatro tiras negras tapan lo de afuera.
 let zoomPagina = { z: 1, cx: 0.5, cy: 0.5 };
+let tirasNegras = [];
+let paginaVisible = true;
+
+function acomodarTiras(ancho, alto) {
+  const cuadro = pagina && paginaVisible && zoomPagina.z > 1.01 && zoomPagina.w ? zoomPagina : null;
+  if (!cuadro) {
+    for (const tira of tirasNegras) tira.setVisible(false);
+    return;
+  }
+  if (!tirasNegras.length) {
+    tirasNegras = [0, 1, 2, 3].map(() => {
+      const tira = new View();
+      tira.setBackgroundColor('#000000');
+      return tira;
+    });
+  }
+  const anchoCuadro = Math.min(ancho, Math.round(cuadro.w * cuadro.z * ancho));
+  const altoCuadro = Math.min(alto, Math.round(cuadro.h * cuadro.z * alto));
+  const izquierda = Math.round((ancho - anchoCuadro) / 2);
+  const arriba = Math.round((alto - altoCuadro) / 2);
+  const lugares = [
+    { x: 0, y: 0, width: ancho, height: arriba },
+    { x: 0, y: arriba + altoCuadro, width: ancho, height: alto - arriba - altoCuadro },
+    { x: 0, y: arriba, width: izquierda, height: altoCuadro },
+    { x: izquierda + anchoCuadro, y: arriba, width: ancho - izquierda - anchoCuadro, height: altoCuadro }
+  ];
+  tirasNegras.forEach((tira, i) => {
+    // Agregarla otra vez la pone encima de la página.
+    ventana.contentView.addChildView(tira);
+    tira.setBounds(lugares[i]);
+    tira.setVisible(true);
+  });
+}
 
 function acomodarPagina() {
   if (!pagina || !ventana) return;
   const [ancho, alto] = ventana.getContentSize();
   const z = zoomPagina.z;
   const mitad = 0.5 / z;
-  const cx = Math.min(1 - mitad, Math.max(mitad, zoomPagina.cx));
-  const cy = Math.min(1 - mitad, Math.max(mitad, zoomPagina.cy));
+  // Con cuadro dibujado su centro queda en el centro de la pantalla, aunque se vea el borde de la
+  // página (lo tapan las tiras).
+  const cx = zoomPagina.w ? zoomPagina.cx : Math.min(1 - mitad, Math.max(mitad, zoomPagina.cx));
+  const cy = zoomPagina.w ? zoomPagina.cy : Math.min(1 - mitad, Math.max(mitad, zoomPagina.cy));
   pagina.setBounds({
     x: Math.round(ancho / 2 - cx * ancho * z),
     y: Math.round(alto / 2 - cy * alto * z),
@@ -120,12 +157,17 @@ function acomodarPagina() {
     height: Math.round(alto * z)
   });
   pagina.webContents.setZoomFactor(z);
+  acomodarTiras(ancho, alto);
 }
 
 function zoomDeLaPagina(zona) {
   if (!zona || typeof zona !== 'object') return false;
   const numero = (valor, minimo, maximo, siNo) => (Number.isFinite(valor) ? Math.min(maximo, Math.max(minimo, valor)) : siNo);
   zoomPagina = { z: numero(zona.z, 1, ZOOM_MAXIMO, 1), cx: numero(zona.cx, 0, 1, 0.5), cy: numero(zona.cy, 0, 1, 0.5) };
+  if (Number.isFinite(zona.w) && Number.isFinite(zona.h)) {
+    zoomPagina.w = numero(zona.w, 0.01, 1, 1);
+    zoomPagina.h = numero(zona.h, 0.01, 1, 1);
+  }
   acomodarPagina();
   return true;
 }
@@ -191,6 +233,7 @@ function cerrarPagina() {
   pagina = null;
   menuPagina = null;
   zoomPagina = { z: 1, cx: 0.5, cy: 0.5 };
+  for (const tira of tirasNegras) tira.setVisible(false);
   clearTimeout(relojMenu);
   if (ventana) ventana.contentView.removeChildView(vieja);
   vieja.webContents.close();
@@ -221,6 +264,8 @@ function abrirPagina(direccion) {
     acomodarPagina();
   }
   pagina.setVisible(true);
+  paginaVisible = true;
+  acomodarPagina();
   pagina.webContents.loadURL(direccion).catch(() => {});
   return true;
 }
@@ -296,7 +341,11 @@ function registrarPedidosDePagina() {
   const atender = (canal, hacer) => ipcMain.handle(canal, (evento, dato) => (pedidoDeConexiones(evento) ? hacer(dato) : null));
   atender('pagina:abrir', abrirPagina);
   atender('pagina:cerrar', () => { cerrarPagina(); return true; });
-  atender('pagina:visible', (siNo) => { if (pagina) pagina.setVisible(siNo !== false); return true; });
+  atender('pagina:visible', (siNo) => {
+    paginaVisible = siNo !== false;
+    if (pagina) { pagina.setVisible(paginaVisible); acomodarPagina(); }
+    return true;
+  });
   atender('pagina:orden', ordenParaLaPagina);
   atender('pagina:foto', () => fotoDeLaPagina().catch(() => null));
   atender('pagina:zoom', zoomDeLaPagina);

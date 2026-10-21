@@ -3,7 +3,7 @@
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
-- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.4.0.exe) — instalador, 105 MB
+- 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.4.1.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
 
 ## 🎬 Demo
@@ -68,9 +68,11 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   sin un toque; «Ir a pantalla completa» también sirve). La música suena encima de todo; un
   video pausa todo (música, avance automático, texto en vivo) y al terminar vuelve a la misma
   diapositiva. Si la misma persona abre dos pantallas, suena sólo la última donde se permitió.
-- **La pantalla se cierra o se recarga**: al abrirla sigue sola con lo mismo: la foto, la
-  canción o el video (subido o de YouTube) en el segundo en que iba, en pausa si estaba en pausa,
-  y la letra de «Escribir en vivo». Si el navegador la deja sin sonido, aparece abajo a la
+- **La pantalla se cierra o se recarga**: la canción o el video (subido o de YouTube) quedan en
+  pausa justo donde iban y el celular los muestra pausados. Al abrirla sigue sola con lo mismo:
+  la foto, la canción o el video desde ese segundo (en pausa si estaba en pausa) y la letra de
+  «Escribir en vivo». Con la pantalla cerrada, «⏹ Terminar» del video y «⏹» de la música
+  igual funcionan: lo terminado ya no vuelve al abrirla. Si el navegador la deja sin sonido, aparece abajo a la
   izquierda «🔇 Sonido apagado · Tocá para activar»: un toque en la PC y se escucha sin volver al
   principio (desde el celular no se puede: el navegador sólo acepta un toque en la PC; con la
   app de PC nunca queda sin sonido). «Cerrar pantalla» en el celular o «Cerrar sesión» en la
@@ -145,7 +147,9 @@ Lo que se toca en el espejo pasa también en la pantalla.
   entera en unos segundos.
 - **Zona (agrandar una parte de la página):** con una página web en pantalla, el celular muestra
   «✂ Zona» al lado del nombre de la página. Se dibuja un cuadro sobre la página y la pantalla se
-  llena con esa parte (hasta ×4); el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»
+  llena con esa parte (hasta ×4) con la forma que se dibujó: un rectángulo largo se ve largo y un
+  cuadrado chico se ve chico, y lo de afuera queda negro (la app de PC lo hace desde la 1.4.1);
+  el cuadro se mueve arrastrando el círculo ✥ y «↩ Entera»
   vuelve. Viaja con el mismo aviso `zoom` de las fotos. En foto en vivo hace falta la app de PC
   1.3.0 o más nueva, que agranda el recuadro de la página sin reacomodarla; con una app
   anterior el botón no aparece.

@@ -286,11 +286,12 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
 .tiempos { display: flex; justify-content: space-between; margin-top: 2px; color: var(--text-muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .pista-ayuda { margin-top: 4px; text-align: center; color: var(--gray-500); font-size: 0.75rem; }
 
-.mandos { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.mandos { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.5vw, 14px); }
+/* Los botones se achican un poco en celulares angostos: así entran los cinco de la música en una fila. */
 .mando {
   flex: none;
-  width: 54px;
-  height: 54px;
+  width: clamp(44px, 13vw, 54px);
+  height: clamp(44px, 13vw, 54px);
   border-radius: 50%;
   border: 1.5px solid var(--gray-600);
   background: var(--gray-800);
@@ -303,8 +304,8 @@ body.video-en-pantalla .auto-badge { visibility: hidden; }
   place-items: center;
 }
 .mando.grande {
-  width: 78px;
-  height: 78px;
+  width: clamp(64px, 20vw, 78px);
+  height: clamp(64px, 20vw, 78px);
   font-size: 1.7rem;
   background: linear-gradient(180deg, var(--primary-400), var(--primary-600));
   border-color: var(--primary-200);

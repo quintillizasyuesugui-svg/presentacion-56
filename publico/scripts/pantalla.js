@@ -1679,6 +1679,7 @@
   // El control manda cuánto agrandar (z: 1 a 4) y qué punto de la foto queda en el centro
   // (cx, cy: de 0 a 1). Al pasar de foto vuelve a la foto entera.
   const zoomCapa = document.getElementById('zoomCapa');
+  const zonaMascara = document.getElementById('zonaMascara');
   let zoomActual = { z: 1, cx: 0.5, cy: 0.5 };
   // Lo que se ve persigue a lo pedido en cada cuadro, sin esperar al aviso siguiente: así la
   // foto sigue al dedo de cerca y no avanza a tirones si los avisos llegan desparejos.
@@ -1693,6 +1694,13 @@
     zoomCapa.style.transform = forma;
     // La página web se agranda igual que la foto: la parte marcada en el celular llena la pantalla.
     marcoPagina.style.transform = forma;
+    // Con «✂ Zona» se ve sólo el cuadro dibujado, con su forma; lo de afuera queda oscuro.
+    const conCuadro = zoomVisto.z > 1.01 && Number.isFinite(zoomActual.w) && Number.isFinite(zoomActual.h);
+    zonaMascara.hidden = !conCuadro;
+    if (conCuadro) {
+      zonaMascara.style.width = Math.min(100, zoomActual.w * zoomVisto.z * 100) + '%';
+      zonaMascara.style.height = Math.min(100, zoomActual.h * zoomVisto.z * 100) + '%';
+    }
   }
   function seguirZoom(ahora) {
     const parte = 1 - Math.exp(-Math.min(100, Math.max(0, ahora - zoomMomento)) / ZOOM_SEGUIMIENTO);

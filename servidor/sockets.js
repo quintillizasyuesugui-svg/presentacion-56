@@ -41,6 +41,31 @@ function mandarFotoWeb(celular, foto) {
 
 const ARRANQUE = Date.now().toString(36);
 
+// Zoom que viaja entre el celular y la pantalla: sólo números acotados. Con «✂ Zona» trae también
+// el ancho y el alto del cuadro dibujado (w, h), para mostrar sólo esa parte.
+function zoomLimpio(datos) {
+  const numero = (v, min, max, siNo) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : siNo);
+  const limpio = { z: numero(datos.z, 1, 4, 1), cx: numero(datos.cx, 0, 1, 0.5), cy: numero(datos.cy, 0, 1, 0.5) };
+  if (Number.isFinite(datos.w) && Number.isFinite(datos.h)) {
+    limpio.w = numero(datos.w, 0.01, 1, 1);
+    limpio.h = numero(datos.h, 0.01, 1, 1);
+  }
+  return limpio;
+}
+
+// Lo que se le manda a la pantalla que se abre para seguir con la música y el video. Si quedó
+// en pausa al cerrarse, sigue desde el mismo segundo y suena otra vez si así quedó marcado.
+function seguirDesde(medios, hace) {
+  const { congelado, ...estado } = medios.estado;
+  if (!congelado) return { ...estado, hace };
+  const volver = (p) => {
+    if (!p) return p;
+    const { alVolver, ...pista } = p;
+    return { ...pista, sonando: alVolver === true };
+  };
+  return { ...estado, musica: volver(estado.musica), video: volver(estado.video), hace: 0 };
+}
+
 function registrarSockets(io) {
   io.on('connection', (socket) => {
     console.log('✨ Dispositivo vinculado');
@@ -58,7 +83,10 @@ function registrarSockets(io) {
       if (!socket.ownerName) return;
       desconectar(socket.ownerName);
       // Se fue una pantalla (cerró sesión, se recargó o se cortó): sus celulares se enteran.
-      if (socket.esPantalla) avisarPantalla(socket.ownerName);
+      if (socket.esPantalla) {
+        avisarPantalla(socket.ownerName);
+        if (!socket.cerrada) pantallaSeFue(socket.ownerName);
+      }
     });
 
     // ¿Esta persona tiene alguna pantalla abierta? Las pantallas entran a una sala propia
@@ -73,6 +101,69 @@ function registrarSockets(io) {
         const otro = io.sockets.sockets.get(id);
         if (otro) otro.cerrada = true;
       }
+    }
+    // Se cerró la última pantalla (pestaña, app o se cortó): lo que sonaba queda en pausa justo
+    // donde iba y los celulares lo ven pausado. Al volver a abrirla sigue sola desde ahí
+    // («alVolver»), salvo que mientras tanto se haya pausado o terminado desde el celular.
+    function congelarMedios(nombre) {
+      const recuerdo = recuerdosMedios.get(nombre);
+      if (!recuerdo || recuerdo.estado.congelado) return recuerdo || null;
+      const paso = (Date.now() - recuerdo.en) / 1000;
+      const quieta = (p) => {
+        if (!p) return p;
+        const t = p.sonando ? (p.duracion ? Math.min(p.t + paso, p.duracion) : p.t + paso) : p.t;
+        return { ...p, t, sonando: false, alVolver: p.sonando === true };
+      };
+      const estado = { ...recuerdo.estado, congelado: true };
+      estado.video = quieta(estado.video);
+      // Con un video encima la canción no corre.
+      estado.musica = estado.video && estado.musica ? { ...estado.musica, alVolver: false } : quieta(estado.musica);
+      const nuevo = { en: Date.now(), estado };
+      recuerdosMedios.set(nombre, nuevo);
+      return nuevo;
+    }
+    function contarMediosSinPantalla(nombre, aviso) {
+      const recuerdo = recuerdosMedios.get(nombre);
+      const estado = recuerdo ? recuerdo.estado : {};
+      const sinMarca = (p) => (p ? { ...p, alVolver: undefined } : null);
+      io.to('owner:' + nombre).emit('mediosEstado', {
+        pantalla: '', permitido: false, musica: sinMarca(estado.musica), video: sinMarca(estado.video),
+        ...(estado.musicaDespues ? { musicaDespues: true } : {}), ...(aviso ? { aviso } : {})
+      });
+    }
+    function pantallaSeFue(nombre) {
+      if (hayPantalla(nombre)) return;
+      // El celular ya avisa «Se cerró la pantalla»: acá sólo se le cuenta que quedó en pausa.
+      if (congelarMedios(nombre)) contarMediosSinPantalla(nombre, '');
+    }
+
+    // Órdenes que valen aunque la pantalla esté cerrada: terminar el video, pausar o seguir.
+    function ordenSinPantalla(nombre, orden) {
+      const recuerdo = congelarMedios(nombre);
+      const estado = recuerdo ? recuerdo.estado : { musica: null, video: null, congelado: true };
+      let aviso = '';
+      if (orden.para === 'musica' && orden.accion === 'terminar') {
+        if (!estado.musica) return;
+        aviso = '⏹ Música terminada. No vuelve al abrir la pantalla.';
+        estado.musica = { ...estado.musica, t: 0, sonando: false, alVolver: false };
+        estado.musicaDespues = false;
+      } else if (orden.para === 'video' && orden.accion === 'terminar') {
+        if (estado.video) aviso = '✅ Terminó «' + estado.video.nombre + '». No vuelve al abrir la pantalla.';
+        // La música que sonaba antes del video sigue al abrir la pantalla, como al terminar con ella abierta.
+        if (estado.video && estado.musicaDespues && estado.musica) estado.musica = { ...estado.musica, alVolver: true };
+        estado.video = null;
+        estado.musicaDespues = false;
+      } else if (['reproducir', 'pausar', 'alternar'].includes(orden.accion)) {
+        const cual = orden.para === 'video' ? 'video' : orden.para === 'musica' && !estado.video ? 'musica' : '';
+        if (!cual || !estado[cual]) return;
+        // El celular lo ve en pausa: ▶ (alternar) quiere decir que siga al volver.
+        const seguir = orden.accion !== 'pausar';
+        estado[cual] = { ...estado[cual], alVolver: seguir };
+        aviso = seguir ? '▶ Sigue sola al abrir la pantalla.' : '⏸ Queda en pausa al abrir la pantalla.';
+      } else return;
+      if (estado.musica || estado.video) recuerdosMedios.set(nombre, { en: Date.now(), estado });
+      else recuerdosMedios.delete(nombre);
+      contarMediosSinPantalla(nombre, aviso);
     }
     function marcarPantalla() {
       if (!socket.ownerName || socket.esPantalla) return;
@@ -91,7 +182,7 @@ function registrarSockets(io) {
         // Siempre contesta (aunque no haya nada), así la pantalla sabe que puede empezar a contar.
         const medios = recuerdosMedios.get(socket.ownerName);
         const hace = medios ? Date.now() - medios.en : 0;
-        socket.emit('mediosSeguir', medios && hace < MEDIOS_VENCEN_MS ? { ...medios.estado, hace } : null);
+        socket.emit('mediosSeguir', medios && hace < MEDIOS_VENCEN_MS ? seguirDesde(medios, hace) : null);
       }
       marcarPantalla();
     });
@@ -184,7 +275,12 @@ function registrarSockets(io) {
     socket.on('medios', (datos) => {
       if (!socket.ownerName) return;
       const orden = limpiarOrdenMedios(datos);
-      if (orden) io.to('owner:' + socket.ownerName).emit('medios', orden);
+      if (!orden) return;
+      // Con la pantalla cerrada nadie recibe la orden: se le aplica a lo que se recuerda, así al
+      // volver a abrir la pantalla no sigue un video que ya se terminó o una canción que se pausó.
+      // (La orden se reenvía igual, por si hay una pantalla abierta desde antes que todavía no avisó.)
+      if (!hayPantalla(socket.ownerName)) ordenSinPantalla(socket.ownerName, orden);
+      io.to('owner:' + socket.ownerName).emit('medios', orden);
     });
     socket.on('mediosEstado', (datos) => {
       if (!socket.ownerName) return;
@@ -249,11 +345,7 @@ function registrarSockets(io) {
         paginaPaso: Number.isInteger(datos.paginaPaso) && datos.paginaPaso > 0 ? Math.min(datos.paginaPaso, 1e9) : 0,
         ancho: Number.isInteger(datos.ancho) ? Math.min(8000, Math.max(0, datos.ancho)) : 0,
         alto: Number.isInteger(datos.alto) ? Math.min(8000, Math.max(0, datos.alto)) : 0,
-        zoom: {
-          z: Number.isFinite(z.z) ? Math.min(4, Math.max(1, z.z)) : 1,
-          cx: Number.isFinite(z.cx) ? Math.min(1, Math.max(0, z.cx)) : 0.5,
-          cy: Number.isFinite(z.cy) ? Math.min(1, Math.max(0, z.cy)) : 0.5
-        }
+        zoom: zoomLimpio(z)
       };
       if (limpio.mostrando && limpio.foto > 0 && !socket.cerrada) recuerdos.set(socket.ownerName, { foto: limpio.foto });
       socket.to('owner:' + socket.ownerName).emit('pantallaEstado', limpio);
@@ -262,12 +354,7 @@ function registrarSockets(io) {
     // Zoom desde el celular: sólo números acotados, a la sala de la misma persona.
     socket.on('zoom', (datos) => {
       if (!socket.ownerName || !datos || typeof datos !== 'object') return;
-      const numero = (v, min, max, siNo) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : siNo);
-      socket.to('owner:' + socket.ownerName).emit('zoom', {
-        z: numero(datos.z, 1, 4, 1),
-        cx: numero(datos.cx, 0, 1, 0.5),
-        cy: numero(datos.cy, 0, 1, 0.5)
-      });
+      socket.to('owner:' + socket.ownerName).emit('zoom', zoomLimpio(datos));
     });
 
     // Página web: lo que se toca en el espejo del celular va a las pantallas de la misma persona.

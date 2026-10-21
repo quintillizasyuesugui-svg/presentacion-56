@@ -235,7 +235,8 @@
       crear('button', { type: 'button', class: 'mando', 'aria-label': 'Retroceder 10 segundos', onclick: () => mandar('musica', 'saltar', -10) }, ['⏪', crear('br'), '10']),
       mPlay,
       crear('button', { type: 'button', class: 'mando', 'aria-label': 'Adelantar 10 segundos', onclick: () => mandar('musica', 'saltar', 10) }, ['⏩', crear('br'), '10']),
-      crear('button', { type: 'button', class: 'mando', 'aria-label': 'Siguiente canción', text: '⏭', onclick: () => mandar('musica', 'siguiente') })
+      crear('button', { type: 'button', class: 'mando', 'aria-label': 'Siguiente canción', text: '⏭', onclick: () => mandar('musica', 'siguiente') }),
+      crear('button', { type: 'button', class: 'mando', 'aria-label': 'Terminar la música', text: '⏹', onclick: () => { mandar('musica', 'terminar'); cerrarHoja(); } })
     ]),
     mVolumen.fila,
     filaVolumenPC().fila,

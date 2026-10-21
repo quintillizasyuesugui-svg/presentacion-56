@@ -3,7 +3,7 @@
 // va la reproducción («mediosEstado»). Todo pasa por acá antes de reenviarse, así nadie
 // puede mandar cualquier cosa a la pantalla de otro ni textos gigantes.
 
-const ACCIONES_MUSICA = ['reproducir', 'pausar', 'alternar', 'siguiente', 'anterior', 'ir', 'saltar', 'volumen', 'elegir', 'bucle'];
+const ACCIONES_MUSICA = ['reproducir', 'pausar', 'alternar', 'siguiente', 'anterior', 'ir', 'saltar', 'volumen', 'elegir', 'bucle', 'terminar'];
 const ACCIONES_VIDEO = ['mandar', 'youtube', 'reproducir', 'pausar', 'alternar', 'ir', 'saltar', 'volumen', 'terminar'];
 // «pc»: el volumen de Windows (sólo cuando la pantalla es la app de PC).
 const ACCIONES_PC = ['volumen', 'subir', 'bajar', 'mudo'];

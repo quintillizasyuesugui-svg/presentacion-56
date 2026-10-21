@@ -1395,6 +1395,9 @@ body.dragging-active { user-select: none; }
   box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.6);
   z-index: 60;
   opacity: 0;
+  /* Es sólo un aviso: los toques pasan a los botones de abajo (si no, «⏹ Terminar» no andaba
+     mientras se veía). */
+  pointer-events: none;
   transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
 
@@ -2883,6 +2886,9 @@ body.eligiendo-imagenes { padding-bottom: 104px; }
 /* En la pantalla: el recuadro tapa la foto mientras se muestra la página. */
 .capa-pagina { position: absolute; inset: 0; z-index: 3; background: #fff; overflow: hidden; }
 .capa-pagina[hidden] { display: none; }
+/* «✂ Zona» en la pantalla: sólo se ve el cuadro dibujado; lo de afuera queda oscuro. */
+.zona-mascara { position: absolute; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%); box-shadow: 0 0 0 200vmax #000; pointer-events: none; }
+.zona-mascara[hidden] { display: none; }
 .capa-pagina iframe { display: block; width: 100%; height: 100%; border: 0; }
 /* Diapositiva con un enlace de YouTube: YouTube no se deja mostrar adentro. La pantalla muestra
    esta portada y el video se elige y se maneja desde el celular (lo pone el reproductor de videos). */
