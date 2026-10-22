@@ -1214,18 +1214,43 @@
   function ponerFiloHabla(si) {
     filoHabla = si;
     try { localStorage.setItem('filoHabla', filoHabla ? 'si' : 'no'); } catch { /* sin almacenamiento */ }
-    if (!filoHabla) { filoAudio.pause(); filoCallaHasta = 0; }
+    if (!filoHabla) { filoAudio.pause(); filoVez++; if (typeof filoTermino === 'function') filoTermino(0); }
     pintarFilo();
   }
   vozHablaBtn.addEventListener('click', () => ponerFiloHabla(!filoHabla));
   pintarFilo();
-  filoAudio.addEventListener('ended', () => { filoCallaHasta = Date.now() + 350; });
-  filoAudio.addEventListener('error', () => { filoCallaHasta = 0; });
+  // Antes se dejaba de oír órdenes 4 s fijos cada vez que Filo hablaba (sus frases duran 1 s):
+  // por eso a veces parecía que no escuchaba. Ahora sólo mientras suena de verdad.
+  // En la app del celular, además, el micrófono se pausa mientras ella habla y sigue al terminar.
+  let filoReanudar = null;
+  let filoVez = 0;
+  function filoTermino(margen) {
+    filoCallaHasta = margen ? Date.now() + margen : 0;
+    clearTimeout(filoReanudar);
+    filoReanudar = null;
+    if (vozDeLaApp && typeof vozDeLaApp.hablando === 'function') {
+      try { vozDeLaApp.hablando(false); } catch { /* app vieja */ }
+    }
+  }
+  filoAudio.addEventListener('playing', () => {
+    const dura = isFinite(filoAudio.duration) && filoAudio.duration > 0 ? filoAudio.duration * 1000 : 2500;
+    filoCallaHasta = Date.now() + Math.min(dura, 6000) + 300;
+  });
+  filoAudio.addEventListener('ended', () => filoTermino(300));
+  filoAudio.addEventListener('error', () => filoTermino(0));
   function filoDice(clave) {
     if (!filoHabla || !clave) return;
     filoAudio.src = 'voz-filo/' + clave + '.mp3';
-    filoCallaHasta = Date.now() + 4000;
-    filoAudio.play().catch(() => { filoCallaHasta = 0; });
+    if (vozDeLaApp && typeof vozDeLaApp.hablando === 'function') {
+      try { vozDeLaApp.hablando(true); } catch { /* app vieja */ }
+    }
+    filoCallaHasta = Date.now() + 2500;
+    // Por si el audio se traba sin avisar: el micrófono vuelve igual.
+    clearTimeout(filoReanudar);
+    filoReanudar = setTimeout(() => filoTermino(0), 7000);
+    // Si llega otra frase antes, la promesa vieja falla: eso no cuenta como fin.
+    const vez = ++filoVez;
+    filoAudio.play().catch(() => { if (vez === filoVez) filoTermino(0); });
   }
   // Qué frase dice Filo según lo que se pidió y lo que se hizo.
   function claveDeFilo(orden, hecho) {
@@ -1273,14 +1298,29 @@
     }
   }
 
+  let ordenDeFilo = null;   // la orden a la que Filo está contestando ahora
   function hacerOrdenDeVoz(alternativas) {
-    // Lo que se oye mientras habla Filo es su propia voz, no una orden.
-    if (Date.now() < filoCallaHasta) return;
+    if (Date.now() < filoCallaHasta) {
+      // Mientras Filo habla, el micrófono puede oírla a ella: eso no es una orden. Pero si la
+      // persona pide OTRA cosa, Filo se calla y se cumple enseguida (así no se traba con
+      // muchas órdenes seguidas). Lo que no se entiende o es lo mismo que contesta, se ignora.
+      if (hojaCerrarAbierta()) return;
+      const nueva = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+      const mismaQueFilo = nueva && ordenDeFilo && nueva.tipo === ordenDeFilo.tipo &&
+        nueva.accion === ordenDeFilo.accion && nueva.valor === ordenDeFilo.valor;
+      if (!nueva || mismaQueFilo) return;
+      filoAudio.pause();
+      filoVez++;
+      filoTermino(0);
+    }
     ordenParaFilo = null;
     hechoParaFilo = null;
     const antes = voiceHeard.textContent;
     cumplirOrdenDeVoz(alternativas);
-    if (voiceHeard.textContent !== antes || hechoParaFilo !== null) filoDice(claveDeFilo(ordenParaFilo, hechoParaFilo));
+    if (voiceHeard.textContent !== antes || hechoParaFilo !== null) {
+      ordenDeFilo = ordenParaFilo;
+      filoDice(claveDeFilo(ordenParaFilo, hechoParaFilo));
+    }
   }
 
   function cumplirOrdenDeVoz(alternativas) {
@@ -1463,6 +1503,7 @@
       recognition.onresult = (event) => {
         // Solo procesar los resultados nuevos desde resultIndex — leer siempre
         // results[0] hacía que, en modo continuo, sólo se escuchara la primera frase de la sesión.
+          vigilarVoz();
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (!result.isFinal) continue;
@@ -1471,29 +1512,55 @@
       };
       recognition.onerror = (event) => {
         console.error('Voice error:', event.error);
+        ultimoErrorVoz = event.error;
         // Sin permiso de micrófono no tiene sentido seguir reintentando
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           voiceActive = false;
           setVoiceUI(false);
         }
       };
+      ['onstart', 'onaudiostart', 'onsoundstart', 'onspeechstart', 'onspeechend'].forEach(evento => {
+        recognition[evento] = vigilarVoz;
+      });
       // El navegador corta el reconocimiento solo (a veces tras una sola orden,
       // sobre todo en celular) aunque continuous=true — por eso lo reiniciamos
       // acá cada vez que termina, mientras el usuario no lo haya apagado.
       recognition.onend = () => {
+        clearTimeout(vozTrabada);
         if (!voiceActive) return;
-        try {
-          recognition.start();
-        } catch (e) {
-          // A veces onend llega justo después de un start() y tira "already started"
-          setTimeout(() => {
-            if (voiceActive) {
-              try { recognition.start(); } catch (e2) { /* se reintentará en el próximo onend */ }
-            }
-          }, 250);
-        }
+        const demora = ultimoErrorVoz === 'network' ? 1000 : 0;
+        ultimoErrorVoz = null;
+        volverAEscuchar(demora);
       };
     }
+  }
+
+  // Vuelve a poner el micrófono a escuchar; si el navegador no lo deja todavía («already
+  // started»), prueba de nuevo hasta que ande. Antes probaba una sola vez y, si fallaba, la voz
+  // quedaba muda hasta apagarla y prenderla.
+  let ultimoErrorVoz = null;
+  let vozReintento = null;
+  let vozTrabada = null;
+  function volverAEscuchar(demora) {
+    clearTimeout(vozReintento);
+    vozReintento = setTimeout(() => {
+      if (!voiceActive || !recognition) return;
+      try {
+        recognition.start();
+        vigilarVoz();
+      } catch (e) {
+        volverAEscuchar(300);
+      }
+    }, demora || 0);
+  }
+  // Si el reconocedor se queda colgado sin avisar nada por 15 s, se corta y arranca de nuevo.
+  function vigilarVoz() {
+    clearTimeout(vozTrabada);
+    vozTrabada = setTimeout(() => {
+      if (!voiceActive || !recognition) return;
+      try { recognition.abort(); } catch { /* ya estaba parado */ }
+      volverAEscuchar(400);
+    }, 15000);
   }
 
   // En la app Conexiones Control escucha el reconocedor de voz del propio celular (el navegador
@@ -1529,11 +1596,13 @@
     }
     if (voiceActive) {
       voiceActive = false;
+      clearTimeout(vozReintento);
+      clearTimeout(vozTrabada);
       recognition.stop();
       setVoiceUI(false);
     } else {
       voiceActive = true;
-      recognition.start();
+      volverAEscuchar(0);
       setVoiceUI(true);
     }
   }

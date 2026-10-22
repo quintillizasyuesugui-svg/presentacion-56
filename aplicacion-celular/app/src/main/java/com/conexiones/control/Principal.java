@@ -49,6 +49,30 @@ public class Principal extends Activity {
     private boolean vozSilencio = false;
     private String vozIdioma = "es-ES";
     private final ArrayList<String> vozFrases = new ArrayList<>();
+    // Mientras Filo contesta, el micrófono descansa (si no, se oye a sí misma y el celular la
+    // tiene muda). Al terminar sigue escuchando solo.
+    private boolean vozPausada = false;
+    // Tras un error raro del reconocedor se lo tira y se arma uno nuevo: reusarlo lo dejaba
+    // trabado y la voz dejaba de escuchar.
+    private boolean vozRecrear = false;
+    private final Runnable vozSeguir = this::escuchar;
+    // Android 13 o más: el micrófono se abre una sola vez y queda escuchando hasta apagarlo
+    // (sin volver a arrancar ni hacer «bip» después de cada frase). Si el celular no lo
+    // permite, se vuelve a la forma de antes: una frase por vez.
+    private boolean vozSinSeguida = false;
+    private boolean vozEnSeguida = false;
+    private int vozFallosSeguida = 0;
+    // Mientras escucha, el reconocedor avisa el nivel del sonido varias veces por segundo. Si
+    // pasan 10 s sin ningún aviso quedó colgado: se tira y se arma uno nuevo.
+    private long vozVivaEn = 0;
+    private final Runnable vozTrabada = new Runnable() {
+        @Override public void run() {
+            if (!vozActiva || vozPausada) return;
+            if (System.currentTimeMillis() - vozVivaEn < 10000) { web.postDelayed(this, 4000); return; }
+            vozRecrear = true;
+            escuchar();
+        }
+    };
 
     private WebView web;
     private FrameLayout raiz;
@@ -322,13 +346,46 @@ public class Principal extends Activity {
         public void detener() {
             runOnUiThread(Principal.this::dejarDeEscuchar);
         }
+
+        @JavascriptInterface
+        public void hablando(boolean si) {
+            if (!paginaPropia) return;
+            runOnUiThread(() -> {
+                // Con la escucha seguida el micrófono no se corta: la página ya no toma como
+                // orden lo que se oye mientras Filo habla.
+                if (vozEnSeguida && vozActiva && !vozPausada) return;
+                vozPausada = si;
+                if (si) {
+                    web.removeCallbacks(vozSeguir);
+                    web.removeCallbacks(vozTrabada);
+                    if (reconocedor != null) reconocedor.cancel();
+                    silenciarAvisos(false);
+                } else {
+                    escucharEn(100);
+                }
+            });
+        }
     }
 
     // El reconocedor de Android escucha una frase y se detiene: mientras la voz esté prendida se
     // lo vuelve a poner a escuchar después de cada frase, de cada silencio y de cada error.
+    private void escucharEn(long espera) {
+        // Una sola vuelta a escuchar pendiente: antes se juntaban varias, chocaban («ocupado»)
+        // y la voz quedaba esperando o sorda.
+        web.removeCallbacks(vozSeguir);
+        web.postDelayed(vozSeguir, espera);
+    }
+
     private void escuchar() {
-        if (!vozActiva) return;
+        web.removeCallbacks(vozSeguir);
+        web.removeCallbacks(vozTrabada);
+        if (!vozActiva || vozPausada) return;
         if (!SpeechRecognizer.isRecognitionAvailable(this)) { avisarVoz("no-disponible"); return; }
+        if (vozRecrear && reconocedor != null) {
+            try { reconocedor.destroy(); } catch (Exception ignorado) { }
+            reconocedor = null;
+        }
+        vozRecrear = false;
         if (reconocedor == null) {
             reconocedor = SpeechRecognizer.createSpeechRecognizer(this);
             reconocedor.setRecognitionListener(new Oyente());
@@ -343,15 +400,26 @@ public class Principal extends Activity {
         if (Build.VERSION.SDK_INT >= 33 && !vozFrases.isEmpty()) {
             pedido.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, vozFrases);
         }
+        vozEnSeguida = Build.VERSION.SDK_INT >= 33 && !vozSinSeguida;
+        if (vozEnSeguida) {
+            pedido.putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS);
+            pedido.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 60L * 60 * 1000);
+        }
         try {
             reconocedor.startListening(pedido);
+            vozVivaEn = System.currentTimeMillis();
+            web.postDelayed(vozTrabada, 4000);
         } catch (Exception e) {
-            web.postDelayed(this::escuchar, 1000);
+            vozRecrear = true;
+            escucharEn(500);
         }
     }
 
     private void dejarDeEscuchar() {
         vozActiva = false;
+        vozPausada = false;
+        web.removeCallbacks(vozSeguir);
+        web.removeCallbacks(vozTrabada);
         if (reconocedor != null) reconocedor.cancel();
         silenciarAvisos(false);
     }
@@ -368,6 +436,7 @@ public class Principal extends Activity {
             int accion = silenciar ? AudioManager.ADJUST_MUTE : AudioManager.ADJUST_UNMUTE;
             audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, accion, 0);
             audio.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, accion, 0);
+            audio.adjustStreamVolume(AudioManager.STREAM_SYSTEM, accion, 0);
         } catch (Exception ignorado) { }
     }
 
@@ -379,26 +448,57 @@ public class Principal extends Activity {
     private class Oyente implements RecognitionListener {
         @Override
         public void onResults(Bundle resultados) {
+            web.removeCallbacks(vozTrabada);
+            avisarOido(resultados);
+            escucharEn(100);
+        }
+
+        // Escucha seguida: cada frase llega acá y el micrófono sigue abierto.
+        @Override
+        public void onSegmentResults(Bundle resultados) {
+            vozVivaEn = System.currentTimeMillis();
+            vozFallosSeguida = 0;
+            avisarOido(resultados);
+        }
+
+        @Override
+        public void onEndOfSegmentedSession() {
+            web.removeCallbacks(vozTrabada);
+            if (!vozPausada) escucharEn(100);
+        }
+
+        private void avisarOido(Bundle resultados) {
             ArrayList<String> oido = resultados.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
             if (vozActiva && paginaPropia && oido != null && !oido.isEmpty()) {
                 web.evaluateJavascript("window.vozNativa&&window.vozNativa.resultado(" + new JSONArray(oido) + ")", null);
             }
-            web.postDelayed(Principal.this::escuchar, 150);
         }
 
         @Override
         public void onError(int error) {
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { avisarVoz("sin-permiso"); return; }
-            // No se oyó nada o no se entendió: se sigue escuchando enseguida. Si el reconocedor
-            // está ocupado o falló la conexión, se espera un poco más antes de volver a probar.
+            // No se oyó nada o no se entendió: se sigue escuchando enseguida. Cualquier otro
+            // error (ocupado, conexión, fallo interno) arma un reconocedor nuevo y vuelve a probar.
+            web.removeCallbacks(vozTrabada);
+            if (vozPausada) return;
+            // La escucha seguida falló dos veces sin oír nada: este celular no la permite.
+            if (vozEnSeguida && error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                    && ++vozFallosSeguida >= 2) vozSinSeguida = true;
             boolean enseguida = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
-            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && reconocedor != null) reconocedor.cancel();
-            web.postDelayed(Principal.this::escuchar, enseguida ? 150 : 1500);
+            if (enseguida) { escucharEn(100); return; }
+            boolean red = error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT;
+            vozRecrear = true;
+            escucharEn(red ? 1000 : 300);
         }
 
-        @Override public void onReadyForSpeech(Bundle parametros) { }
-        @Override public void onBeginningOfSpeech() { }
-        @Override public void onRmsChanged(float nivel) { }
+        @Override public void onReadyForSpeech(Bundle parametros) {
+            vozVivaEn = System.currentTimeMillis();
+            // El «bip» suena sólo al abrir el micrófono: pasado eso vuelve el sonido del celular
+            // (para oír a Filo) y el micrófono sigue abierto.
+            if (vozEnSeguida) web.postDelayed(() -> { if (vozActiva && vozEnSeguida) silenciarAvisos(false); }, 800);
+        }
+        @Override public void onBeginningOfSpeech() { vozVivaEn = System.currentTimeMillis(); }
+        @Override public void onRmsChanged(float nivel) { vozVivaEn = System.currentTimeMillis(); }
         @Override public void onBufferReceived(byte[] datos) { }
         @Override public void onEndOfSpeech() { }
         @Override public void onPartialResults(Bundle parciales) { }
@@ -466,6 +566,8 @@ public class Principal extends Activity {
     protected void onPause() {
         super.onPause();
         web.onPause();
+        web.removeCallbacks(vozSeguir);
+        web.removeCallbacks(vozTrabada);
         if (reconocedor != null) reconocedor.cancel();
         silenciarAvisos(false);
     }
@@ -474,6 +576,7 @@ public class Principal extends Activity {
     protected void onResume() {
         super.onResume();
         web.onResume();
+        vozPausada = false;
         if (vozActiva) escuchar();
     }
 

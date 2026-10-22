@@ -4,7 +4,7 @@
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.4.1.exe) — instalador, 105 MB
-- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 32 KB (siempre la última versión)
+- 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 33 KB (siempre la última versión)
 
 ## 🎬 Demo
 Controla diapositivas en tiempo real:
@@ -215,6 +215,11 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
   - **Órdenes por voz (desde la 1.0.7):** en la app escucha el reconocedor de voz del propio
     celular (`Voz.empezar` / `Voz.detener`; lo oído llega a la página por
     `window.vozNativa.resultado`). Pide permiso de micrófono recién al tocar «🎤 Voz».
+    Desde la 1.0.8, en Android 13 o más el micrófono se abre una sola vez y queda escuchando
+    hasta apagarlo (escucha seguida, sin «bip» por frase); en celulares más viejos vuelve a
+    escuchar tras cada frase. Si el reconocedor falla o se cuelga, se arma uno nuevo solo.
+    Mientras Filo contesta, la página no toma su voz como orden, pero sí otra orden distinta
+    (Filo se calla). `Voz.hablando(true|false)` pausa el micrófono en los celulares viejos.
   - **Cuidados (1.0.6):** el PIN guardado no entra en las copias de seguridad del celular, y lo que
     la app le presta a la página (leer el PIN guardado, bajar e instalar la versión nueva) sólo
     contesta mientras se está viendo una página de Conexiones.
