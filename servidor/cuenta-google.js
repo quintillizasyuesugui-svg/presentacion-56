@@ -121,16 +121,29 @@ const TOPE_DIA = 90;        // Gmail gratis manda unos 100 por día con el scrip
 function huellaCodigo(codigo) {
   return crypto.createHash('sha256').update('conexiones-codigo:' + codigo).digest('hex');
 }
+// Devuelve 0 si se puede (y lo anota) o cuántos segundos hay que esperar.
 function pasaTope(mapa, clave, tope) {
   const ahora = Date.now();
   const lista = (mapa.get(clave) || []).filter(t => ahora - t < CODIGO_VIVE_MS);
-  if (lista.length >= tope) { mapa.set(clave, lista); return false; }
+  if (lista.length >= tope) { mapa.set(clave, lista); return Math.ceil((lista[0] + CODIGO_VIVE_MS - ahora) / 1000); }
   lista.push(ahora);
   mapa.set(clave, lista);
-  return true;
+  return 0;
+}
+// Después de equivocarse el código varias veces, ese correo queda bloqueado un rato (con reloj).
+const BLOQUEO_MS = 5 * 60 * 1000;
+const bloqueos = new Map(); // correo → hasta cuándo
+function esperaBloqueo(correo) {
+  const hasta = bloqueos.get(correo) || 0;
+  return hasta > Date.now() ? Math.ceil((hasta - Date.now()) / 1000) : 0;
+}
+function contestarEspera(res, segundos, mensaje) {
+  res.set('Retry-After', String(segundos));
+  return res.status(429).json({ error: mensaje, esperaSegundos: segundos });
 }
 setInterval(() => {
   const ahora = Date.now();
+  for (const [c, hasta] of bloqueos) if (hasta < ahora) bloqueos.delete(c);
   for (const [c, v] of codigos) if (v.vence < ahora) codigos.delete(c);
   for (const mapa of [pedidosPorIp, pedidosPorCorreo]) {
     for (const [k, lista] of mapa) if (!lista.some(t => ahora - t < CODIGO_VIVE_MS)) mapa.delete(k);
@@ -179,18 +192,25 @@ function registrarRutasCuentaGoogle(app) {
     }
   });
 
-  // POST /api/recuperar/pedir { correo } — manda el código, si el correo está unido a una cuenta.
-  // Contesta lo mismo exista o no, así nadie averigua qué correos tienen cuenta.
-  const AVISO = 'Si ese correo está unido a una cuenta de Conexiones, en un minuto te llega un código. Mirá también en «Spam».';
+  // POST /api/recuperar/pedir { correo } — manda el código si el correo está unido a una cuenta.
+  // Si no lo está, lo dice claro (el usuario lo pidió así: si no, se quedaba esperando un correo
+  // que nunca llegaba).
+  const AVISO = 'Listo: te mandamos un código a tu correo. Llega en un minuto; mirá también en «Spam».';
   app.post('/api/recuperar/pedir', async (req, res) => {
     try {
       const correo = correoLimpio((req.body || {}).correo);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) return res.status(400).json({ error: 'Escribí tu correo completo (ejemplo: nombre@gmail.com).' });
       if (!correoActivo()) return res.status(503).json({ error: 'Todavía no está activado el envío de correos. Pedile al admin que te dé un PIN nuevo.' });
-      if (!pasaTope(pedidosPorIp, ipDelPedido(req), TOPE_IP)) return res.status(429).json({ error: 'Pediste muchos códigos. Esperá unos minutos y probá de nuevo.' });
+      const bloqueo = esperaBloqueo(correo);
+      if (bloqueo) return contestarEspera(res, bloqueo, 'Muchos intentos con ese correo.');
+      const esperaIp = pasaTope(pedidosPorIp, ipDelPedido(req), TOPE_IP);
+      if (esperaIp) return contestarEspera(res, esperaIp, 'Pediste muchos códigos.');
       const unida = almacenGoogle.actual().find(r => r.correo === correo);
-      if (!unida || !nombresDePersonas().includes(unida.owner)) return res.json({ aviso: AVISO });
-      if (!pasaTope(pedidosPorCorreo, correo, TOPE_CORREO)) return res.status(429).json({ error: 'Ya te mandamos varios códigos. Usá el último que llegó o esperá unos minutos.' });
+      if (!unida || !nombresDePersonas().includes(unida.owner)) {
+        return res.status(404).json({ error: 'Ese correo no está unido a ninguna cuenta de Conexiones. Revisá que esté bien escrito. Si nunca uniste tu Google, pedile al admin un PIN nuevo.' });
+      }
+      const esperaCorreo = pasaTope(pedidosPorCorreo, correo, TOPE_CORREO);
+      if (esperaCorreo) return contestarEspera(res, esperaCorreo, 'Ya te mandamos varios códigos. Usá el último que llegó.');
       const hoy = new Date().toISOString().slice(0, 10);
       if (enviadosHoy.dia !== hoy) enviadosHoy = { dia: hoy, cuantos: 0 };
       if (enviadosHoy.cuantos >= TOPE_DIA) return res.status(429).json({ error: 'Hoy ya se mandaron muchos correos. Probá mañana o pedile al admin un PIN nuevo.' });
@@ -210,6 +230,8 @@ function registrarRutasCuentaGoogle(app) {
     try {
       const correo = correoLimpio((req.body || {}).correo);
       const codigo = String((req.body || {}).codigo || '').replace(/\D/g, '');
+      const bloqueo = esperaBloqueo(correo);
+      if (bloqueo) return contestarEspera(res, bloqueo, 'Muchos intentos con ese correo.');
       const guardado = codigos.get(correo);
       if (!guardado || guardado.vence < Date.now()) {
         codigos.delete(correo);
@@ -221,7 +243,8 @@ function registrarRutasCuentaGoogle(app) {
         guardado.intentos++;
         if (guardado.intentos >= INTENTOS_POR_CODIGO) {
           codigos.delete(correo);
-          return res.status(400).json({ error: 'Muchos intentos. Pedí un código nuevo.' });
+          bloqueos.set(correo, Date.now() + BLOQUEO_MS);
+          return contestarEspera(res, Math.ceil(BLOQUEO_MS / 1000), 'Muchos intentos con ese correo.');
         }
         const quedan = INTENTOS_POR_CODIGO - guardado.intentos;
         return res.status(400).json({ error: `Ese código no es. Fijate en el correo (te quedan ${quedan} intento${quedan === 1 ? '' : 's'}).` });

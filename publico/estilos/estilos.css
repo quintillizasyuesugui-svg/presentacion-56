@@ -3170,3 +3170,17 @@ body[data-reproductor="control"] .utility-row .btn.icon-only { width: 38px; }
 .auth-google.auth-google-nota { flex-direction: column; align-items: stretch; gap: 6px; }
 .auth-google-nota .auth-abrir-chrome { display: flex; justify-content: center; text-decoration: none; }
 .auth-google-nota small { color: var(--text-muted); font-size: 0.76rem; line-height: 1.4; text-align: center; }
+/* Botones del «¿Te olvidaste el PIN?» y del aviso de Google con aire entre ellos. */
+.auth-gate #authRecuperar .btn-row { margin-bottom: 12px; }
+.auth-gate #authRecuperar .auth-back { margin-top: 6px; padding: 6px 0; }
+.auth-gate #authRecuperar .auth-back + .auth-back { margin-top: 2px; }
+.auth-gate #authListo .auth-protege { margin-bottom: 16px; }
+.auth-protege .auth-google { margin: 8px 0 4px; }
+.auth-protege .auth-back { margin-top: 6px; padding: 6px 0; }
+.auth-pregunta .auth-google { margin: 14px 0 6px; }
+.mi-cuenta .action-text { gap: 6px; }
+.mi-cuenta .auth-google { margin-top: 8px; }
+.auth-gate .auth-bloqueo {
+  margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--amber-400); border-radius: 12px;
+  background: rgba(251, 191, 36, 0.1); color: #fde68a; font-size: 0.85rem; font-weight: 700; line-height: 1.4; text-align: center;
+}

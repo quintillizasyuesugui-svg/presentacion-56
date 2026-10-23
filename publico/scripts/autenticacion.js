@@ -126,6 +126,7 @@
     if (!res.ok) {
       const error = new Error(data.error || 'No se pudo entrar. Probá de nuevo.');
       error.estado = res.status; // 401 = PIN incorrecto; 429 = el servidor bloqueó por muchos intentos
+      error.esperaSegundos = Number(data.esperaSegundos) || 0;
       throw error;
     }
     return data;
@@ -333,6 +334,7 @@
 
         <!-- «Me olvidé el PIN»: correo unido a Google → código de 6 números → PIN nuevo. -->
         <div id="authRecuperar" hidden>
+          <p class="auth-bloqueo" id="authBloqueo" hidden></p>
           <div id="authRecuperarCorreo">
             <input type="email" id="authCorreo" placeholder="tu.correo@gmail.com" autocomplete="email" maxlength="200">
             <div class="btn-row"><button type="button" class="btn primary" id="authMandarCodigo" style="flex:1">Mandar código</button></div>
@@ -676,8 +678,37 @@
         recuperarBox.hidden = false;
         verParte('correo');
         errorEl.textContent = 'Escribí el correo de Google que uniste a tu cuenta. Te mandamos un código.';
-        correoInput.focus();
+        if (!aplicarBloqueo()) correoInput.focus();
       });
+
+      // Bloqueo con cronómetro después de muchos intentos. Queda guardado en el celular, así sigue
+      // aunque se recargue la página (el servidor igual lo hace cumplir).
+      const BLOQUEO_KEY = 'conexionesRecuperarBloqueo';
+      const bloqueoEl = gate.querySelector('#authBloqueo');
+      let relojBloqueo = null;
+      function leerBloqueo() {
+        try { return JSON.parse(localStorage.getItem(BLOQUEO_KEY)) || null; } catch { return null; }
+      }
+      function bloquear(segundos, mensaje) {
+        try { localStorage.setItem(BLOQUEO_KEY, JSON.stringify({ hasta: Date.now() + segundos * 1000, mensaje })); } catch { /* sin almacenamiento */ }
+        aplicarBloqueo();
+      }
+      function aplicarBloqueo() {
+        const b = leerBloqueo();
+        const quedan = b ? Math.ceil((b.hasta - Date.now()) / 1000) : 0;
+        const bloqueado = quedan > 0;
+        [correoInput, mandarBtn, confirmarBtn, reenviarBtn, ...cifras].forEach(el => { el.disabled = bloqueado || (el === reenviarBtn && Date.now() < reenviarEn); });
+        bloqueoEl.hidden = !bloqueado;
+        if (bloqueado) {
+          bloqueoEl.textContent = `⏳ ${b.mensaje} Esperá ${Math.floor(quedan / 60)}:${String(quedan % 60).padStart(2, '0')} para volver a probar.`;
+          if (!relojBloqueo) relojBloqueo = setInterval(aplicarBloqueo, 1000);
+        } else {
+          if (b) { try { localStorage.removeItem(BLOQUEO_KEY); } catch { /* sin almacenamiento */ } }
+          clearInterval(relojBloqueo);
+          relojBloqueo = null;
+        }
+        return bloqueado;
+      }
       gate.querySelector('#authBackFromRecuperar').addEventListener('click', () => {
         recuperarBox.hidden = true;
         if (allowRegister) showChoice(); else { authOldBox.hidden = false; errorEl.textContent = 'Es el PIN que te dieron al registrarte desde tu celular.'; }
@@ -696,11 +727,12 @@
           empezarRelojes();
           cifras[0].focus();
         } catch (err) {
-          errorEl.textContent = err.message;
+          errorEl.textContent = err.estado === 429 ? '' : err.message;
           if (!parteCodigo.hidden) pintarRelojes();
+          if (err.estado === 429 && err.esperaSegundos) bloquear(err.esperaSegundos, err.message);
         } finally {
-          mandarBtn.disabled = false;
           mandarBtn.textContent = 'Mandar código';
+          if (!aplicarBloqueo()) mandarBtn.disabled = false;
         }
       }
       mandarBtn.addEventListener('click', mandarCodigo);
@@ -731,7 +763,7 @@
           venceEl.textContent = '⌛ El código venció. Tocá «Reenviar código».';
           venceEl.classList.add('vencido');
         }
-        reenviarBtn.disabled = esperar > 0;
+        reenviarBtn.disabled = esperar > 0 || !bloqueoEl.hidden;
         reenviarBtn.textContent = esperar > 0 ? `📩 Reenviar en ${esperar} s` : '📩 Reenviar código';
       }
       function empezarRelojes() {
@@ -784,12 +816,19 @@
             'Anotalo: el viejo ya no sirve. Tus fotos, música y videos siguen igual.');
           verParte('listo');
         } catch (err) {
-          errorEl.textContent = err.message;
-          if (/venció|Muchos intentos/.test(err.message)) verParte('correo');
-          else { cifras.forEach(c => { c.value = ''; }); cifras[0].focus(); }
+          cifras.forEach(c => { c.value = ''; });
+          if (err.estado === 429 && err.esperaSegundos) {
+            errorEl.textContent = '';
+            detenerRelojes();
+            verParte('correo');
+            bloquear(err.esperaSegundos, err.message);
+          } else {
+            errorEl.textContent = err.message;
+            if (/venció/.test(err.message)) verParte('correo'); else cifras[0].focus();
+          }
         } finally {
           confirmando = false;
-          confirmarBtn.disabled = false;
+          if (!aplicarBloqueo()) confirmarBtn.disabled = false;
         }
       }
       confirmarBtn.addEventListener('click', confirmarCodigo);
