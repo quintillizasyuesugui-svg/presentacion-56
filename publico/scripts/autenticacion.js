@@ -327,7 +327,7 @@
               <button type="submit" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
             </div>
           </form>
-          <button type="button" class="auth-back auth-olvide" id="authOlvide">¿Te olvidaste el PIN?</button>
+          ${allowRegister ? '<button type="button" class="auth-back auth-olvide" id="authOlvide">¿Te olvidaste el PIN?</button>' : ''}
           ${allowRegister ? '<button type="button" class="auth-back" id="authBackFromOld">← Volver</button>' : ''}
           ${cancelable ? '<button type="button" class="auth-back" id="authCancel">✕ Cancelar</button>' : ''}
         </div>
@@ -672,7 +672,7 @@
         parteListo.hidden = cual !== 'listo';
         gate.querySelector('#authBackFromRecuperar').hidden = cual === 'listo';
       }
-      gate.querySelector('#authOlvide').addEventListener('click', () => {
+      gate.querySelector('#authOlvide')?.addEventListener('click', () => {
         if (choiceBox) choiceBox.hidden = true;
         authOldBox.hidden = true;
         recuperarBox.hidden = false;
