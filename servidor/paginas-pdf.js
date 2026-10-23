@@ -42,10 +42,12 @@ function popplerDisponible() {
 // Devuelve { numPages, destroy() }; destroy() borra lo temporal. Siempre llamarlo al terminar.
 async function abrirPdf(bytes) {
   const lib = await cargarPdfjs();
+  const tarea = lib.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false });
   let pdf;
   try {
-    pdf = await lib.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false }).promise;
+    pdf = await tarea.promise;
   } catch (err) {
+    await tarea.destroy().catch(() => {});
     const conClave = err && err.name === 'PasswordException';
     const error = new Error(conClave ? 'El PDF tiene contraseña. Quitásela y volvé a subirlo.' : 'El archivo no es un PDF válido o está dañado.');
     error.estado = 422;
@@ -58,7 +60,8 @@ async function abrirPdf(bytes) {
     await fs.writeFile(documento.ruta, bytes);
   }
   documento.destroy = async () => {
-    await pdf.destroy().catch(() => {});
+    // PDF.js 6 ya no tiene pdf.destroy(): se cierra con la tarea que lo abrió.
+    await tarea.destroy().catch(() => {});
     if (documento.carpeta) await fs.rm(documento.carpeta, { recursive: true, force: true }).catch(() => {});
   };
   return documento;
