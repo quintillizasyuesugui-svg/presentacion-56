@@ -3160,3 +3160,13 @@ body[data-reproductor="control"] .utility-row .btn.icon-only { width: 38px; }
 .mi-cuenta .action-desc { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: unset; }
 .auth-gate .auth-nota-codigo { margin: -4px 0 12px; color: var(--text-muted); font-size: 0.76rem; line-height: 1.4; text-align: left; }
 .auth-gate .auth-nota-codigo b { color: var(--text); font-size: 0.7rem; letter-spacing: 0.04em; }
+.auth-pregunta .modal-card { position: relative; }
+.auth-pregunta .aviso-cerrar {
+  position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--gray-700); background: var(--gray-850); color: var(--text-muted); font-size: 1rem; cursor: pointer;
+}
+.auth-pregunta .aviso-cerrar:hover { color: var(--text); border-color: var(--primary-400); }
+.auth-pregunta h2 { padding-right: 40px; }
+.auth-google.auth-google-nota { flex-direction: column; align-items: stretch; gap: 6px; }
+.auth-google-nota .auth-abrir-chrome { display: flex; justify-content: center; text-decoration: none; }
+.auth-google-nota small { color: var(--text-muted); font-size: 0.76rem; line-height: 1.4; text-align: center; }

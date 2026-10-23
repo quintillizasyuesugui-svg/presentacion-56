@@ -159,8 +159,19 @@
   // Dibuja «Continuar con Google» en «caja». alUnir(correo) cuando queda unida; alError(texto) si falla.
   async function botonGoogle(caja, pin, alUnir, alError) {
     if (enApp || enAppDePc) {
-      caja.textContent = 'Para unir tu Google, abrí Conexiones en Chrome (Modo avanzado → Mi cuenta).';
+      // La app abre en el navegador los enlaces que no son https de Conexiones: con «http» va a
+      // Chrome (Render lo pasa solo a https) y ahí, al entrar con el PIN, sale este mismo aviso.
+      caja.textContent = '';
       caja.classList.add('auth-google-nota');
+      const enlace = Object.assign(document.createElement('a'), {
+        className: 'btn auth-abrir-chrome',
+        href: 'http://' + location.host + '/control.html',
+        target: '_blank',
+        rel: 'noopener',
+        textContent: '🌐 Unir en Chrome'
+      });
+      const nota = Object.assign(document.createElement('small'), { textContent: 'Google no deja hacerlo dentro de la app: se abre Chrome, entrás con tu PIN y tocás «Continuar con Google».' });
+      caja.append(enlace, nota);
       return;
     }
     try {
@@ -205,14 +216,19 @@
   function avisoCerrado() { try { return sessionStorage.getItem(AVISO_GOOGLE_KEY) === '1'; } catch { return false; } }
   function cerrarAvisoPorAhora() { try { sessionStorage.setItem(AVISO_GOOGLE_KEY, '1'); } catch { /* sin almacenamiento */ } }
   async function ofrecerUnirGoogle(auth) {
-    if (!auth || auth.isAdmin || enApp || enAppDePc || avisoCerrado()) return;
+    if (!auth || auth.isAdmin || avisoCerrado()) return;
     let cuenta;
     try { cuenta = await leerCuenta(auth.pin); } catch { return; }
     if (cuenta.correo || !cuenta.puedeUnir) return;
+    // Si hay otra ventana abierta (guardar el PIN, versión nueva de la app…), espera a que se cierre.
+    const otraAbierta = () => Boolean(document.querySelector('.modal-overlay.show, .modal-overlay:not([hidden]).auth-pregunta, .hoja-actualizacion-capa'));
+    for (let i = 0; i < 600 && otraAbierta(); i++) await new Promise(r => setTimeout(r, 500));
+    if (otraAbierta() || avisoCerrado()) return;
     const capa = document.createElement('div');
     capa.className = 'modal-overlay auth-pregunta';
     capa.innerHTML = `
       <div class="modal-card">
+        <button type="button" class="aviso-cerrar" id="avisoCerrar" aria-label="Cerrar">✕</button>
         <h2>🛡️ ¿Y si olvidás el PIN?</h2>
         <p>Uní tu cuenta de Google: si un día olvidás el PIN, te mandamos un código a tu correo y entrás con uno nuevo. Tus fotos y música no cambian.</p>
         <div class="auth-google" id="avisoGoogle"></div>
@@ -223,10 +239,9 @@
     requestAnimationFrame(() => capa.classList.add('show'));
     const cerrar = () => { capa.classList.remove('show'); setTimeout(() => capa.remove(), 200); };
     const errorAviso = capa.querySelector('#avisoGoogleError');
-    capa.querySelector('#avisoAhoraNo').addEventListener('click', () => {
-      cerrarAvisoPorAhora();
-      cerrar();
-    });
+    const porAhora = () => { cerrarAvisoPorAhora(); cerrar(); };
+    capa.querySelector('#avisoAhoraNo').addEventListener('click', porAhora);
+    capa.querySelector('#avisoCerrar').addEventListener('click', porAhora);
     botonGoogle(capa.querySelector('#avisoGoogle'), auth.pin, (correo) => {
       const caja = capa.querySelector('#avisoGoogle');
       caja.replaceWith(textoUnida(correo));
@@ -621,7 +636,7 @@
         listoBox.hidden = false;
         const protege = gate.querySelector('#authProtege');
         const errorGoogle = gate.querySelector('#authGoogleError');
-        if (!enApp && !enAppDePc) {
+        {
           protege.hidden = false;
           botonGoogle(gate.querySelector('#authGoogle'), auth.pin, (correo) => {
             protege.replaceWith(textoUnida(correo));
