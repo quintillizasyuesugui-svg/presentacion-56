@@ -3105,3 +3105,15 @@ body[data-reproductor="control"] .utility-row .btn.icon-only { width: 38px; }
   display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px;
   background: #0b1016 center / cover no-repeat; font-size: 1.6rem;
 }
+
+/* Control: «🔗 Copiar link» de la pantalla (paso 2 y franja «Falta la pantalla»). */
+.copiar-link {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 3px 10px;
+  border: 1px solid var(--primary-400); border-radius: var(--radius-pill);
+  background: rgba(52, 205, 250, 0.12); color: var(--primary-200, #a5e8fd);
+  font: inherit; font-size: 0.78rem; font-weight: 700; white-space: nowrap; cursor: pointer; vertical-align: middle;
+}
+.copiar-link:active { transform: scale(0.96); }
+.copiar-link[hidden] { display: none; }
+.estado-pantalla .copiar-link { margin-left: auto; flex: none; }
+#instalarApp[hidden] { display: none; }

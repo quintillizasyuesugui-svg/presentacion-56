@@ -105,6 +105,7 @@
     franja.classList.toggle('lista', hayPantalla && !esperando);
     document.getElementById('estadoPantallaTitulo').textContent = esperando ? 'Esperando la pantalla.' : hayPantalla ? 'Pantalla lista.' : 'Falta la pantalla.';
     document.getElementById('estadoPantallaTexto').textContent = esperando ? (hayPantalla ? 'Ya sigue sola.' : 'Abrila: sigue sola.') : hayPantalla ? 'Tocá «Mostrar».' : 'Abrila en la PC.';
+    document.getElementById('copiarLinkFranja').hidden = hayPantalla;
     document.getElementById('mostrarNumero').hidden = !encendido;
     document.getElementById('mostrarAvance').hidden = !encendido;
     document.getElementById('mostrarNombre').textContent = encendido ? 'En pantalla' : esperando ? 'Esperando' : sinPantalla ? 'Sin pantalla' : 'Mostrar';
@@ -297,6 +298,34 @@
   let pasosOcultos = false;
   try { pasosOcultos = localStorage.getItem(CLAVE_PASOS) === '1'; } catch { /* sin almacenamiento */ }
   document.getElementById('direccionPantalla').textContent = location.host + '/pantalla.html';
+
+  // «🔗 Copiar link»: copia la dirección de la pantalla y, si el celular puede, abre «Compartir»
+  // para mandarla por WhatsApp o correo y abrirla en la PC sin escribirla.
+  function copiarAMano(texto) {
+    const caja = document.createElement('textarea');
+    caja.value = texto;
+    caja.setAttribute('readonly', '');
+    caja.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.append(caja);
+    caja.select();
+    let hecho = false;
+    try { hecho = document.execCommand('copy'); } catch { /* el navegador no deja */ }
+    caja.remove();
+    return hecho;
+  }
+  function copiarTexto(texto) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(texto).then(() => true, () => copiarAMano(texto));
+    return Promise.resolve(copiarAMano(texto));
+  }
+  async function copiarLinkPantalla() {
+    const link = location.origin + '/pantalla.html';
+    const copiado = await copiarTexto(link);
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Pantalla de Conexiones', text: 'Abrí esto en la PC:', url: link }); return; } catch { /* cerró «Compartir» */ }
+    }
+    showToast(copiado ? '✅ Link copiado. Mandátelo y abrilo en la PC.' : '🔗 ' + link);
+  }
+  document.querySelectorAll('.copiar-link').forEach((boton) => boton.addEventListener('click', copiarLinkPantalla));
   function ocultarPasos() {
     pasosOcultos = true;
     try { localStorage.setItem(CLAVE_PASOS, '1'); } catch { /* sin almacenamiento */ }

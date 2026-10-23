@@ -13,6 +13,8 @@
   const authBadge = document.getElementById('authBadge');
   const logoutBtn = document.getElementById('logoutBtn');
   const salirEsquina = document.getElementById('salirEsquina');
+  // Dentro de la app de PC no hace falta ofrecer instalarla.
+  if (window.ConexionesPC) document.getElementById('instalarApp').hidden = true;
   const iniciarSesionBtn = document.getElementById('iniciarSesionBtn');
   const loginCorner = document.getElementById('loginCorner');
   const invitacionInterruptor = document.getElementById('invitacionInterruptor');
