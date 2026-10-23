@@ -1177,6 +1177,8 @@
   window.addEventListener('resize', () => { espejoAjustar(); vivoPintarLupa(); });
 
   ensureAuthed().then((auth) => {
+    // Cuentas sin Google: una vez, el aviso para poder recuperar el PIN si se olvida.
+    setTimeout(() => window.cuentaGoogle && window.cuentaGoogle.ofrecer(auth), 1500);
     authNameBadge.hidden = false;
     authNameBadge.textContent = authBadgeText(auth);
     logoutBtn.hidden = false;

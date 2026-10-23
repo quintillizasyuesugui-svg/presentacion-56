@@ -1074,4 +1074,26 @@
     authNameBadge.textContent = authBadgeText(auth);
     logoutBtn.hidden = false;
     logoutBtn.addEventListener('click', () => logoutAuth());
+    pintarMiCuenta(auth);
   });
+
+  // ---- Mi cuenta: unir Google (para «Me olvidé el PIN») ----
+  async function pintarMiCuenta(auth) {
+    const g = window.cuentaGoogle;
+    if (!g || auth.isAdmin) return;
+    let cuenta;
+    try { cuenta = await g.leer(auth.pin); } catch { return; }
+    const caja = document.getElementById('miCuentaGoogle');
+    const titulo = document.getElementById('miCuentaTitulo');
+    const texto = document.getElementById('miCuentaTexto');
+    const error = document.getElementById('miCuentaError');
+    document.getElementById('miCuenta').hidden = false;
+    const unida = (correo) => {
+      titulo.textContent = '✓ Cuenta unida a Google';
+      texto.textContent = correo + '. Si olvidás el PIN, te mandamos un código a ese correo.';
+      caja.hidden = true;
+      error.hidden = true;
+    };
+    if (cuenta.correo) { unida(cuenta.correo); return; }
+    g.boton(caja, auth.pin, unida, (t) => { error.textContent = t; error.hidden = false; });
+  }

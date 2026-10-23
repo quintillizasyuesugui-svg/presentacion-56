@@ -171,6 +171,20 @@ async function borrarPersonas(nombres) {
   return borradas;
 }
 
+// «Me olvidé el PIN»: la cuenta recibe un PIN nuevo y el viejo deja de servir. Sus fotos, música
+// y videos no cambian (van por nombre, no por PIN). Devuelve el PIN nuevo, o null si no existe.
+async function darPinNuevo(nombre) {
+  let pin = null;
+  await almacenPersonas.modificar((personas) => {
+    const p = personas.find(x => x.name === nombre);
+    if (!p) return SIN_CAMBIOS;
+    pin = generarPin();
+    p.pinHash = huella(pin, Boolean(SECRETO));
+    p.conSecreto = Boolean(SECRETO);
+  });
+  return pin;
+}
+
 // Qué ve cada uno: admin ve todo, cualquier otra persona sólo lo que subió ella.
 function visiblePara(persona, orden) {
   return persona.isAdmin ? orden : orden.filter(r => r.owner === persona.name);
@@ -316,4 +330,4 @@ function registrarRutasPersonas(app) {
   });
 }
 
-module.exports = { identificar, identificarDesde, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersonas, NOMBRE_ADMIN };
+module.exports = { identificar, identificarDesde, requierePersona, requiereAdmin, visiblePara, registrarRutasPersonas, nombresDePersonas, borrarPersonas, darPinNuevo, ipDelPedido, NOMBRE_ADMIN };

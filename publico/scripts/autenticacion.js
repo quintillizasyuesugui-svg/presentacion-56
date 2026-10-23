@@ -131,6 +131,111 @@
     return data;
   }
 
+  // ---- Cuenta de Google (para recuperar el PIN) ----
+  // El botón lo dibuja Google (script oficial). Dentro de las apps (celular y PC) Google no deja
+  // iniciar sesión, así que ahí se avisa que se haga desde Chrome.
+  let googlePromesa = null;
+  function cargarGoogle() {
+    if (window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve();
+    if (!googlePromesa) {
+      googlePromesa = new Promise((listo, mal) => {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.onload = () => listo();
+        s.onerror = () => { googlePromesa = null; mal(new Error('No se pudo cargar Google. Revisá tu internet.')); };
+        document.head.append(s);
+      });
+    }
+    return googlePromesa;
+  }
+  const enAppDePc = Boolean(window.ConexionesPC);
+  async function leerCuenta(pin) {
+    const res = await pedir('/api/cuenta', { headers: { 'x-pin': pin } });
+    const datos = await res.json();
+    if (!res.ok) throw new Error(datos.error || 'No se pudo leer tu cuenta.');
+    return datos;
+  }
+  // Dibuja «Continuar con Google» en «caja». alUnir(correo) cuando queda unida; alError(texto) si falla.
+  async function botonGoogle(caja, pin, alUnir, alError) {
+    if (enApp || enAppDePc) {
+      caja.textContent = 'Para unir tu Google, abrí Conexiones en Chrome (Modo avanzado → Mi cuenta).';
+      caja.classList.add('auth-google-nota');
+      return;
+    }
+    try {
+      const cuenta = await leerCuenta(pin);
+      await cargarGoogle();
+      window.google.accounts.id.initialize({
+        client_id: cuenta.googleId,
+        ux_mode: 'popup',
+        auto_select: false,
+        callback: async (respuesta) => {
+          try {
+            const res = await pedir('/api/cuenta/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-pin': pin },
+              body: JSON.stringify({ credencial: respuesta.credential })
+            });
+            const datos = await res.json();
+            if (!res.ok) throw new Error(datos.error || 'No se pudo unir la cuenta.');
+            alUnir(datos.correo);
+          } catch (err) { alError(err.message); }
+        }
+      });
+      caja.textContent = '';
+      window.google.accounts.id.renderButton(caja, {
+        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill',
+        logo_alignment: 'left', locale: 'es', width: Math.round(Math.min(320, Math.max(200, caja.clientWidth || 260)))
+      });
+    } catch (err) {
+      alError(err.message);
+    }
+  }
+  function textoUnida(correo) {
+    const p = document.createElement('p');
+    p.className = 'auth-unida';
+    p.append('✓ Sos ', Object.assign(document.createElement('b'), { textContent: correo }), '. Si olvidás el PIN, te mandamos un código a ese correo.');
+    return p;
+  }
+
+  // Cuentas sin Google: el aviso sale cada vez que se entra (cada vez que se abre la página o la
+  // app), hasta que la unan. «Ahora no» lo cierra sólo hasta la próxima entrada.
+  const AVISO_GOOGLE_KEY = 'conexionesAvisoGoogle';
+  function avisoCerrado() { try { return sessionStorage.getItem(AVISO_GOOGLE_KEY) === '1'; } catch { return false; } }
+  function cerrarAvisoPorAhora() { try { sessionStorage.setItem(AVISO_GOOGLE_KEY, '1'); } catch { /* sin almacenamiento */ } }
+  async function ofrecerUnirGoogle(auth) {
+    if (!auth || auth.isAdmin || enApp || enAppDePc || avisoCerrado()) return;
+    let cuenta;
+    try { cuenta = await leerCuenta(auth.pin); } catch { return; }
+    if (cuenta.correo || !cuenta.puedeUnir) return;
+    const capa = document.createElement('div');
+    capa.className = 'modal-overlay auth-pregunta';
+    capa.innerHTML = `
+      <div class="modal-card">
+        <h2>🛡️ ¿Y si olvidás el PIN?</h2>
+        <p>Uní tu cuenta de Google: si un día olvidás el PIN, te mandamos un código a tu correo y entrás con uno nuevo. Tus fotos y música no cambian.</p>
+        <div class="auth-google" id="avisoGoogle"></div>
+        <p class="auth-google-error" id="avisoGoogleError" hidden></p>
+        <button type="button" class="auth-back" id="avisoAhoraNo">Ahora no</button>
+      </div>`;
+    document.body.appendChild(capa);
+    requestAnimationFrame(() => capa.classList.add('show'));
+    const cerrar = () => { capa.classList.remove('show'); setTimeout(() => capa.remove(), 200); };
+    const errorAviso = capa.querySelector('#avisoGoogleError');
+    capa.querySelector('#avisoAhoraNo').addEventListener('click', () => {
+      cerrarAvisoPorAhora();
+      cerrar();
+    });
+    botonGoogle(capa.querySelector('#avisoGoogle'), auth.pin, (correo) => {
+      const caja = capa.querySelector('#avisoGoogle');
+      caja.replaceWith(textoUnida(correo));
+      errorAviso.hidden = true;
+      capa.querySelector('#avisoAhoraNo').textContent = 'Listo';
+    }, (texto) => { errorAviso.textContent = texto; errorAviso.hidden = false; });
+  }
+  window.cuentaGoogle = { boton: botonGoogle, leer: leerCuenta, textoUnida, ofrecer: ofrecerUnirGoogle };
+
   // allowRegister=false arma sólo el bloque de PIN, sin "Soy nuevo/a" — para
   // pantalla.html: en el proyector/TV no tiene sentido dar de alta gente
   // nueva, eso se hace desde el propio celular (control.html/gestionar.html).
@@ -167,7 +272,8 @@
         <div id="authNew" hidden>
           <p class="auth-invitacion" id="authInvitacion" hidden></p>
           <input type="text" id="authName" placeholder="Tu nombre" autocomplete="off" maxlength="40">
-          <input type="text" id="authCodigo" placeholder="Código de invitación (si tenés)" autocomplete="off" autocapitalize="characters" maxlength="16">
+          <input type="text" id="authCodigo" placeholder="Código de invitación" autocomplete="off" autocapitalize="characters" maxlength="16">
+          <p class="auth-nota-codigo"><b>CÓDIGO OPCIONAL.</b> Dejalo vacío. Solo si no te deja registrarte, pedile el código a quien presenta.</p>
           <!-- Trampa para programas que llenan formularios: no se ve ni se puede tocar; si llega con algo, el servidor no registra. -->
           <input type="text" id="authSitioWeb" name="sitio_web" class="auth-usuario" tabindex="-1" autocomplete="off" aria-hidden="true">
           <div class="btn-row">
@@ -205,8 +311,41 @@
               <button type="submit" class="btn primary" id="authLoginBtn" style="flex:1">Entrar</button>
             </div>
           </form>
+          <button type="button" class="auth-back auth-olvide" id="authOlvide">¿Te olvidaste el PIN?</button>
           ${allowRegister ? '<button type="button" class="auth-back" id="authBackFromOld">← Volver</button>' : ''}
           ${cancelable ? '<button type="button" class="auth-back" id="authCancel">✕ Cancelar</button>' : ''}
+        </div>
+
+        <!-- «Me olvidé el PIN»: correo unido a Google → código de 6 números → PIN nuevo. -->
+        <div id="authRecuperar" hidden>
+          <div id="authRecuperarCorreo">
+            <input type="email" id="authCorreo" placeholder="tu.correo@gmail.com" autocomplete="email" maxlength="200">
+            <div class="btn-row"><button type="button" class="btn primary" id="authMandarCodigo" style="flex:1">Mandar código</button></div>
+          </div>
+          <div id="authRecuperarCodigo" hidden>
+            <div class="auth-cifras" id="authCifras">${'<input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Número del código">'.repeat(6)}</div>
+            <p class="auth-vence" id="authVence"></p>
+            <div class="btn-row"><button type="button" class="btn primary" id="authConfirmarCodigo" style="flex:1">Listo</button></div>
+            <div class="btn-row"><button type="button" class="btn" id="authReenviar" style="flex:1">📩 Reenviar código</button></div>
+            <button type="button" class="auth-back" id="authOtroCodigo">Cambiar correo</button>
+          </div>
+          <div id="authRecuperarListo" hidden>
+            <p class="auth-pin-nuevo" id="authPinNuevo"></p>
+            <div class="btn-row"><button type="button" class="btn primary" id="authEntrarNuevo" style="flex:1">Entrar</button></div>
+          </div>
+          <button type="button" class="auth-back" id="authBackFromRecuperar">← Volver</button>
+        </div>
+
+        <!-- Recién registrado: ofrece unir la cuenta de Google para poder recuperar el PIN. -->
+        <div id="authListo" hidden>
+          <div class="auth-protege" id="authProtege" hidden>
+            <b>🛡️ ¿Y si olvidás el PIN?</b>
+            <small>Uní tu cuenta de Google: si lo olvidás, te mandamos un código a tu correo.</small>
+            <div class="auth-google" id="authGoogle"></div>
+            <p class="auth-google-error" id="authGoogleError" hidden></p>
+            <button type="button" class="auth-back" id="authAhoraNo">Ahora no</button>
+          </div>
+          <div class="btn-row"><button type="button" class="btn primary" id="authListoBtn" style="flex:1">Entrar</button></div>
         </div>
         ${enApp && allowRegister ? '<button type="button" class="auth-olvidar" id="authOlvidar" hidden></button>' : ''}
       </div>`;
@@ -302,6 +441,7 @@
         choiceBox.hidden = false;
         authNewBox.hidden = true;
         authOldBox.hidden = true;
+        gate.querySelector('#authRecuperar').hidden = true;
         errorEl.textContent = 'Elegí una opción para entrar.';
       }
       function showNewForm() {
@@ -466,17 +606,184 @@
         document.addEventListener('keydown', escCancela);
       }
 
+      // Recién registrado: muestra el PIN y ofrece unir Google (opción A). Entra al tocar «Entrar».
+      const listoBox = gate.querySelector('#authListo');
       function showPinOnce(auth) {
         // El PIN sólo se muestra en este momento — después queda guardado en
         // el celular y no hace falta volver a escribirlo en este dispositivo.
         errorEl.textContent = '';
-        errorEl.append(`¡Listo, ${auth.name}! Tu PIN es `, Object.assign(document.createElement('strong'), { textContent: auth.pin }), ' — anotalo, te sirve para entrar desde otro celular.');
+        errorEl.append(`¡Listo, ${auth.name}! Tu PIN es `, Object.assign(document.createElement('strong'), { textContent: auth.pin }), '. Anotalo: te sirve para entrar desde otro celular.');
         if (registerBtn) registerBtn.disabled = true;
         loginBtn.disabled = true;
         if (nameInput) nameInput.disabled = true;
         pinInput.disabled = true;
-        setTimeout(() => finish(auth), 2600);
+        authNewBox.hidden = true;
+        listoBox.hidden = false;
+        const protege = gate.querySelector('#authProtege');
+        const errorGoogle = gate.querySelector('#authGoogleError');
+        if (!enApp && !enAppDePc) {
+          protege.hidden = false;
+          botonGoogle(gate.querySelector('#authGoogle'), auth.pin, (correo) => {
+            protege.replaceWith(textoUnida(correo));
+          }, (texto) => { errorGoogle.textContent = texto; errorGoogle.hidden = false; });
+          gate.querySelector('#authAhoraNo').addEventListener('click', () => {
+            protege.hidden = true;
+            // Que el aviso de «unir Google» no salga apenas entra: ya lo vio recién.
+            cerrarAvisoPorAhora();
+          });
+        }
+        gate.querySelector('#authListoBtn').addEventListener('click', () => {
+          // Ya le ofrecimos unir Google recién: el aviso para cuentas de antes no sale enseguida.
+          cerrarAvisoPorAhora();
+          finish(auth);
+        });
       }
+
+      // ---- «¿Te olvidaste el PIN?» ----
+      const recuperarBox = gate.querySelector('#authRecuperar');
+      const parteCorreo = gate.querySelector('#authRecuperarCorreo');
+      const parteCodigo = gate.querySelector('#authRecuperarCodigo');
+      const parteListo = gate.querySelector('#authRecuperarListo');
+      const correoInput = gate.querySelector('#authCorreo');
+      const mandarBtn = gate.querySelector('#authMandarCodigo');
+      const confirmarBtn = gate.querySelector('#authConfirmarCodigo');
+      const cifras = [...gate.querySelectorAll('#authCifras input')];
+      let recuperado = null;
+      function verParte(cual) {
+        parteCorreo.hidden = cual !== 'correo';
+        parteCodigo.hidden = cual !== 'codigo';
+        parteListo.hidden = cual !== 'listo';
+        gate.querySelector('#authBackFromRecuperar').hidden = cual === 'listo';
+      }
+      gate.querySelector('#authOlvide').addEventListener('click', () => {
+        if (choiceBox) choiceBox.hidden = true;
+        authOldBox.hidden = true;
+        recuperarBox.hidden = false;
+        verParte('correo');
+        errorEl.textContent = 'Escribí el correo de Google que uniste a tu cuenta. Te mandamos un código.';
+        correoInput.focus();
+      });
+      gate.querySelector('#authBackFromRecuperar').addEventListener('click', () => {
+        recuperarBox.hidden = true;
+        if (allowRegister) showChoice(); else { authOldBox.hidden = false; errorEl.textContent = 'Es el PIN que te dieron al registrarte desde tu celular.'; }
+      });
+      async function mandarCodigo() {
+        const correo = correoInput.value.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) { errorEl.textContent = 'Escribí tu correo completo (ejemplo: nombre@gmail.com).'; return; }
+        mandarBtn.disabled = true;
+        mandarBtn.textContent = 'Mandando…';
+        reenviarBtn.disabled = true;
+        try {
+          const datos = await callAuth('/api/recuperar/pedir', { correo });
+          errorEl.textContent = datos.aviso;
+          cifras.forEach(c => { c.value = ''; });
+          verParte('codigo');
+          empezarRelojes();
+          cifras[0].focus();
+        } catch (err) {
+          errorEl.textContent = err.message;
+          if (!parteCodigo.hidden) pintarRelojes();
+        } finally {
+          mandarBtn.disabled = false;
+          mandarBtn.textContent = 'Mandar código';
+        }
+      }
+      mandarBtn.addEventListener('click', mandarCodigo);
+      correoInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') mandarCodigo(); });
+      gate.querySelector('#authOtroCodigo').addEventListener('click', () => {
+        detenerRelojes();
+        verParte('correo');
+        errorEl.textContent = 'Escribí el correo de Google que uniste a tu cuenta. Te mandamos un código.';
+        correoInput.focus();
+      });
+
+      // Cuánto falta para que venza el código (15 min) y para poder pedir otro (45 s: así no se
+      // mandan muchos correos seguidos). Si venció o no llegó, «Reenviar código» manda uno nuevo.
+      const reenviarBtn = gate.querySelector('#authReenviar');
+      const venceEl = gate.querySelector('#authVence');
+      const VENCE_MS = 15 * 60 * 1000;
+      const REENVIAR_MS = 45 * 1000;
+      let venceEn = 0, reenviarEn = 0, reloj = null;
+      function dosCifras(n) { return String(n).padStart(2, '0'); }
+      function pintarRelojes() {
+        const ahora = Date.now();
+        const quedan = Math.max(0, Math.ceil((venceEn - ahora) / 1000));
+        const esperar = Math.max(0, Math.ceil((reenviarEn - ahora) / 1000));
+        if (quedan > 0) {
+          venceEl.textContent = `⏱️ Vence en ${Math.floor(quedan / 60)}:${dosCifras(quedan % 60)}. ¿No llegó? Mirá en «Spam».`;
+          venceEl.classList.remove('vencido');
+        } else {
+          venceEl.textContent = '⌛ El código venció. Tocá «Reenviar código».';
+          venceEl.classList.add('vencido');
+        }
+        reenviarBtn.disabled = esperar > 0;
+        reenviarBtn.textContent = esperar > 0 ? `📩 Reenviar en ${esperar} s` : '📩 Reenviar código';
+      }
+      function empezarRelojes() {
+        venceEn = Date.now() + VENCE_MS;
+        reenviarEn = Date.now() + REENVIAR_MS;
+        clearInterval(reloj);
+        reloj = setInterval(pintarRelojes, 1000);
+        pintarRelojes();
+      }
+      function detenerRelojes() { clearInterval(reloj); reloj = null; }
+      reenviarBtn.addEventListener('click', () => {
+        cifras.forEach(c => { c.value = ''; });
+        mandarCodigo();
+      });
+      // Cajitas del código: un número por cajita; pasa sola a la siguiente y acepta pegar los 6.
+      cifras.forEach((caja, i) => {
+        caja.addEventListener('input', () => {
+          const numeros = caja.value.replace(/\D/g, '');
+          if (numeros.length > 1) {
+            numeros.slice(0, 6 - i).split('').forEach((n, j) => { cifras[i + j].value = n; });
+          } else caja.value = numeros;
+          const siguiente = cifras.find(c => !c.value);
+          if (siguiente) { if (caja.value) siguiente.focus(); } else confirmarCodigo();
+        });
+        caja.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && !caja.value && cifras[i - 1]) cifras[i - 1].focus();
+          if (e.key === 'Enter') confirmarCodigo();
+        });
+        caja.addEventListener('paste', (e) => {
+          const numeros = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+          if (!numeros) return;
+          e.preventDefault();
+          numeros.split('').forEach((n, j) => { if (cifras[j]) cifras[j].value = n; });
+          if (numeros.length === 6) confirmarCodigo();
+        });
+      });
+      let confirmando = false;
+      async function confirmarCodigo() {
+        const codigo = cifras.map(c => c.value).join('');
+        if (codigo.length !== 6) { errorEl.textContent = 'Escribí los 6 números del código.'; return; }
+        if (confirmando) return;
+        confirmando = true;
+        confirmarBtn.disabled = true;
+        try {
+          recuperado = await callAuth('/api/recuperar/confirmar', { correo: correoInput.value.trim(), codigo });
+          errorEl.textContent = '';
+          const nuevo = gate.querySelector('#authPinNuevo');
+          nuevo.textContent = '';
+          nuevo.append(`¡Listo, ${recuperado.name}! Tu PIN nuevo es:`, Object.assign(document.createElement('strong'), { textContent: recuperado.pin }),
+            'Anotalo: el viejo ya no sirve. Tus fotos, música y videos siguen igual.');
+          verParte('listo');
+        } catch (err) {
+          errorEl.textContent = err.message;
+          if (/venció|Muchos intentos/.test(err.message)) verParte('correo');
+          else { cifras.forEach(c => { c.value = ''; }); cifras[0].focus(); }
+        } finally {
+          confirmando = false;
+          confirmarBtn.disabled = false;
+        }
+      }
+      confirmarBtn.addEventListener('click', confirmarCodigo);
+      gate.querySelector('#authEntrarNuevo').addEventListener('click', () => {
+        if (!recuperado) return;
+        clearLock();
+        const recordar = gate.querySelector('#authRecordar');
+        finish(recuperado, recordar ? recordar.checked : true);
+      });
 
       if (registerBtn) {
         registerBtn.addEventListener('click', async () => {

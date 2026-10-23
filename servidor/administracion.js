@@ -8,6 +8,7 @@ const { contarPorDueno, quitarDiapositivasDe } = require('./diapositivas');
 const { borrarFraseDe } = require('./frase-final');
 const { borrarAvanceDe } = require('./avance-automatico');
 const { cancelarTrabajosDe } = require('./documentos');
+const { borrarGoogleDe } = require('./cuenta-google');
 const { estadoGuardian, simulacro } = require('./guardian');
 const { espacioPorPersona, espacioDe, espacioFijoDe, calculoAutomatico, usadoTotal, fijarEspacio, quitarMultimediaDe, usoDeLaNube, MB } = require('./multimedia');
 
@@ -37,6 +38,7 @@ function borrarCuentas(nombres) {
     await quitarMultimediaDe(aBorrar);
     await borrarFraseDe(aBorrar);
     await borrarAvanceDe(aBorrar);
+    await borrarGoogleDe(aBorrar);
     await borrarPersonas(aBorrar);
     return { borradas: aBorrar.map(name => ({ name, diapositivas: diapositivas[name] || 0 })), noEncontradas };
   });

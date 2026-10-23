@@ -31,6 +31,19 @@
   </div>
 
   <div class="panel advanced-panel">
+    <!-- Mi cuenta: unir Google para poder recuperar el PIN si se olvida. -->
+    <div id="miCuenta" hidden>
+      <div class="section-label">Mi cuenta</div>
+      <div class="action-card mi-cuenta" id="miCuentaCaja">
+        <span class="action-icon">🛡️</span>
+        <span class="action-text">
+          <span class="action-title" id="miCuentaTitulo">Unir con Google</span>
+          <span class="action-desc" id="miCuentaTexto">Para recuperar el PIN si lo olvidás</span>
+          <span class="auth-google" id="miCuentaGoogle"></span>
+          <span class="auth-google-error" id="miCuentaError" hidden></span>
+        </span>
+      </div>
+    </div>
     <div class="section-label">Imágenes</div>
     <button type="button" class="action-card" id="combineBtn">
       <span class="action-icon">🧩</span>
