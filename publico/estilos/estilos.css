@@ -176,6 +176,32 @@ body.pantalla {
 
 .auto-badge[hidden] { display: none; }
 
+/* «Cerrar sesión» durante la presentación: debajo del número de imagen, casi transparente
+   para no tapar las fotos; se ve entero al pasar el mouse o con el teclado. */
+.salir-esquina {
+  position: fixed;
+  top: calc(max(16px, env(safe-area-inset-top)) + 52px);
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 20;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-pill);
+  background: rgba(13, 20, 36, 0.35);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 0.2s, background 0.2s, border-color 0.2s, color 0.2s;
+}
+.salir-esquina:hover, .salir-esquina:focus-visible {
+  opacity: 1;
+  background: rgba(13, 20, 36, 0.9);
+  border-color: var(--red-400);
+  color: var(--red-300);
+}
+.salir-esquina[hidden] { display: none; }
+
 /* Mismo aviso, pero para control.html (que no es pantalla completa, así que
    no puede ser un badge flotante — va como una línea normal en el flujo). */
 .auto-countdown-inline {
@@ -3064,3 +3090,18 @@ body[data-reproductor="control"] .utility-row .btn { min-height: 38px; padding: 
 body[data-reproductor="control"] .utility-row .btn.icon-only { width: 38px; }
 /* En celulares muy angostos el ☰ pasa a un segundo renglón en vez de salirse del ancho. */
 @media (max-width: 330px) { body[data-reproductor="control"] .utility-row { flex-wrap: wrap; } }
+/* Modo avanzado: «¿Activamos el temporizador?» con la foto donde va y la primera. */
+.desde-tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.desde-tarjeta {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 8px 10px; border-radius: 14px; cursor: pointer;
+  background: var(--gray-800, #1a222c); color: var(--text); border: 1px solid var(--panel-border);
+  font: inherit; font-size: 0.82rem; line-height: 1.3; text-align: center;
+}
+.desde-tarjeta b { font-size: 0.9rem; margin-top: 4px; }
+.desde-tarjeta span:last-child { color: var(--text-muted); }
+.desde-tarjeta.elegida { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); box-shadow: inset 0 0 0 1px var(--primary-400); }
+.desde-mini {
+  display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px;
+  background: #0b1016 center / cover no-repeat; font-size: 1.6rem;
+}

@@ -12,6 +12,7 @@
   const identityCorner = document.getElementById('identityCorner');
   const authBadge = document.getElementById('authBadge');
   const logoutBtn = document.getElementById('logoutBtn');
+  const salirEsquina = document.getElementById('salirEsquina');
   const iniciarSesionBtn = document.getElementById('iniciarSesionBtn');
   const loginCorner = document.getElementById('loginCorner');
   const invitacionInterruptor = document.getElementById('invitacionInterruptor');
@@ -265,13 +266,25 @@
     authFetch('/api/avance-automatico')
       .then(res => res.json())
       .then(auto => {
+        const antes = autoAdvance;
         autoAdvance = auto;
-        // Si el show ya arrancó y no hay ningún reloj corriendo todavía —
-        // por ejemplo, se apretó "Mostrar" antes de que este pedido
-        // terminara, o recién ahora se prendió desde otro dispositivo —
-        // lo arranca acá. Si YA hay uno corriendo, no lo toca (eso es lo
-        // que hace que sobreviva a este mismo refresco cada 4s).
-        if (started && !autoAdvanceTimer && !videoEnPantalla) scheduleAutoAdvance();
+        const cambio = Boolean(antes) && (Boolean(antes.enabled) !== Boolean(auto.enabled) || antes.seconds !== auto.seconds);
+        if (cambio && started && !auto.enabled) {
+          // Se apagó con la presentación en marcha: el reloj se corta ya (antes pasaba una vez más).
+          if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+          autoAdvanceEndAt = null;
+          avanceRestanteMs = null;
+          updateAutoBadge();
+          socket.emit('avanceAutoAviso', { tipo: 'apagado' });
+        } else if (cambio && started) {
+          // Se prendió o se cambiaron los segundos: la cuenta empieza de nuevo con el tiempo nuevo
+          // (antes seguía la cuenta vieja hasta pasar de imagen y parecía trabado).
+          scheduleAutoAdvance();
+        } else if (started && !autoAdvanceTimer && !videoEnPantalla) {
+          // Se tocó «Mostrar» antes de que llegara este dato: arranca acá. Si el reloj ya corre
+          // y nada cambió, no se toca (así sobrevive al refresco de respaldo).
+          scheduleAutoAdvance();
+        }
       })
       .catch(err => console.error('Error loading avance automático:', err));
   }
@@ -750,7 +763,10 @@
     waitingHint.textContent = 'Presiona el botón para ir a pantalla completa (necesario en algunos navegadores).';
     identityCorner.hidden = false;
     authBadge.textContent = authBadgeText(auth, { showPin: false });
-    logoutBtn.addEventListener('click', () => { socket.emit('pantallaOlvidar', 'todo'); logoutAuth(); });
+    const salir = () => { socket.emit('pantallaOlvidar', 'todo'); logoutAuth(); };
+    logoutBtn.addEventListener('click', salir);
+    salirEsquina.addEventListener('click', salir);
+    salirEsquina.hidden = !started;
     refreshSlides();
     refreshFraseFinal();
     refreshAutoAdvance();
@@ -1018,6 +1034,7 @@
       started = true;
       waiting.classList.add('hide');
       identityCorner.hidden = true; // deja de taparle una esquina a las fotos
+      salirEsquina.hidden = !conSesion;
       cerrarBanda();
       pintarInvitacion();
     } else if (accion === 'siguiente') {
@@ -1072,6 +1089,7 @@
       started = true;
       waiting.classList.add('hide');
       identityCorner.hidden = true;
+      salirEsquina.hidden = !conSesion;
       cerrarBanda();
       pintarInvitacion();
     } else {
@@ -1092,6 +1110,7 @@
     waitingHint.textContent = '📷 Ya no quedan imágenes. Subilas desde el celular en «🖼️ Gestionar» y tocá Mostrar de nuevo.';
     waiting.classList.remove('hide');
     identityCorner.hidden = false;
+    salirEsquina.hidden = true;
     aplicarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true);
     updateHud();
     updateProgress();

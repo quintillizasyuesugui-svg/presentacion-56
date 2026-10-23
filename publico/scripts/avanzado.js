@@ -937,6 +937,7 @@
         // minutos si da un número redondo, para no forzar "120" en vez de "2".
         const useMinutes = saved.seconds >= 60 && saved.seconds % 60 === 0;
         autoState = { enabled: !!saved.enabled, unit: useMinutes ? 'minutes' : 'seconds' };
+        estabaPrendido = !!saved.enabled;
         autoValue.value = useMinutes ? saved.seconds / 60 : saved.seconds;
         selectAutoToggle(autoState.enabled ? 'on' : 'off');
         selectAutoUnit(autoState.unit);
@@ -947,19 +948,115 @@
 
   autoCancel.addEventListener('click', () => closeOverlay(autoOverlay));
 
+  async function guardarAvance(enabled, seconds) {
+    const res = await authFetch('/api/avance-automatico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, seconds })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo guardar. Probá de nuevo.');
+  }
+
+  // ---- ¿Desde qué imagen arranca? (sólo si la presentación ya va por la 2 o más) ----
+  // Este socket entra a la sala de la persona para preguntarle a su pantalla en qué imagen va.
+  let estadoPantalla = null;
+  let esperandoEstado = null;
+  socket.on('pantallaEstado', (estado) => {
+    estadoPantalla = estado;
+    if (esperandoEstado) esperandoEstado(estado);
+  });
+  socket.on('hayPantalla', (hay) => { if (!hay && esperandoEstado) esperandoEstado(null); });
+  ensureAuthed().then((auth) => {
+    const identificar = () => socket.emit('identificar', auth.pin);
+    if (socket.connected) identificar();
+    socket.on('connect', identificar);
+  });
+  // Pregunta a la pantalla cómo va; sin respuesta en 1,5 s se toma como que no está mostrando.
+  function pedirEstadoPantalla() {
+    return new Promise((resolver) => {
+      const tope = setTimeout(() => terminar(null), 1500);
+      function terminar(estado) { clearTimeout(tope); esperandoEstado = null; resolver(estado); }
+      esperandoEstado = terminar;
+      socket.emit('pantallaPedirEstado');
+    });
+  }
+
+  const autoDesdeOverlay = document.getElementById('autoDesdeOverlay');
+  const desdeTarjetas = autoDesdeOverlay.querySelectorAll('.desde-tarjeta');
+  let estabaPrendido = false;
+  let desdeElegido = 'aqui';
+  let desdePendiente = null; // { seconds }
+  desdeTarjetas.forEach((t) => t.addEventListener('click', () => {
+    desdeElegido = t.dataset.desde;
+    desdeTarjetas.forEach((x) => x.classList.toggle('elegida', x === t));
+  }));
+
+  function fotoChica(src) {
+    if (!/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(src)) return src;
+    return src.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_fill,w_320,h_180/');
+  }
+  function pintarMini(caja, diapositiva) {
+    caja.textContent = '';
+    caja.style.backgroundImage = '';
+    if (!diapositiva) return;
+    if (diapositiva.pagina) {
+      caja.textContent = '🌐';
+      caja.title = diapositiva.titulo || diapositiva.pagina;
+    } else if (diapositiva.src) {
+      caja.style.backgroundImage = `url("${fotoChica(diapositiva.src).replace(/"/g, '%22')}")`;
+    }
+  }
+
+  async function preguntarDesde(estado, seconds) {
+    let lista = [];
+    try { lista = await (await authFetch('/images')).json(); } catch { /* sin fotos chicas igual se puede elegir */ }
+    document.getElementById('desdeAquiTitulo').textContent = `Imagen ${estado.foto}`;
+    pintarMini(document.getElementById('desdeMiniAqui'), lista[estado.foto - 1] || { src: estado.src, pagina: estado.pagina });
+    pintarMini(document.getElementById('desdeMiniPrimera'), lista[0]);
+    desdeElegido = 'aqui';
+    desdeTarjetas.forEach((x) => x.classList.toggle('elegida', x.dataset.desde === 'aqui'));
+    desdePendiente = { seconds };
+    closeOverlay(autoOverlay);
+    openOverlay(autoDesdeOverlay);
+  }
+
+  document.getElementById('autoDesdeCancel').addEventListener('click', () => {
+    desdePendiente = null;
+    closeOverlay(autoDesdeOverlay);
+    showToast('No se activó el temporizador.');
+  });
+  const autoDesdeActivar = document.getElementById('autoDesdeActivar');
+  autoDesdeActivar.addEventListener('click', async () => {
+    if (!desdePendiente) return;
+    autoDesdeActivar.disabled = true;
+    try {
+      await guardarAvance(true, desdePendiente.seconds);
+      if (desdeElegido === 'primera') socket.emit('cambiar', '1');
+      desdePendiente = null;
+      closeOverlay(autoDesdeOverlay);
+      showToast(desdeElegido === 'primera' ? '⏱️ Temporizador prendido desde la imagen 1.' : '⏱️ Temporizador prendido desde donde estás.');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      autoDesdeActivar.disabled = false;
+    }
+  });
+
   autoConfirm.addEventListener('click', async () => {
     const raw = parseFloat(autoValue.value);
     if (!Number.isFinite(raw) || raw <= 0) { showToast('Poné un número mayor a 0.'); return; }
     const seconds = Math.round(autoState.unit === 'minutes' ? raw * 60 : raw);
     autoConfirm.disabled = true;
     try {
-      const res = await authFetch('/api/avance-automatico', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: autoState.enabled, seconds })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo guardar. Probá de nuevo.');
+      if (autoState.enabled && !estabaPrendido) {
+        const estado = await pedirEstadoPantalla();
+        if (estado && estado.mostrando && estado.foto > 1) {
+          await preguntarDesde(estado, seconds);
+          return;
+        }
+      }
+      await guardarAvance(autoState.enabled, seconds);
       showToast('Avance automático guardado.');
       closeOverlay(autoOverlay);
     } catch (err) {

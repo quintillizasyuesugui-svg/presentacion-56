@@ -220,7 +220,11 @@
   function refreshAutoAdvanceEnabled() {
     authFetch('/api/avance-automatico')
       .then(res => res.json())
-      .then(auto => { autoAdvanceOn = !!(auto && auto.enabled); updateNavButtonsState(); })
+      .then(auto => {
+        autoAdvanceOn = !!(auto && auto.enabled);
+        if (!autoAdvanceOn && autoAdvanceEndAt) { autoAdvanceEndAt = null; updateAutoCountdownInline(); }
+        updateNavButtonsState();
+      })
       .catch(err => console.error('Error loading avance automático:', err));
   }
 
@@ -248,6 +252,11 @@
       updateAutoCountdownInline();
       autoAdvanceOn = true;
       updateNavButtonsState();
+    } else if (payload.tipo === 'apagado') {
+      autoAdvanceEndAt = null;
+      updateAutoCountdownInline();
+      autoAdvanceOn = false;
+      updateNavButtonsState();
     } else if (payload.tipo === 'terminamos') {
       autoAdvanceEndAt = null;
       updateAutoCountdownInline();
@@ -265,11 +274,17 @@
   // propias de quien está controlando (o todas, con el PIN admin) — mismo
   // criterio que pantalla.html, para que los números coincidan con lo que se ve ahí.
   let totalSlides = 0;
+  let fotosLista = []; // dirección de cada diapositiva, en el mismo orden que la pantalla
   let imagenesCargadas = false;
   function refreshSlideCount() {
     authFetch('/api/images')
       .then(res => res.json())
-      .then(images => { totalSlides = images.length; imagenesCargadas = true; pintarPasos(); })
+      .then(images => {
+        totalSlides = images.length;
+        fotosLista = images.map(r => (r.pagina ? '' : r.src || ''));
+        imagenesCargadas = true;
+        pintarPasos();
+      })
       .catch(err => console.error('Error loading images:', err));
   }
 
@@ -331,12 +346,35 @@
     return src.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_limit,w_800/');
   }
 
+  // Deja bajadas la anterior y las dos siguientes, igual que la pantalla: al pasar de imagen el
+  // celular ya la tiene y no se queda unos segundos con la vieja (con internet de celular tardaba).
+  const precargadasCel = new Map();
+  function precargarCelular(foto) {
+    const total = fotosLista.length;
+    if (!total || !foto) return;
+    const quiero = new Set();
+    for (const n of [foto + 1, foto + 2, foto - 1]) {
+      const src = fotosLista[((n - 1) % total + total) % total];
+      if (src) quiero.add(fotoChica(src));
+    }
+    for (const dir of quiero) {
+      if (precargadasCel.has(dir)) continue;
+      const imagen = new Image();
+      imagen.decoding = 'async';
+      imagen.src = dir;
+      precargadasCel.set(dir, imagen);
+    }
+    // Sólo se guardan unas pocas, para no llenar la memoria del celular.
+    while (precargadasCel.size > 8) precargadasCel.delete(precargadasCel.keys().next().value);
+  }
+
   function zoomMostrarFoto(src, z) {
     if (!src) return;
     if (src !== zoomSrc) {
       zoomSrc = src;
       zoomFoto.src = fotoChica(src);
     }
+    precargarCelular(fotoPantalla.foto);
     zoomFoto.hidden = false;
     document.getElementById('zoomApagado').hidden = true;
     document.getElementById('zoomAyuda').hidden = false;
