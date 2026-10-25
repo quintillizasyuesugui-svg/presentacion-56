@@ -40,6 +40,8 @@
         if (ordenes.some(Boolean) || (top && top.etiqueta === FP.IA)) return { camino: 'nube', ordenes: [], etiqueta: top && top.etiqueta, prob: top && top.prob };
       }
     }
+    // El temporizador lo entienden sólo las reglas (el modelo chico no lo aprendió).
+    if (reglas && reglas.tipo === 'temporizador') return { camino: 'reglas', ordenes: [reglas] };
     // Las reglas a veces se confunden con frases largas («vuelve a cargar la página» no es
     // «vuelve» = atrás): si el modelo está casi seguro de otra cosa, gana el modelo.
     if (reglas && top && palabras.length >= 3 && top.prob >= MUY_SEGURO && top.etiqueta !== FP.IA && top.etiqueta !== FP.NADA) {

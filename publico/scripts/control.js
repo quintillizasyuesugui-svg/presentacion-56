@@ -218,11 +218,14 @@
   anteriorBtn.classList.add('is-off');
   siguienteBtn.classList.add('is-off');
 
+  // Lo último que se sabe del temporizador (para las órdenes de voz, que contestan al instante).
+  let temporizadorGuardado = { enabled: false, seconds: 10 };
   function refreshAutoAdvanceEnabled() {
     authFetch('/api/avance-automatico')
       .then(res => res.json())
       .then(auto => {
         autoAdvanceOn = !!(auto && auto.enabled);
+        if (auto && Number.isFinite(auto.seconds)) temporizadorGuardado = { enabled: !!auto.enabled, seconds: auto.seconds };
         if (!autoAdvanceOn && autoAdvanceEndAt) { autoAdvanceEndAt = null; updateAutoCountdownInline(); }
         updateNavButtonsState();
       })
@@ -1369,6 +1372,7 @@
   function claveDeFilo(orden, hecho) {
     const texto = String(hecho || '');
     if (!orden) return /no entend/i.test(texto) ? 'no_entendi' : null;
+    if (/^No hay imágenes/.test(texto)) return 'no_hay_imagenes';
     if (/^(No |Todavía|primero|ese botón|el buscador|decime|no hay)/i.test(texto) || /sólo está/.test(texto)) return 'no_puedo';
     const a = orden.accion;
     switch (orden.tipo) {
@@ -1378,6 +1382,10 @@
       case 'cerrar': return 'cerrar';
       case 'ayuda': return 'ayuda';
       case 'youtube': return 'buscar';
+      case 'temporizador':
+        if (a === 'cual') return null; // el tiempo se lee en la burbuja
+        if (/ya estaba apagado/.test(texto)) return 'temporizador_apagado';
+        return { prender: 'temporizador_prendido', poner: 'temporizador_prendido', apagar: 'temporizador_apagado', mas: 'temporizador_mas', menos: 'temporizador_menos' }[a] || 'listo';
       case 'boton': return orden.id === 'actualizarBtn' ? 'actualizo' : /^fs/.test(orden.id) ? 'pantalla_completa' : 'listo';
       case 'diapositiva':
         if (a === 'mostrar' || a === 'siguiente' || a === 'anterior') return a;
@@ -1687,8 +1695,14 @@
         '«pantalla completa», «actualiza», «zona»');
       return;
     }
+    if (orden.tipo === 'temporizador') { temporizadorPorVoz(orden, oido); return; }
     if (orden.tipo === 'diapositiva') {
       if (!hayPantalla) { showHeard(oido, 'primero abrí la pantalla'); return; }
+      // Sin imágenes no hay nada que mostrar: se dice, en vez de «¡Mostrando!» con la pantalla vacía.
+      if (orden.accion === 'mostrar' && imagenesCargadas && totalSlides === 0) {
+        showHeard(oido, 'No hay imágenes: subilas en «🖼️ Gestionar»');
+        return;
+      }
       socket.emit('cambiar', orden.accion);
       showHeard(oido);
       return;
@@ -1774,6 +1788,41 @@
   }
 
   // Muestra en verde lo último que se reconoció por voz y, si hay, lo que se hizo con eso
+  // ---- Temporizador por voz (el mismo «avance automático» de Modo avanzado) ----
+  function tiempoDicho(segundos) {
+    if (segundos >= 60 && segundos % 60 === 0) return (segundos / 60) + (segundos === 60 ? ' minuto' : ' minutos');
+    return segundos + ' segundos';
+  }
+  function temporizadorPorVoz(orden, oido) {
+    const antes = temporizadorGuardado;
+    if (orden.accion === 'cual') {
+      showHeard(oido, antes.enabled ? `⏱️ Temporizador cada ${tiempoDicho(antes.seconds)}` : `⏱️ Temporizador apagado (está en ${tiempoDicho(antes.seconds)})`);
+      return;
+    }
+    if (orden.accion === 'apagar' && !antes.enabled) { showHeard(oido, '⏱️ El temporizador ya estaba apagado'); return; }
+    let seconds = antes.seconds || 10;
+    if (orden.accion === 'poner') seconds = orden.valor;
+    if (orden.accion === 'mas') seconds += orden.valor;
+    if (orden.accion === 'menos') seconds -= orden.valor;
+    seconds = Math.max(3, Math.min(3600, Math.round(seconds)));
+    // Prender, poner un tiempo, o cambiarlo: queda prendido. Apagar: guarda el tiempo y lo apaga.
+    const enabled = orden.accion !== 'apagar';
+    temporizadorGuardado = { enabled, seconds };
+    authFetch('/api/avance-automatico', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, seconds })
+    }).then(r => { if (!r.ok) throw new Error(); }).catch(() => {
+      temporizadorGuardado = antes;
+      showToast('No se pudo cambiar el temporizador. Probá de nuevo.');
+    });
+    const tope = orden.accion === 'menos' && seconds === 3 ? ' (es lo mínimo)' : '';
+    if (!enabled) showHeard(oido, '⏱️ Temporizador apagado');
+    else if (orden.accion === 'mas') showHeard(oido, `⏱️ Más tiempo: cada ${tiempoDicho(seconds)}`);
+    else if (orden.accion === 'menos') showHeard(oido, `⏱️ Menos tiempo: cada ${tiempoDicho(seconds)}${tope}`);
+    else showHeard(oido, `⏱️ Temporizador prendido: cada ${tiempoDicho(seconds)}` + (showStarted ? '' : ' · decí «mostrar» para empezar'));
+  }
+
   function showHeard(text, hecho) {
     hechoParaFilo = hecho || '';
     if (juntando) { juntando.push(hecho || ''); return; }

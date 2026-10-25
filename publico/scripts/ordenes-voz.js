@@ -44,6 +44,8 @@
     bucle: ['bucle', 'repetir', 'repite', 'repeti', 'repetila', 'repetilo', 'loop'],
     apagar: ['quita', 'quitar', 'saca', 'sacar', 'sin', 'apaga', 'apagar', 'desactiva', 'desactivar'],
     irA: ['ve', 'vete', 'va', 'vaya', 'ir', 'anda', 'andate', 'salta', 'saltar', 'lleva', 'llevala', 'llevalo'],
+    // El temporizador es el «avance automático»: pasa sola de imagen cada tanto.
+    temporizador: ['temporizador', 'temporizadora', 'temporisador', 'temporizar', 'cronometro', 'automatico'],
     segundos: ['segundo', 'segundos'],
     minutos: ['minuto', 'minutos'],
     final: ['final', 'fin'],
@@ -173,6 +175,27 @@
       const texto = palabras.slice(1).filter((p, i, todas) =>
         !(i < 3 && ['en', 'youtube', 'un', 'una', 'el', 'la', 'video', 'videos', 'de'].includes(p) && todas.slice(0, i).every(q => ['en', 'youtube', 'un', 'una', 'el', 'la', 'video', 'videos', 'de'].includes(q))));
       if (texto.length) return { tipo: 'youtube', texto: texto.join(' ') };
+    }
+
+    // Temporizador: «pon el temporizador», «temporizador a 10 segundos», «aumenta el temporizador»,
+    // «baja el temporizador 5», «apaga el temporizador», «¿cuánto tiene el temporizador?».
+    if (dice(palabras, 'temporizador')) {
+      const enMinutos = dice(palabras, 'minutos');
+      // «un minuto» sin número dicho = 1 minuto.
+      const cuantos = numero !== null ? numero : (enMinutos ? 1 : null);
+      const segundos = cuantos !== null && cuantos > 0 ? Math.round(cuantos * (enMinutos ? 60 : 1)) : null;
+      // «a 20», «hasta 30»: ese tiempo exacto, aunque diga «sube» o «baja».
+      const hastaNumero = segundos !== null && palabras.some((p, i) => HASTA.includes(p) && i + 1 < palabras.length &&
+        (/^\d+$/.test(palabras[i + 1]) || NUMEROS[palabras[i + 1]] !== undefined));
+      const t = (accion, valor) => (valor === undefined ? { tipo: 'temporizador', accion } : { tipo: 'temporizador', accion, valor });
+      if (dice(palabras, 'apagar') || dice(palabras, 'pausar') || palabras.some(p => ['cancela', 'cancelar', 'cancelalo', 'detenlo'].includes(p)) ||
+        (palabras.includes('para') && segundos === null)) return t('apagar');
+      if (palabras.some(p => ['cuanto', 'cuantos', 'cuanta', 'cuantas'].includes(p)) || (palabras.length <= 4 && ['que', 'como'].includes(palabras[0]))) return t('cual');
+      if (hastaNumero) return t('poner', segundos);
+      if (dice(palabras, 'subir') || palabras.includes('mas') || palabras.some(p => ['alarga', 'alargar', 'alargalo', 'agranda', 'agrandalo'].includes(p))) return t('mas', segundos || 5);
+      if (dice(palabras, 'bajar') || palabras.includes('menos') || palabras.some(p => ['acorta', 'acortar', 'acortalo', 'reduce', 'reducir', 'reducelo', 'achica', 'achicalo'].includes(p))) return t('menos', segundos || 5);
+      if (segundos) return t('poner', segundos);
+      return t('prender');
     }
 
     // Botones del control por voz (frases cortas): pantalla completa, actualizar, listas, ayuda.
@@ -356,7 +379,7 @@
   // Frases que se le pasan al reconocedor de la app para que las prefiera al oír.
   const FRASES_DE_AYUDA = [
     'mostrar', 'siguiente', 'atrás', 'anterior', 'pon música', 'música uno', 'música dos', 'siguiente canción',
-    'canción anterior', 'pausa', 'reproducir', 'sube el volumen', 'baja el volumen', 'volumen a la mitad',
+    'canción anterior', 'pausa', 'reproducir', 'temporizador', 'apaga el temporizador', 'sube el volumen', 'baja el volumen', 'volumen a la mitad',
     'volumen al máximo', 'silencio', 'quita el silencio', 'volumen cero', 'volumen cincuenta', 'baja a cero', 'sube veinte', 'baja diez',
     'última diapositiva', 'primera diapositiva', 'sube el volumen de la PC', 'baja el volumen de la PC', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
     'agranda la imagen', 'achica la imagen', 'más grande', 'más chico', 'tamaño normal',
