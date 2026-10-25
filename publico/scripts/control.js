@@ -1355,6 +1355,7 @@
     if (/^(No |Todavía|primero|ese botón|el buscador|decime|no hay)/i.test(texto) || /sólo está/.test(texto)) return 'no_puedo';
     const a = orden.accion;
     switch (orden.tipo) {
+      case 'varias': return 'listo';
       case 'cerrarRespuesta': return orden.si ? 'cerrada' : 'sigues';
       case 'ytElegido': return 'video';
       case 'cerrar': return 'cerrar';
@@ -1394,6 +1395,169 @@
     }
   }
 
+  // ---- Filo piensa (scripts/filo-piensa.js y filo-decide.js) ----
+  // Lo que las reglas no entienden lo mira primero un modelo chico que corre en este celular (al
+  // instante). Si duda, o son dos órdenes juntas con un nombre, le pregunta a la IA entrenada en
+  // Colab (Hugging Face). A la IA no se la espera más de 2 s: el micrófono sigue escuchando y una
+  // orden nueva gana. Las dos sólo pueden elegir órdenes de la lista de la presentación.
+  // Sin dirección: por ahora no hay IA en la nube (Hugging Face pide la cuenta PRO para servirla),
+  // así que lo que el celular no entiende queda como «no entendí». Con una dirección gratis, va acá.
+  const FILO_NUBE_DEFECTO = '';
+  const FILO_ESPERA = 2000;
+  let filoNube = FILO_NUBE_DEFECTO;
+  try { filoNube = localStorage.getItem('filoNube') || FILO_NUBE_DEFECTO; } catch { /* sin almacenamiento */ }
+  let modeloFilo = null;
+  let modeloFiloPedido = false;
+  let nubeLista = false;         // la IA contestó al despertarla: vale la pena preguntarle
+  let nubeVez = 0;               // sube con cada pregunta: una respuesta vieja no se usa
+  let marcaCamino = '';          // «⚡» o «☁️ 1,2 s» en la burbuja de Filo
+  function prepararFilo() {
+    if (!modeloFiloPedido && window.FiloPiensa) {
+      modeloFiloPedido = true;
+      fetch('modelo-filo/clasificador.json')
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+        .then(j => { modeloFilo = window.FiloPiensa.cargarModelo(j); })
+        .catch(() => { modeloFiloPedido = false; });
+    }
+    // Despierta la IA (un Space gratis se duerme si nadie lo usa): tarda, pero no se espera.
+    if (!nubeLista && filoNube) {
+      fetch(filoNube + '/', { cache: 'no-store' }).then(r => { nubeLista = r.ok; }).catch(() => { nubeLista = false; });
+    }
+  }
+  function filoDecidir(oido, reglas) {
+    if (typeof window.filoDecide !== 'function') return { camino: reglas ? 'reglas' : 'ignorar', ordenes: reglas ? [reglas] : [] };
+    return window.filoDecide({ frase: oido, reglas, modelo: modeloFilo, total: totalSlides, interpretar: window.OrdenesVoz.interpretarVoz });
+  }
+  function cancelarNube() {
+    nubeVez++;
+    if (pensandoBurbuja && filoBurbujas) filoBurbujas.textContent = '';
+    pensandoBurbuja = null;
+  }
+
+  // Le pregunta a la IA. Mientras tanto: burbuja «🧠 pensando…». Sin IA (o si tarda), hace lo
+  // que habían entendido las reglas o avisa que no entendió.
+  function pensarEnLaNube(alternativas, oido, reglas) {
+    const vez = ++nubeVez;
+    // tarde = la IA no contestó en 2 s: se avisa para decirlo de nuevo (no se queda esperando).
+    const sinIA = (tarde) => {
+      if (vez !== nubeVez) return;
+      quitarPensando();
+      if (tarde && !reglas) { ordenParaFilo = null; hechoParaFilo = null; showHeard(oido, 'no entendí a tiempo, dímelo otra vez'); filoDice('no_entendi'); return; }
+      contestarDespues(alternativas, reglas ? [reglas] : [], oido, '');
+    };
+    if (!nubeLista || !filoNube) { sinIA(); return; }
+    burbujaPensando(oido);
+    const corte = new AbortController();
+    const reloj = setTimeout(() => corte.abort(), FILO_ESPERA);
+    const t0 = Date.now();
+    fetch(filoNube + '/pensar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frase: window.FiloPiensa.normalizar(oido) }), signal: corte.signal
+    })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+      .then(datos => {
+        clearTimeout(reloj);
+        if (vez !== nubeVez) return;
+        quitarPensando();
+        const ordenes = window.FiloPiensa.leerRespuesta(datos.respuesta, totalSlides);
+        const marca = '☁️ ' + ((Date.now() - t0) / 1000).toFixed(1).replace('.', ',') + ' s';
+        // «nada»: era alguien explicando, no una orden. No se dice nada.
+        if (!ordenes.length && String(datos.respuesta).trim() === 'nada') {
+          if (reglas) contestarDespues(alternativas, [reglas], oido, '');
+          else filoBurbujas.textContent = '';
+          return;
+        }
+        contestarDespues(alternativas, ordenes, oido, marca);
+      })
+      .catch(() => { clearTimeout(reloj); sinIA(corte.signal.aborted); });
+  }
+  // Hace lo que pensó la IA y Filo contesta una vez, igual que con una orden dicha normal.
+  function contestarDespues(alternativas, ordenes, oido, marca) {
+    ordenParaFilo = null;
+    hechoParaFilo = null;
+    if (ordenes.length > 1) { marcaCamino = marca; hacerVarias(alternativas, oido, ordenes); }
+    else if (ordenes.length === 1) { marcaCamino = marca; cumplirOrdenDeVoz(alternativas, ordenes[0]); }
+    else if (oido.split(/\s+/).length <= 6) showHeard(oido, 'no entendí esa orden');
+    else if (filoBurbujas) filoBurbujas.textContent = '';
+    marcaCamino = '';
+    if (hechoParaFilo !== null) {
+      ordenDeFilo = ordenParaFilo;
+      filoDice(claveDeFilo(ordenParaFilo, hechoParaFilo));
+    }
+  }
+  // Varias órdenes de una vez («pausa y después dale play»): se hacen en el orden dicho y Filo
+  // habla una sola vez al final («¡Listo!»).
+  let juntando = null;
+  function hacerVarias(alternativas, oido, ordenes) {
+    const marca = marcaCamino;
+    juntando = [];
+    for (const orden of ordenes) {
+      hechoParaFilo = null;
+      cumplirOrdenDeVoz(alternativas, orden);
+    }
+    const hechos = juntando.filter(Boolean);
+    juntando = null;
+    marcaCamino = marca;
+    showHeard(oido, hechos.join(' · ') || '✅ Listo, las ' + ordenes.length + ' cosas');
+    ordenParaFilo = { tipo: 'varias', cuantas: ordenes.length };
+  }
+
+  // ---- Burbujas sobre la foto: lo que dijiste y lo que contesta Filo ----
+  const filoBurbujas = document.getElementById('filoBurbujas');
+  let burbujasReloj = null;
+  let pensandoBurbuja = null;
+  function ubicarBurbujas() {
+    const panel = document.querySelector('.nav-panel');
+    if (!filoBurbujas || !panel) return;
+    // Justo encima de «Atrás / Siguiente»; si esos botones quedan más abajo de lo que se ve, abajo
+    // de la pantalla (nunca afuera).
+    const arriba = Math.min(panel.getBoundingClientRect().top, window.innerHeight);
+    filoBurbujas.style.bottom = Math.max(8, window.innerHeight - arriba + 8) + 'px';
+  }
+  function burbuja(clase, quien, texto) {
+    const b = document.createElement('div');
+    b.className = 'filo-burbuja ' + clase;
+    const q = document.createElement('span');
+    q.className = 'filo-quien';
+    q.textContent = quien;
+    b.append(q, document.createTextNode(texto));
+    filoBurbujas.append(b);
+    requestAnimationFrame(() => requestAnimationFrame(() => b.classList.add('ver')));
+    return b;
+  }
+  function burbujasSeVan(ms) {
+    clearTimeout(burbujasReloj);
+    burbujasReloj = setTimeout(() => {
+      filoBurbujas.querySelectorAll('.filo-burbuja').forEach(b => b.classList.remove('ver'));
+      burbujasReloj = setTimeout(() => { filoBurbujas.textContent = ''; }, 250);
+    }, ms);
+  }
+  function burbujaPensando(oido) {
+    if (!filoBurbujas) return;
+    ubicarBurbujas();
+    clearTimeout(burbujasReloj);
+    filoBurbujas.textContent = '';
+    burbuja('tu', 'Tú', oido);
+    pensandoBurbuja = burbuja('filo pensando', 'Filo', '🧠 pensando…');
+  }
+  function quitarPensando() {
+    if (pensandoBurbuja) { pensandoBurbuja.remove(); pensandoBurbuja = null; }
+  }
+  function burbujasDe(text, hecho) {
+    if (!filoBurbujas) return;
+    ubicarBurbujas();
+    clearTimeout(burbujasReloj);
+    // Si quedó la burbuja «Tú» de cuando pensaba, se usa esa; si no, empieza de cero.
+    const tuYa = filoBurbujas.querySelector('.filo-burbuja.tu');
+    if (!(tuYa && filoBurbujas.children.length === 1 && tuYa.lastChild.textContent === text)) { filoBurbujas.textContent = ''; burbuja('tu', 'Tú', text); }
+    const nada = /no entend/i.test(hecho || '');
+    const texto = hecho ? (nada ? '🤔 ' + hecho : hecho) : '✅ Listo';
+    burbuja('filo' + (nada ? ' duda' : ''), 'Filo' + (marcaCamino ? ' · ' + marcaCamino : ''), texto);
+    // La ayuda es larga: se queda más para poder leerla.
+    burbujasSeVan(String(hecho || '').length > 120 ? 9000 : 3000);
+  }
+  window.addEventListener('resize', ubicarBurbujas);
+
   let ordenDeFilo = null;   // la orden a la que Filo está contestando ahora
   function hacerOrdenDeVoz(alternativas) {
     if (Date.now() < filoCallaHasta) {
@@ -1419,7 +1583,8 @@
     }
   }
 
-  function cumplirOrdenDeVoz(alternativas) {
+  // ordenDada: una orden que ya pensó la IA (sin volver a decidir).
+  function cumplirOrdenDeVoz(alternativas, ordenDada) {
     const oido = String(alternativas[0] || '').trim();
     // Con la pregunta «¿Cerrar tu pantalla?» abierta sólo se escucha la respuesta: «sí» (o
     // «cerrar») cierra, «no» (o «seguir») la deja como está.
@@ -1447,7 +1612,17 @@
         return;
       }
     }
-    let orden = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+    let orden;
+    if (ordenDada !== undefined) orden = ordenDada;
+    else {
+      const reglas = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+      const d = filoDecidir(oido, reglas);
+      if (d.camino === 'nube') { pensarEnLaNube(alternativas, oido, reglas); return; }
+      if (d.camino !== 'ignorar') cancelarNube();
+      if (d.camino === 'celular') marcaCamino = '⚡';
+      if (d.ordenes.length > 1) { hacerVarias(alternativas, oido, d.ordenes); marcaCamino = ''; return; }
+      orden = d.ordenes[0] || null;
+    }
     if (!orden) {
       // Una frase corta que no se entendió se muestra, para saber qué oyó; una larga es
       // alguien hablando y no hace falta avisar nada.
@@ -1573,6 +1748,8 @@
   const voiceHeard = document.getElementById('voiceHeard');
 
   function setVoiceUI(active) {
+    if (active) prepararFilo();
+    document.body.classList.toggle('voz-prendida', active);
     voiceBtn.textContent = active ? '🛑 Detener voz' : '🎤 Voz';
     voiceBtn.classList.toggle('active', active);
     voiceStatus.hidden = !active;
@@ -1582,6 +1759,9 @@
   // Muestra en verde lo último que se reconoció por voz y, si hay, lo que se hizo con eso
   function showHeard(text, hecho) {
     hechoParaFilo = hecho || '';
+    if (juntando) { juntando.push(hecho || ''); return; }
+    burbujasDe(text, hecho);
+    marcaCamino = '';
     voiceHeard.textContent = '🎙️ "' + text + '"' + (hecho ? ' · ' + hecho : '');
     voiceHeard.hidden = false;
     voiceHeard.classList.remove('pulse');
