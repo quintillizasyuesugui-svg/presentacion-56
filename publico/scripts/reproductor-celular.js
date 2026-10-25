@@ -608,6 +608,9 @@
       const elemento = lista[orden.numero - 1];
       return elemento ? poner(elemento) : `No tenés ${cual} ${orden.numero} (hay ${lista.length}).`;
     }
+    // «reproducir» con algo ya en la pantalla (en pausa): sigue, aunque haya venido de YouTube o
+    // de un enlace y no esté en la lista.
+    if (orden.accion === 'reproducir' && actual) { mandar(para, 'reproducir'); return '▶ Sigue'; }
     if (!lista.length) return para === 'video' ? 'Todavía no tenés videos.' : 'Todavía no tenés música.';
     if (orden.accion === 'siguiente' || orden.accion === 'anterior') {
       if (para === 'musica') { mandar('musica', orden.accion); return orden.accion === 'siguiente' ? '⏭ Siguiente canción' : '⏮ Canción anterior'; }

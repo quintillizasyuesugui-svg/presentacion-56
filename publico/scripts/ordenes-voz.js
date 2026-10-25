@@ -70,7 +70,8 @@
   // Palabras que, justo antes del número, dicen «hasta ese número»: «baja a 10», «sube al 80».
   const HASTA = ['a', 'al', 'en', 'hasta'];
   // Palabras que no cuentan al buscar una canción o un video por su nombre.
-  const RELLENO = ['la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'que', 'se', 'llama', 'mi', 'me', 'por', 'favor'];
+  const RELLENO = ['la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'que', 'se', 'llama', 'mi', 'me', 'por', 'favor',
+    'le', 'lo', 'al', 'a', 'dale', 'ese', 'esa', 'este', 'esta', 'otra', 'vez', 'nuevo', 'ahora', 'ya', 'porfa', 'filo'];
 
   // Quita tildes y signos: «¡Atrás!» y «atras» valen lo mismo.
   function normalizar(texto) {
@@ -303,6 +304,9 @@
 
     // Música y video: «pon música», «música 2», «siguiente canción», «siguiente video».
     if (para) {
+      // «sigue el video», «continúa con la música»: seguir lo que está en pausa, no pasar al otro.
+      const sigueSolo = palabras.includes('sigue') && !palabras.some(p => ['siguiente', 'otro', 'otra', 'proximo', 'proxima'].includes(p));
+      if (sigueSolo) return { tipo: 'medios', para, accion: 'reproducir' };
       if (dice(palabras, 'siguiente')) return { tipo: 'medios', para, accion: 'siguiente' };
       if (dice(palabras, 'anterior')) return { tipo: 'medios', para, accion: 'anterior' };
       if (numero !== null && numero >= 1) return { tipo: 'medios', para, accion: 'elegir', numero };
