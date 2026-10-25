@@ -3264,3 +3264,61 @@ body[data-reproductor="control"].voz-prendida .voice-status { padding: 0.45rem 0
 @media (max-height: 600px) {
   body[data-reproductor="control"].voz-prendida .zoom-mini { max-height: 16vh; }
 }
+
+/* ===== Cuenta de Google (diseño «hoja desde abajo») =====
+   Fila con el logo de Google y una etiqueta «Sin proteger» / «Protegida». En el celular el aviso
+   sube desde abajo (cómodo con el pulgar); en la PC sale al centro como las demás ventanas. */
+.google-fila { display: flex; gap: 12px; align-items: center; text-align: left; min-width: 0; }
+.google-fila > div, .google-fila > .action-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.google-logo {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; background: #fff;
+  display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.google-logo svg { width: 24px; height: 24px; display: block; }
+.chip-google { align-self: flex-start; display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 700; line-height: 1.3; }
+.chip-google.no { background: rgba(251, 191, 36, 0.13); color: #fbbf24; }
+.chip-google.si { background: rgba(34, 197, 94, 0.14); color: #4ade80; }
+.hoja-google .google-fila { margin-bottom: 4px; padding-right: 40px; }
+.hoja-google .google-fila h2 { margin: 0; padding: 0; font-size: 1.05rem; }
+.hoja-google .google-fila p { margin: 0; font-size: 0.84rem; line-height: 1.4; }
+.auth-pregunta .hoja-google .auth-google { margin: 12px 0 2px; }
+.auth-pregunta .hoja-google .auth-back { margin-top: 4px; }
+.auth-unida.google-fila { color: var(--text); }
+.auth-unida.google-fila b { color: #fff; font-size: 0.9rem; word-break: break-word; }
+.auth-unida.google-fila small { color: var(--text-muted); font-size: 0.76rem; line-height: 1.35; }
+.auth-protege { border: 1px solid var(--gray-700); background: var(--gray-850); }
+.auth-protege .google-fila b { font-size: 0.9rem; }
+.auth-protege .google-fila small { font-size: 0.78rem; }
+.auth-protege .google-logo { width: 40px; height: 40px; }
+.auth-protege .google-logo svg { width: 21px; height: 21px; }
+.auth-pin-caja {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 2px; padding: 10px 12px;
+  border: 1px dashed #2f4a5c; border-radius: 12px; background: rgba(0, 0, 0, 0.25); color: var(--text-muted); text-align: left;
+}
+.auth-pin-caja strong { color: var(--text); font-size: 1.15rem; letter-spacing: 0.12em; }
+.auth-pin-caja small { flex-basis: 100%; font-size: 0.74rem; line-height: 1.35; }
+/* «Mi cuenta» en Modo avanzado: fila corta + botón de Google debajo a lo ancho. */
+.mi-cuenta { flex-direction: column; align-items: stretch; gap: 10px; }
+.mi-cuenta:hover { border-color: var(--gray-700); background: var(--gray-850); }
+.mi-cuenta:active { transform: none; }
+.mi-cuenta .action-title { word-break: break-word; }
+.mi-cuenta .action-desc { font-size: 0.78rem; }
+.mi-cuenta .auth-google { justify-content: center; margin: 0; }
+.mi-cuenta .auth-google-error { text-align: left; }
+@media (max-width: 600px) and (min-height: 500px) {
+  /* Celular parado. Acostado (poca altura) sale al centro y se puede bajar, como las otras ventanas. */
+  .modal-overlay.hoja-abajo { align-items: flex-end; padding: 0; }
+  .modal-overlay.hoja-abajo .modal-card {
+    max-width: none; max-height: 94dvh; overflow-y: auto; border-bottom: none; border-radius: 24px 24px 0 0;
+    padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+    transform: translateY(100%);
+  }
+  .modal-overlay.hoja-abajo.show .modal-card { transform: none; }
+  .modal-overlay.hoja-abajo .modal-card::before {
+    content: ""; display: block; width: 40px; height: 4px; border-radius: 9px; background: var(--gray-700); margin: 0 auto 12px;
+  }
+  .auth-pregunta.hoja-abajo .aviso-cerrar { top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay.hoja-abajo .modal-card { transition: none; }
+}

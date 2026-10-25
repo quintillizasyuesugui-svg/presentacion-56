@@ -35,13 +35,16 @@
     <div id="miCuenta" hidden>
       <div class="section-label">Mi cuenta</div>
       <div class="action-card mi-cuenta" id="miCuentaCaja">
-        <span class="action-icon">🛡️</span>
-        <span class="action-text">
-          <span class="action-title" id="miCuentaTitulo">Unir con Google</span>
-          <span class="action-desc" id="miCuentaTexto">Para recuperar el PIN si lo olvidás</span>
-          <span class="auth-google" id="miCuentaGoogle"></span>
-          <span class="auth-google-error" id="miCuentaError" hidden></span>
+        <span class="google-fila">
+          <span class="google-logo" id="miCuentaLogo"></span>
+          <span class="action-text">
+            <span class="action-title" id="miCuentaTitulo">Google</span>
+            <span class="chip-google no" id="miCuentaChip">● Sin proteger</span>
+            <span class="action-desc" id="miCuentaTexto">Si olvidás el PIN, te llega un código al correo</span>
+          </span>
         </span>
+        <span class="auth-google" id="miCuentaGoogle"></span>
+        <span class="auth-google-error" id="miCuentaError" hidden></span>
       </div>
     </div>
     <div class="section-label">Imágenes</div>

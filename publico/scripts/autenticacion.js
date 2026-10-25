@@ -151,6 +151,8 @@
     return googlePromesa;
   }
   const enAppDePc = Boolean(window.ConexionesPC);
+  // Logo de Google (los 4 colores), para la fila de la cuenta.
+  const LOGO_G = '<span class="google-logo"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 2.9-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg></span>';
   async function leerCuenta(pin) {
     const res = await pedir('/api/cuenta', { headers: { 'x-pin': pin } });
     const datos = await res.json();
@@ -205,10 +207,11 @@
     }
   }
   function textoUnida(correo) {
-    const p = document.createElement('p');
-    p.className = 'auth-unida';
-    p.append('✓ Sos ', Object.assign(document.createElement('b'), { textContent: correo }), '. Si olvidás el PIN, te mandamos un código a ese correo.');
-    return p;
+    const fila = document.createElement('div');
+    fila.className = 'auth-unida google-fila';
+    fila.innerHTML = LOGO_G + '<div><b></b><span class="chip-google si">● Protegida</span><small>Si olvidás el PIN, te mandamos un código a ese correo.</small></div>';
+    fila.querySelector('b').textContent = correo;
+    return fila;
   }
 
   // Cuentas sin Google: el aviso sale cada vez que se entra (cada vez que se abre la página o la
@@ -226,12 +229,12 @@
     for (let i = 0; i < 600 && otraAbierta(); i++) await new Promise(r => setTimeout(r, 500));
     if (otraAbierta() || avisoCerrado()) return;
     const capa = document.createElement('div');
-    capa.className = 'modal-overlay auth-pregunta';
+    // En el celular sube desde abajo (cómoda con el pulgar); en la PC sale al centro.
+    capa.className = 'modal-overlay auth-pregunta hoja-abajo';
     capa.innerHTML = `
-      <div class="modal-card">
+      <div class="modal-card hoja-google">
         <button type="button" class="aviso-cerrar" id="avisoCerrar" aria-label="Cerrar">✕</button>
-        <h2>🛡️ ¿Y si olvidás el PIN?</h2>
-        <p>Uní tu cuenta de Google: si un día olvidás el PIN, te mandamos un código a tu correo y entrás con uno nuevo. Tus fotos y música no cambian.</p>
+        <div class="google-fila">${LOGO_G}<div><h2>¿Y si olvidás el PIN?</h2><p>Uní Google y te mandamos un código a tu correo. Tus fotos y música no cambian.</p></div></div>
         <div class="auth-google" id="avisoGoogle"></div>
         <p class="auth-google-error" id="avisoGoogleError" hidden></p>
         <button type="button" class="auth-back" id="avisoAhoraNo">Ahora no</button>
@@ -250,7 +253,7 @@
       capa.querySelector('#avisoAhoraNo').textContent = 'Listo';
     }, (texto) => { errorAviso.textContent = texto; errorAviso.hidden = false; });
   }
-  window.cuentaGoogle = { boton: botonGoogle, leer: leerCuenta, textoUnida, ofrecer: ofrecerUnirGoogle };
+  window.cuentaGoogle = { boton: botonGoogle, leer: leerCuenta, textoUnida, ofrecer: ofrecerUnirGoogle, logo: LOGO_G };
 
   // allowRegister=false arma sólo el bloque de PIN, sin "Soy nuevo/a" — para
   // pantalla.html: en el proyector/TV no tiene sentido dar de alta gente
@@ -356,8 +359,7 @@
         <!-- Recién registrado: ofrece unir la cuenta de Google para poder recuperar el PIN. -->
         <div id="authListo" hidden>
           <div class="auth-protege" id="authProtege" hidden>
-            <b>🛡️ ¿Y si olvidás el PIN?</b>
-            <small>Uní tu cuenta de Google: si lo olvidás, te mandamos un código a tu correo.</small>
+            <div class="google-fila">${LOGO_G}<div><b>Por si lo olvidás</b><small>Uní Google y recuperalo con tu correo.</small></div></div>
             <div class="auth-google" id="authGoogle"></div>
             <p class="auth-google-error" id="authGoogleError" hidden></p>
             <button type="button" class="auth-back" id="authAhoraNo">Ahora no</button>
@@ -629,7 +631,14 @@
         // El PIN sólo se muestra en este momento — después queda guardado en
         // el celular y no hace falta volver a escribirlo en este dispositivo.
         errorEl.textContent = '';
-        errorEl.append(`¡Listo, ${auth.name}! Tu PIN es `, Object.assign(document.createElement('strong'), { textContent: auth.pin }), '. Anotalo: te sirve para entrar desde otro celular.');
+        const titulo = gate.querySelector('h2');
+        if (titulo) titulo.textContent = `¡Listo, ${auth.name}!`;
+        const pinCaja = Object.assign(document.createElement('span'), { className: 'auth-pin-caja' });
+        pinCaja.append('🔑 Tu PIN es ', Object.assign(document.createElement('strong'), { textContent: auth.pin }),
+          Object.assign(document.createElement('small'), { textContent: 'Anotalo: te sirve para entrar desde otro celular.' }));
+        errorEl.append(pinCaja);
+        // En el celular, esta ventana sube desde abajo como el aviso de Google.
+        gate.classList.add('hoja-abajo');
         if (registerBtn) registerBtn.disabled = true;
         loginBtn.disabled = true;
         if (nameInput) nameInput.disabled = true;

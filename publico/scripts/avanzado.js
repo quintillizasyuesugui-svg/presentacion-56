@@ -1087,10 +1087,15 @@
     const titulo = document.getElementById('miCuentaTitulo');
     const texto = document.getElementById('miCuentaTexto');
     const error = document.getElementById('miCuentaError');
+    const chip = document.getElementById('miCuentaChip');
+    const logo = document.getElementById('miCuentaLogo');
+    if (g.logo && logo) logo.outerHTML = g.logo;
     document.getElementById('miCuenta').hidden = false;
     const unida = (correo) => {
-      titulo.textContent = '✓ Cuenta unida a Google';
-      texto.textContent = correo + '. Si olvidás el PIN, te mandamos un código a ese correo.';
+      titulo.textContent = correo;
+      chip.textContent = '● Protegida';
+      chip.className = 'chip-google si';
+      texto.textContent = 'Si olvidás el PIN, te mandamos un código a ese correo.';
       caja.hidden = true;
       error.hidden = true;
     };
