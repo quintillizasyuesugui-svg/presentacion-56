@@ -110,6 +110,7 @@ const socket = io();
     $('filtroAdmin').hidden = false;
   }
 
+  const virtuales = {};
   function pintarLista(tipo) {
     const lista = tipo === 'musica' ? $('listaMusica') : $('listaVideos');
     const barra = tipo === 'musica' ? $('seleccionMusica') : $('seleccionVideos');
@@ -158,39 +159,57 @@ const socket = io();
     boton.hidden = items.length <= VISIBLES_PLEGADA;
     boton.textContent = desplegada[tipo] ? 'Ver menos ▴' : `Ver todas (${items.length}) ▾`;
 
-    lista.replaceChildren(...visibles.map((e, n) => {
-      const marcada = sel.has(e.id);
-      const detalles = [];
-      if (e.origen === 'youtube') detalles.push('🔗 YouTube' + (e.inicio != null || e.fin != null ? ` (${fmtTiempo(e.inicio || 0)} a ${e.fin != null ? fmtTiempo(e.fin) : 'el final'})` : ''));
-      if (e.duracion) detalles.push(fmtTiempo(e.duracion));
-      detalles.push(e.bytes ? fmtMb(e.bytes) : '0 MB');
-      if (auth.isAdmin && e.owner && e.owner !== auth.name) detalles.push('👤 ' + e.owner);
-      const fila = crear('li', { class: 'fila-medio' + (marcada ? ' marcada' : ''), 'data-id': e.id });
+    // Con miles de filas sólo se dibujan las que se ven (lista-virtual.js)
+    const ctx = { tipo, sel, ordenable, dueno, total: items.length };
+    if (!virtuales[tipo]) {
+      virtuales[tipo] = window.listaVirtual(lista, {
+        crearFila: (e, n) => crearFilaMedio(virtuales[tipo].ctx, e, n),
+        numero: '.numero-orden',
+        // Se agarra de cualquier parte de la fila (no de los botones); con ≡ agarra sin esperar.
+        arrastre: (ev) => {
+          if (!virtuales[tipo].ctx.ordenable) return false;
+          const sobre = ev.target.closest('button, input, a, select, textarea');
+          if (sobre && !sobre.classList.contains('asa-orden')) return false;
+          return sobre ? 'ya' : 'esperar';
+        },
+        alOrdenar: () => guardarOrden(virtuales[tipo].ctx.tipo, virtuales[tipo].ctx.dueno, virtuales[tipo].visibles)
+      });
+    }
+    virtuales[tipo].ctx = ctx;
+    virtuales[tipo].visibles = visibles;
+    virtuales[tipo].poner(visibles);
+  }
+
+  function crearFilaMedio({ tipo, sel, ordenable, dueno, total }, e, n) {
+    const marcada = sel.has(e.id);
+    const detalles = [];
+    if (e.origen === 'youtube') detalles.push('🔗 YouTube' + (e.inicio != null || e.fin != null ? ` (${fmtTiempo(e.inicio || 0)} a ${e.fin != null ? fmtTiempo(e.fin) : 'el final'})` : ''));
+    if (e.duracion) detalles.push(fmtTiempo(e.duracion));
+    detalles.push(e.bytes ? fmtMb(e.bytes) : '0 MB');
+    if (auth.isAdmin && e.owner && e.owner !== auth.name) detalles.push('👤 ' + e.owner);
+    const fila = crear('li', { class: 'fila-medio' + (marcada ? ' marcada' : ''), 'data-id': e.id });
+    if (ordenable) {
+      fila.append(crear('button', { type: 'button', class: 'asa-orden', 'aria-label': 'Arrastrar para cambiar el orden de ' + e.nombre, text: '≡' }));
+      fila.classList.add('ordenable');
+    }
+    fila.append(crear('span', { class: 'numero-orden', 'aria-hidden': 'true', text: String(n + 1) }));
+    if (seleccionando[tipo]) {
+      const cb = crear('input', { type: 'checkbox', 'aria-label': 'Marcar ' + e.nombre });
+      cb.checked = marcada;
+      cb.addEventListener('change', () => { if (cb.checked) sel.add(e.id); else sel.delete(e.id); pintarLista(tipo); });
+      fila.append(cb);
+    }
+    fila.append(crear('span', { class: 'datos-medio' }, [crear('b', { text: (e.origen === 'youtube' ? '' : tipo === 'video' ? '📁 ' : '') + e.nombre }), crear('span', { text: detalles.join(' · ') })]));
+    if (!seleccionando[tipo]) {
       if (ordenable) {
-        const asa = crear('button', { type: 'button', class: 'asa-orden', 'aria-label': 'Arrastrar para cambiar el orden de ' + e.nombre, text: '≡' });
-        asa.addEventListener('pointerdown', (ev) => arrastrar(ev, fila, lista, tipo, dueno));
-        fila.append(asa);
+        fila.append(
+          crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Subir de posición', text: '▲', disabled: n === 0, onclick: () => mover(tipo, e.id, -1, dueno) }),
+          crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Bajar de posición', text: '▼', disabled: n === total - 1, onclick: () => mover(tipo, e.id, 1, dueno) })
+        );
       }
-      fila.append(crear('span', { class: 'numero-orden', 'aria-hidden': 'true', text: String(n + 1) }));
-      if (seleccionando[tipo]) {
-        const cb = crear('input', { type: 'checkbox', 'aria-label': 'Marcar ' + e.nombre });
-        cb.checked = marcada;
-        cb.addEventListener('change', () => { if (cb.checked) sel.add(e.id); else sel.delete(e.id); pintarLista(tipo); });
-        fila.append(cb);
-      }
-      fila.append(crear('span', { class: 'datos-medio' }, [crear('b', { text: (e.origen === 'youtube' ? '' : tipo === 'video' ? '📁 ' : '') + e.nombre }), crear('span', { text: detalles.join(' · ') })]));
-      if (!seleccionando[tipo]) {
-        const i = propios.indexOf(e);
-        if (ordenable && i !== -1) {
-          fila.append(
-            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Subir de posición', text: '▲', disabled: i === 0, onclick: () => mover(tipo, e.id, -1, dueno) }),
-            crear('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Bajar de posición', text: '▼', disabled: i === propios.length - 1, onclick: () => mover(tipo, e.id, 1, dueno) })
-          );
-        }
-        fila.append(crear('button', { type: 'button', class: 'icon-btn danger', 'aria-label': 'Borrar ' + e.nombre, text: '🗑️', onclick: () => pedirBorrar(tipo, [e.id]) }));
-      }
-      return fila;
-    }));
+      fila.append(crear('button', { type: 'button', class: 'icon-btn danger', 'aria-label': 'Borrar ' + e.nombre, text: '🗑️', onclick: () => pedirBorrar(tipo, [e.id]) }));
+    }
+    return fila;
   }
 
   function pintarTodo() {
@@ -211,58 +230,22 @@ const socket = io();
     }
   }
 
-  // ---- Arrastrar con el dedo para ordenar (las flechas ▲▼ quedan de respaldo) ----
-  function arrastrar(e, fila, lista, tipo, dueno) {
-    e.preventDefault();
-    const asa = e.currentTarget;
-    let inicioY = e.clientY;
-    fila.classList.add('arrastrando');
-    asa.setPointerCapture(e.pointerId);
-    function mover(ev) {
-      fila.style.transform = `translateY(${ev.clientY - inicioY}px)`;
-      const r = fila.getBoundingClientRect();
-      const centro = r.top + r.height / 2;
-      for (const otra of [...lista.children]) {
-        if (otra === fila) continue;
-        const o = otra.getBoundingClientRect();
-        const filas = [...lista.children];
-        const yo = filas.indexOf(fila);
-        const ella = filas.indexOf(otra);
-        if (yo < ella && centro > o.top + o.height / 2) {
-          lista.insertBefore(otra, fila);
-          inicioY += o.height + 8;
-        } else if (yo > ella && centro < o.top + o.height / 2) {
-          lista.insertBefore(fila, otra);
-          inicioY -= o.height + 8;
-        }
-        fila.style.transform = `translateY(${ev.clientY - inicioY}px)`;
-      }
+  // ---- Arrastrar para ordenar (las flechas ▲▼ quedan de respaldo) ----
+  async function guardarOrden(tipo, dueno, visibles) {
+    // Lo que se ve quedó en el orden nuevo; lo que estaba plegado sigue detrás, igual que antes.
+    const vistos = visibles.map(x => x.id);
+    const yaVistos = new Set(vistos);
+    const resto = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno && !yaVistos.has(x.id)).map(x => x.id);
+    const ids = [...vistos, ...resto];
+    const antes = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno).map(x => x.id);
+    if (ids.join() === antes.join()) return;
+    try {
+      datos = await pedir('/api/multimedia/orden', { tipo, ids, dueno });
+      avisar('✅ Orden guardado: así van a salir en el celular.', true);
+    } catch (err) {
+      avisar(err.message);
+      pintarTodo();
     }
-    async function soltar(ev) {
-      asa.releasePointerCapture(ev.pointerId);
-      asa.removeEventListener('pointermove', mover);
-      asa.removeEventListener('pointerup', soltar);
-      asa.removeEventListener('pointercancel', soltar);
-      fila.classList.remove('arrastrando');
-      fila.style.transform = '';
-      // Lo que se ve quedó en el orden nuevo; lo que estaba plegado sigue detrás, igual que antes.
-      const vistos = [...lista.children].map(li => li.dataset.id);
-      const resto = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno && !vistos.includes(x.id)).map(x => x.id);
-      const ids = [...vistos, ...resto];
-      const antes = datos.elementos.filter(x => x.tipo === tipo && x.owner === dueno).map(x => x.id);
-      if (ids.join() === antes.join()) return;
-      try {
-        datos = await pedir('/api/multimedia/orden', { tipo, ids, dueno });
-        pintarTodo();
-        avisar('✅ Orden guardado: así van a salir en el celular.', true);
-      } catch (err) {
-        avisar(err.message);
-        pintarTodo();
-      }
-    }
-    asa.addEventListener('pointermove', mover);
-    asa.addEventListener('pointerup', soltar);
-    asa.addEventListener('pointercancel', soltar);
   }
 
   if (hayListas) {

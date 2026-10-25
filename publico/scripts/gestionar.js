@@ -218,132 +218,76 @@
     }
   });
 
+  // Con miles de imágenes sólo se dibujan las que se ven (lista-virtual.js).
+  // Toda la fila se puede arrastrar para reordenar de un tirón, PERO las flechas ▲▼ siguen ahí
+  // como respaldo, por si el arrastre no anda bien en algún celular.
+  const listaImagenes = window.listaVirtual(imageList, {
+    crearFila: crearFilaImagen,
+    numero: '.order-badge',
+    arrastre: (e) => (eligiendo || e.target.closest('.icon-btn') ? false : 'esperar'),
+    alOrdenar: () => saveOrder()
+  });
+
   function render() {
-    imageList.innerHTML = '';
     emptyHint.hidden = images.length > 0;
     pintarBarrasDeElegir();
-
-    images.forEach(({ id, src, pagina, titulo }, i) => {
-      const row = document.createElement('div');
-      row.className = 'image-row';
-      row.dataset.id = id;
-      // Una página web va con un globo en lugar de la foto y con su dirección como nombre.
-      row.innerHTML = `
-        <span class="order-badge">${i + 1}</span>
-        ${pagina ? '<span class="thumb thumb-pagina" aria-hidden="true">🌐</span>' : `<img class="thumb" src="${src}" alt="">`}
-        <span class="filename-label"></span>
-        <div class="row-actions">
-          <button type="button" class="icon-btn" data-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Subir de posición">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-          </button>
-          <button type="button" class="icon-btn" data-action="down" ${i === images.length - 1 ? 'disabled' : ''} aria-label="Bajar de posición">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-          <button type="button" class="icon-btn danger" data-action="delete" aria-label="Eliminar">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
-        </div>
-      `;
-      row.querySelector('.filename-label').textContent = pagina ? (titulo || pagina) : id.split('/').pop();
-      if (eligiendo) {
-        // La fila entera es la casilla: sin flechas, sin tacho y sin arrastrar.
-        const marcada = elegidas.has(id);
-        row.classList.add('elegible');
-        row.classList.toggle('elegida', marcada);
-        row.querySelector('.row-actions').style.display = 'none';
-        const casilla = document.createElement('span');
-        casilla.className = 'fila-casilla';
-        casilla.textContent = '✓';
-        casilla.setAttribute('aria-hidden', 'true');
-        row.prepend(casilla);
-        row.tabIndex = 0;
-        row.setAttribute('role', 'checkbox');
-        row.setAttribute('aria-checked', String(marcada));
-        row.setAttribute('aria-label', `Imagen ${i + 1}`);
-        row.addEventListener('click', () => alternarElegida(id));
-        row.addEventListener('keydown', (e) => {
-          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); alternarElegida(id); }
-        });
-        imageList.appendChild(row);
-        return;
-      }
-      row.querySelector('[data-action="up"]').addEventListener('click', () => move(i, -1));
-      row.querySelector('[data-action="down"]').addEventListener('click', () => move(i, 1));
-      row.querySelector('[data-action="delete"]').addEventListener('click', () => remove(id));
-      // Toda la fila se puede arrastrar para reordenar de un tirón, PERO las
-      // flechas ▲▼ siguen ahí como respaldo — por si el arrastre no anda bien
-      // en algún celular (mismo criterio que los botones del editor).
-      row.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('.icon-btn')) return;
-        startDrag(e, row);
-      });
-      imageList.appendChild(row);
-    });
+    listaImagenes.poner(images);
   }
 
-  // ---- Arrastrar con el dedo (o el mouse) para reordenar ----
-  // Se agarra de cualquier parte de la fila, no de un agarradero chiquito.
-  function startDrag(e, row) {
-    e.preventDefault();
-    const handle = e.currentTarget;
-    let startY = e.clientY;
-
-    row.classList.add('dragging');
-    document.body.classList.add('dragging-active');
-    handle.setPointerCapture(e.pointerId);
-
-    function onMove(ev) {
-      const dy = ev.clientY - startY;
-      row.style.transform = `translateY(${dy}px)`;
-
-      const rowRect = row.getBoundingClientRect();
-      const rowCenter = rowRect.top + rowRect.height / 2;
-      const siblings = Array.from(imageList.children).filter(r => r !== row);
-
-      for (const sib of siblings) {
-        const sibRect = sib.getBoundingClientRect();
-        const sibCenter = sibRect.top + sibRect.height / 2;
-        const rows = Array.from(imageList.children);
-        const rowIndex = rows.indexOf(row);
-        const sibIndex = rows.indexOf(sib);
-
-        if (rowIndex < sibIndex && rowCenter > sibCenter) {
-          imageList.insertBefore(sib, row);
-          startY += sibRect.height;
-          row.style.transform = `translateY(${ev.clientY - startY}px)`;
-        } else if (rowIndex > sibIndex && rowCenter < sibCenter) {
-          imageList.insertBefore(row, sib);
-          startY -= sibRect.height;
-          row.style.transform = `translateY(${ev.clientY - startY}px)`;
-        }
-      }
+  function crearFilaImagen({ id, src, pagina, titulo }, i) {
+    const row = document.createElement('div');
+    row.className = 'image-row';
+    row.dataset.id = id;
+    // Una página web va con un globo en lugar de la foto y con su dirección como nombre.
+    row.innerHTML = `
+      <span class="order-badge">${i + 1}</span>
+      ${pagina ? '<span class="thumb thumb-pagina" aria-hidden="true">🌐</span>' : `<img class="thumb" src="${src}" alt="" loading="lazy" decoding="async">`}
+      <span class="filename-label"></span>
+      <div class="row-actions">
+        <button type="button" class="icon-btn" data-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Subir de posición">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        </button>
+        <button type="button" class="icon-btn" data-action="down" ${i === images.length - 1 ? 'disabled' : ''} aria-label="Bajar de posición">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <button type="button" class="icon-btn danger" data-action="delete" aria-label="Eliminar">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+    row.querySelector('.filename-label').textContent = pagina ? (titulo || pagina) : id.split('/').pop();
+    if (eligiendo) {
+      // La fila entera es la casilla: sin flechas, sin tacho y sin arrastrar.
+      const marcada = elegidas.has(id);
+      row.classList.add('elegible');
+      row.classList.toggle('elegida', marcada);
+      row.querySelector('.row-actions').style.display = 'none';
+      const casilla = document.createElement('span');
+      casilla.className = 'fila-casilla';
+      casilla.textContent = '✓';
+      casilla.setAttribute('aria-hidden', 'true');
+      row.prepend(casilla);
+      row.tabIndex = 0;
+      row.setAttribute('role', 'checkbox');
+      row.setAttribute('aria-checked', String(marcada));
+      row.setAttribute('aria-label', `Imagen ${i + 1}`);
+      row.addEventListener('click', () => alternarElegida(id));
+      row.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); alternarElegida(id); }
+      });
+      return row;
     }
-
-    function onUp(ev) {
-      handle.releasePointerCapture(ev.pointerId);
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onUp);
-      handle.removeEventListener('pointercancel', onUp);
-      row.classList.remove('dragging');
-      document.body.classList.remove('dragging-active');
-      row.style.transform = '';
-
-      // El DOM ya quedó en el orden final — reconstruimos el array a partir de él
-      const byId = new Map(images.map(img => [img.id, img]));
-      images = Array.from(imageList.children).map(r => byId.get(r.dataset.id));
-      render();
-      saveOrder();
-    }
-
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onUp);
-    handle.addEventListener('pointercancel', onUp);
+    // El lugar se busca al tocar: después de arrastrar la fila ya no está donde se dibujó
+    row.querySelector('[data-action="up"]').addEventListener('click', () => move(images.findIndex(x => x.id === id), -1));
+    row.querySelector('[data-action="down"]').addEventListener('click', () => move(images.findIndex(x => x.id === id), 1));
+    row.querySelector('[data-action="delete"]').addEventListener('click', () => remove(id));
+    return row;
   }
 
   async function saveOrder() {
@@ -360,7 +304,7 @@
 
   function move(index, delta) {
     const target = index + delta;
-    if (target < 0 || target >= images.length) return;
+    if (index < 0 || target < 0 || target >= images.length) return;
     [images[index], images[target]] = [images[target], images[index]];
     render();
     saveOrder();

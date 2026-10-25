@@ -1273,7 +1273,7 @@ body.control {
   border: 1px solid var(--gray-700);
   border-radius: var(--radius-sm);
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
   transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 
@@ -3184,3 +3184,34 @@ body[data-reproductor="control"] .utility-row .btn.icon-only { width: 38px; }
   margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--amber-400); border-radius: 12px;
   background: rgba(251, 191, 36, 0.1); color: #fde68a; font-size: 0.85rem; font-weight: 700; line-height: 1.4; text-align: center;
 }
+
+/* ---- Ordenar arrastrando (lista-virtual.js): imágenes, música y videos ---- */
+.orden-agarrada {
+  position: absolute !important;
+  left: 0;
+  right: 0;
+  margin: 0 !important;
+  z-index: 10;
+  will-change: transform;
+  border-color: var(--primary-500) !important;
+  box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.75);
+  cursor: grabbing;
+}
+.orden-cayendo { transition: transform 170ms cubic-bezier(.2, .8, .2, 1); }
+.orden-fantasma {
+  opacity: 0.45;
+  border: 2px dashed var(--primary-400) !important;
+  background: rgba(52, 205, 250, 0.08) !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+.orden-fantasma .order-badge,
+.orden-fantasma .numero-orden { background: var(--primary-400); color: #04121c; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .orden-cayendo { transition: none; }
+}
+/* Filas que se agarran enteras: deslizar sin esperar sigue bajando la página */
+.image-row, .fila-medio.ordenable { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.fila-medio.ordenable { cursor: grab; touch-action: pan-y; }
+/* Todas las filas del mismo alto (la lista larga sólo dibuja las que se ven) */
+.fila-medio .datos-medio span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
