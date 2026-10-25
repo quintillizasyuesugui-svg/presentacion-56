@@ -1334,9 +1334,26 @@
   });
   filoAudio.addEventListener('ended', () => filoTermino(300));
   filoAudio.addEventListener('error', () => filoTermino(0));
+  // Varias formas de decir lo mismo (voz-filo/siguiente.mp3, siguiente_2.mp3…): se elige una al
+  // azar sin repetir la última, así Filo no suena siempre igual.
+  const FILO_FORMAS = {
+    siguiente: 3, anterior: 3, mostrar: 3, listo: 3, no_entendi: 3, no_puedo: 3, subir: 3, bajar: 3,
+    agrando: 3, achico: 3, normal: 3, muevo: 3, pausa: 3, seguir: 3, cancion: 3, video: 3, silencio: 3,
+    sonido: 3, diapositiva: 3, ultima: 3, siguiente_cancion: 3, anterior_cancion: 3, adelanto: 2,
+    atraso: 2, momento: 2, azar: 2, varias: 3
+  };
+  const filoUltima = {};
+  function formaDeFilo(clave) {
+    const n = FILO_FORMAS[clave] || 1;
+    if (n < 2) return clave;
+    let k = 1 + Math.floor(Math.random() * n);
+    if (k === filoUltima[clave]) k = (k % n) + 1;
+    filoUltima[clave] = k;
+    return k === 1 ? clave : clave + '_' + k;
+  }
   function filoDice(clave) {
     if (!filoHabla || !clave) return;
-    filoAudio.src = 'voz-filo/' + clave + '.mp3';
+    filoAudio.src = 'voz-filo/' + formaDeFilo(clave) + '.mp3';
     if (vozDeLaApp && typeof vozDeLaApp.hablando === 'function') {
       try { vozDeLaApp.hablando(true); } catch { /* app vieja */ }
     }
@@ -1355,7 +1372,7 @@
     if (/^(No |Todavía|primero|ese botón|el buscador|decime|no hay)/i.test(texto) || /sólo está/.test(texto)) return 'no_puedo';
     const a = orden.accion;
     switch (orden.tipo) {
-      case 'varias': return 'listo';
+      case 'varias': return 'varias';
       case 'cerrarRespuesta': return orden.si ? 'cerrada' : 'sigues';
       case 'ytElegido': return 'video';
       case 'cerrar': return 'cerrar';
