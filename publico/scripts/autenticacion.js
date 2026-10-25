@@ -160,7 +160,46 @@
     return datos;
   }
   // Dibuja «Continuar con Google» en «caja». alUnir(correo) cuando queda unida; alError(texto) si falla.
+  async function unirConCredencial(pin, credencial) {
+    const res = await pedir('/api/cuenta/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-pin': pin },
+      body: JSON.stringify({ credencial })
+    });
+    const datos = await res.json();
+    if (!res.ok) throw new Error(datos.error || 'No se pudo unir la cuenta.');
+    return datos.correo;
+  }
+  // App de celular 1.0.9 o más: la ventana de cuentas de Android, sin salir a Chrome.
+  const googleEnApp = (() => { try { return Boolean(window.CuentaGoogle && window.CuentaGoogle.disponible()); } catch { return false; } })();
+  async function botonGoogleApp(caja, pin, alUnir, alError) {
+    let cuenta;
+    try { cuenta = await leerCuenta(pin); } catch (err) { alError(err.message); return; }
+    caja.textContent = '';
+    const boton = Object.assign(document.createElement('button'), { type: 'button', className: 'boton-google-app' });
+    const ponerTexto = (t) => { boton.innerHTML = LOGO_G; boton.append(t); };
+    ponerTexto('Continuar con Google');
+    caja.append(boton);
+    boton.addEventListener('click', () => {
+      boton.disabled = true;
+      ponerTexto('Abriendo tus cuentas…');
+      window.googleNativo = async (estado, texto) => {
+        window.googleNativo = null;
+        const listo = () => { boton.disabled = false; ponerTexto('Continuar con Google'); };
+        if (estado === 'ok') {
+          try { alUnir(await unirConCredencial(pin, texto)); } catch (err) { listo(); alError(err.message); }
+          return;
+        }
+        listo();
+        if (estado === 'cancelado') return;
+        if (estado === 'sin_cuentas') { alError('Este celular no tiene cuentas de Google. Agregá una en Ajustes → Cuentas y probá de nuevo.'); return; }
+        alError('Google no respondió (' + (texto || 'sin detalle') + '). Probá de nuevo en un rato.');
+      };
+      try { window.CuentaGoogle.pedir(cuenta.googleId); } catch { window.googleNativo('error', 'la app no respondió'); }
+    });
+  }
   async function botonGoogle(caja, pin, alUnir, alError) {
+    if (enApp && googleEnApp) return botonGoogleApp(caja, pin, alUnir, alError);
     if (enApp || enAppDePc) {
       // La app abre en el navegador los enlaces que no son https de Conexiones: con «http» va a
       // Chrome (Render lo pasa solo a https) y ahí, al entrar con el PIN, sale este mismo aviso.
@@ -185,16 +224,7 @@
         ux_mode: 'popup',
         auto_select: false,
         callback: async (respuesta) => {
-          try {
-            const res = await pedir('/api/cuenta/google', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-pin': pin },
-              body: JSON.stringify({ credencial: respuesta.credential })
-            });
-            const datos = await res.json();
-            if (!res.ok) throw new Error(datos.error || 'No se pudo unir la cuenta.');
-            alUnir(datos.correo);
-          } catch (err) { alError(err.message); }
+          try { alUnir(await unirConCredencial(pin, respuesta.credential)); } catch (err) { alError(err.message); }
         }
       });
       caja.textContent = '';

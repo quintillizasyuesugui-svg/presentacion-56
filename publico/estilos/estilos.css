@@ -3322,3 +3322,14 @@ body[data-reproductor="control"].voz-prendida .voice-status { padding: 0.45rem 0
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay.hoja-abajo .modal-card { transition: none; }
 }
+
+/* «Continuar con Google» dentro de la app del celular (lo dibuja la página, igual al de Google). */
+.boton-google-app {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 320px; height: 44px;
+  padding: 0 18px; border-radius: 999px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f;
+  font: 600 0.95rem "Segoe UI", Roboto, Arial, sans-serif; cursor: pointer;
+}
+.boton-google-app .google-logo { width: 22px; height: 22px; box-shadow: none; background: none; }
+.boton-google-app .google-logo svg { width: 20px; height: 20px; }
+.boton-google-app:disabled { opacity: 0.7; cursor: default; }
+.boton-google-app:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }

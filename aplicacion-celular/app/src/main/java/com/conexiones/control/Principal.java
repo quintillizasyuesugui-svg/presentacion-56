@@ -34,6 +34,19 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.os.CancellationSignal;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+import androidx.credentials.exceptions.NoCredentialException;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+import org.json.JSONObject;
 
 // Abre el control de Conexiones (el mismo de Render) como app del celular.
 public class Principal extends Activity {
@@ -174,6 +187,7 @@ public class Principal extends Activity {
         web.addJavascriptInterface(new Memoria(), "Memoria");
         web.addJavascriptInterface(new Actualizador(), "Actualizador");
         web.addJavascriptInterface(new Voz(), "Voz");
+        web.addJavascriptInterface(new CuentaGoogle(), "CuentaGoogle");
 
         if (guardado != null) web.restoreState(guardado);
         else web.loadUrl(direccionDe(getIntent()));
@@ -313,6 +327,57 @@ public class Principal extends Activity {
             });
             return true;
         }
+    }
+
+    // «Continuar con Google» dentro de la app: abre la ventana de cuentas de Android (las que ya
+    // están en el celular) y le pasa a la página la credencial por window.googleNativo(estado, texto).
+    // estado: «ok» (texto = credencial), «cancelado», «sin_cuentas» o «error» (texto = motivo).
+    // El servidor la revisa con Google igual que la de la página web.
+    private class CuentaGoogle {
+        @JavascriptInterface
+        public boolean disponible() {
+            return paginaPropia;
+        }
+
+        @JavascriptInterface
+        public void pedir(String clienteId) {
+            if (!paginaPropia || clienteId == null || !clienteId.endsWith(".apps.googleusercontent.com")) return;
+            runOnUiThread(() -> pedirCuentaGoogle(clienteId));
+        }
+    }
+
+    private void pedirCuentaGoogle(String clienteId) {
+        GetSignInWithGoogleOption opcion = new GetSignInWithGoogleOption.Builder(clienteId).build();
+        GetCredentialRequest pedido = new GetCredentialRequest.Builder().addCredentialOption(opcion).build();
+        CredentialManager.create(this).getCredentialAsync(this, pedido, new CancellationSignal(), web::post,
+            new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                @Override
+                public void onResult(GetCredentialResponse respuesta) {
+                    Credential c = respuesta.getCredential();
+                    if (c instanceof CustomCredential && GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType())) {
+                        try {
+                            avisarGoogle("ok", GoogleIdTokenCredential.createFrom(c.getData()).getIdToken());
+                        } catch (Exception e) {
+                            avisarGoogle("error", "credencial rara");
+                        }
+                    } else {
+                        avisarGoogle("error", "credencial rara");
+                    }
+                }
+
+                @Override
+                public void onError(GetCredentialException e) {
+                    if (e instanceof GetCredentialCancellationException) avisarGoogle("cancelado", "");
+                    else if (e instanceof NoCredentialException) avisarGoogle("sin_cuentas", "");
+                    else avisarGoogle("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+                }
+            });
+    }
+
+    private void avisarGoogle(String estado, String texto) {
+        if (!paginaPropia) return;
+        web.post(() -> web.evaluateJavascript("window.googleNativo&&window.googleNativo(" + JSONObject.quote(estado) + ","
+            + JSONObject.quote(texto == null ? "" : texto) + ")", null));
     }
 
     // La página llama a Voz.empezar() al tocar «🎤 Voz» y a Voz.detener() al apagarla. Lo que se
