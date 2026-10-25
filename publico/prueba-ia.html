@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Prueba: Filo piensa en tu celular</title>
+<!-- Página aparte para medir cuánto tarda la IA de Filo (entrenada en Colab) pensando DENTRO del
+     celular, con wllama (llama.cpp en el navegador). No toca el control. -->
+<style>
+  :root { --fondo:#0a0e14; --panel:#151d27; --borde:#2a3440; --texto:#f6f9fb; --suave:#8a98a5; --celeste:#34cdfa; --verde:#4ade80; --dorado:#ffcb4d; --rojo:#ff6b6b; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  main { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font-size: 1.2rem; margin: 0; text-wrap: balance; }
+  p { margin: 0; color: var(--suave); font-size: .88rem; line-height: 1.4; }
+  .tarjeta { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+  .dato b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .dato span { font-size: .7rem; color: var(--suave); }
+  button { min-height: 48px; border-radius: 12px; border: none; background: var(--celeste); color: #04121c; font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; }
+  button.sec { background: transparent; color: var(--texto); border: 1px solid var(--borde); font-weight: 700; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--texto); outline-offset: 2px; }
+  .barra { height: 10px; border-radius: 99px; background: #0d131b; overflow: hidden; border: 1px solid var(--borde); }
+  .barra i { display: block; height: 100%; width: 0; background: var(--celeste); transition: width .2s; }
+  .estado { font-size: .85rem; font-weight: 600; min-height: 1.3em; }
+  .fila { display: flex; gap: 8px; align-items: baseline; font-size: .85rem; padding: 6px 0; border-top: 1px solid var(--borde); }
+  .fila:first-child { border-top: none; }
+  .ms { flex: none; width: 4.6em; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ms.bien { color: var(--verde); } .ms.lento { color: var(--dorado); } .ms.muy { color: var(--rojo); }
+  .fila .que { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .fila .que small { display: block; color: var(--suave); }
+  .resumen { font-size: 1rem; font-weight: 800; text-align: center; }
+  form { display: flex; gap: 6px; }
+  input { flex: 1; min-width: 0; min-height: 44px; border-radius: 10px; border: 1px solid var(--borde); background: #0d131b; color: var(--texto); padding: 0 10px; font: inherit; }
+  form button { min-height: 44px; padding: 0 14px; font-size: .9rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🧠 Prueba: Filo piensa en tu celular</h1>
+  <p>Mide cuánto tarda la IA entrenada en Colab pensando <b>dentro de este celular</b>. La primera vez baja <b>531 MB</b> (mejor con wifi); después queda guardada.</p>
+
+  <section class="tarjeta" aria-label="Tu celular">
+    <div class="datos">
+      <div class="dato"><b id="nucleos">–</b><span>núcleos</span></div>
+      <div class="dato"><b id="memoria">–</b><span>memoria</span></div>
+      <div class="dato"><b id="varios">–</b><span>varios núcleos</span></div>
+    </div>
+  </section>
+
+  <button type="button" id="empezar">⬇ Bajar la IA y probar</button>
+  <section class="tarjeta" id="avance" hidden aria-live="polite">
+    <div class="estado" id="estado">Preparando…</div>
+    <div class="barra"><i id="barra"></i></div>
+  </section>
+
+  <section class="tarjeta" id="resultados" hidden aria-label="Resultados">
+    <div class="resumen" id="resumen"></div>
+    <div id="lista"></div>
+  </section>
+
+  <section class="tarjeta" id="probar" hidden aria-label="Probar una frase">
+    <p>Escribe lo que le dirías a Filo:</p>
+    <form id="formulario">
+      <input id="frase" maxlength="120" placeholder="baja la música y pasa la foto" autocomplete="off" aria-label="Frase para Filo">
+      <button type="submit">Pensar</button>
+    </form>
+  </section>
+  <button type="button" class="sec" id="otraVez" hidden>↻ Medir otra vez</button>
+</main>
+<script type="module">
+import { Wllama } from './wllama/index.js';
+const $ = (id) => document.getElementById(id);
+const MODELO = 'https://huggingface.co/fabian2wws/filo-piensa/resolve/main/filo.gguf';
+const FRASES = ['siguiente', 'baja la musica y pasa a la siguiente', 'pausa y despues dale play', 'ponme la cancion de despacito',
+  'quita un poco de zoom', 'filo dame la otra foto que viene luego pues', 'busca en youtube experimentos de ciencia', 'muevete para la derecha'];
+// Lo que contesta la IA, en palabras («vol.bajar ; diap.siguiente» → «baja el volumen · pasa la foto»).
+const NOMBRES = { 'diap.siguiente': 'pasa la foto', 'diap.anterior': 'foto anterior', 'diap.mostrar': 'empieza', 'diap.ultima': 'última foto', 'diap.ir': 'va a la foto',
+  'medio.pausar': 'pausa', 'medio.reproducir': 'play', 'musica.bajar': 'baja la música', 'vol.bajar': 'baja el volumen', 'vol.subir': 'sube el volumen',
+  'musica.buscar': 'busca la canción', 'video.buscar': 'busca el video', 'youtube': 'busca en YouTube', 'zoom.alejar': 'achica', 'zoom.acercar': 'agranda',
+  'zoom.derecha': 'derecha', 'zoom.izquierda': 'izquierda', 'zoom.arriba': 'arriba', 'zoom.abajo': 'abajo', 'nada': 'no es una orden' };
+const enPalabras = (t) => t.split(';').map(p => { const m = p.trim().match(/^([a-z.]+)(.*)$/i); return m ? (NOMBRES[m[1]] || m[1]) + m[2] : p; }).join(' · ');
+const nucleos = navigator.hardwareConcurrency || 1;
+const multi = window.crossOriginIsolated === true;
+const hilos = multi ? Math.max(1, Math.min(4, nucleos)) : 1;
+$('nucleos').textContent = nucleos;
+$('memoria').textContent = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '?';
+$('varios').textContent = multi ? 'sí (' + hilos + ')' : 'no';
+let ia = null;
+const colorDe = (ms) => (ms <= 2000 ? 'bien' : ms <= 4000 ? 'lento' : 'muy');
+const seg = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
+
+async function pensar(frase) {
+  const t = performance.now();
+  const r = await ia.createCompletion({ prompt: 'Orden: ' + frase + '\nFilo:', max_tokens: 40, temperature: 0, stop: ['\n'] });
+  return { texto: (r.choices[0].text || '').split('\n')[0].trim(), ms: Math.round(performance.now() - t) };
+}
+function fila(frase, r) {
+  const d = document.createElement('div');
+  d.className = 'fila';
+  d.innerHTML = '<span class="ms"></span><span class="que"><span></span><small></small></span>';
+  d.querySelector('.ms').textContent = seg(r.ms);
+  d.querySelector('.ms').classList.add(colorDe(r.ms));
+  d.querySelector('.que span').textContent = '«' + frase + '»';
+  d.querySelector('small').textContent = '→ ' + enPalabras(r.texto);
+  $('lista').append(d);
+}
+async function medir() {
+  $('lista').textContent = '';
+  $('resultados').hidden = false;
+  $('resumen').textContent = 'Pensando…';
+  const tiempos = [];
+  for (const f of FRASES) {
+    $('estado').textContent = 'Pensando «' + f + '»…';
+    const r = await pensar(f);
+    tiempos.push(r.ms);
+    fila(f, r);
+  }
+  const orden = tiempos.slice(1).sort((a, b) => a - b); // la primera calienta
+  const mitad = orden[Math.floor(orden.length / 2)];
+  $('resumen').textContent = (mitad <= 2000 ? '✅ ' : '⚠️ ') + 'Tarda ' + seg(mitad) + ' (lo normal) · peor ' + seg(orden[orden.length - 1]);
+  $('estado').textContent = 'Listo. Mándale una captura de esta pantalla a Claude.';
+  $('probar').hidden = false;
+  $('otraVez').hidden = false;
+}
+
+$('empezar').addEventListener('click', async () => {
+  $('empezar').disabled = true;
+  $('avance').hidden = false;
+  try {
+    ia = new Wllama({ default: './wllama/wllama.wasm' }, { suppressNativeLog: true });
+    const t0 = performance.now();
+    const avance = ({ loaded, total }) => {
+      const p = total ? Math.round(loaded * 100 / total) : 0;
+      $('barra').style.width = p + '%';
+      $('estado').textContent = 'Bajando la IA… ' + p + ' % (' + Math.round(loaded / 1e6) + ' de ' + Math.round(total / 1e6) + ' MB)';
+    };
+    const AJUSTES = { n_ctx: 256, n_threads: hilos, n_batch: 64 };
+    try {
+      // Se guarda en el celular: la próxima vez no se baja de nuevo.
+      await ia.loadModelFromUrl(MODELO, { ...AJUSTES, useCache: true, progressCallback: avance });
+    } catch (e) {
+      if (!/quota|espacio|storage/i.test(String(e && e.message))) throw e;
+      // Sin espacio para guardarla: se baja a la memoria y se usa igual (la próxima vez se baja otra vez).
+      await ia.exit().catch(() => {});
+      ia = new Wllama({ default: './wllama/wllama.wasm' }, { suppressNativeLog: true });
+      const r = await fetch(MODELO);
+      if (!r.ok) throw new Error('Hugging Face respondió ' + r.status);
+      const total = Number(r.headers.get('content-length')) || 531067872;
+      const lector = r.body.getReader();
+      const partes = [];
+      let loaded = 0;
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) break;
+        partes.push(value);
+        loaded += value.length;
+        avance({ loaded, total });
+      }
+      $('estado').textContent = 'Preparando la IA…';
+      await ia.loadModel([new Blob(partes)], AJUSTES);
+      $('estado').textContent = 'Sin espacio para guardarla: se usa sin guardar.';
+    }
+    $('barra').style.width = '100%';
+    $('estado').textContent = 'Cargó en ' + seg(performance.now() - t0) + '. Midiendo…';
+    $('empezar').hidden = true;
+    await medir();
+  } catch (e) {
+    $('estado').textContent = '❌ No se pudo: ' + (e && e.message ? e.message : e) + '. Prueba con wifi o con menos apps abiertas.';
+    $('empezar').disabled = false;
+  }
+});
+$('otraVez').addEventListener('click', () => { $('otraVez').hidden = true; medir(); });
+$('formulario').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = $('frase').value.trim();
+  if (!f || !ia) return;
+  const r = await pensar(f.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim());
+  fila(f, r);
+  $('frase').value = '';
+});
+</script>
+</body>
+</html>

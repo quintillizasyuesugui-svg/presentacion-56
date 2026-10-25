@@ -32,6 +32,13 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+  // La prueba de la IA de Filo dentro del celular (prueba-ia.html) piensa con varios núcleos:
+  // el navegador sólo lo deja si la página va aislada. «credentialless» deja bajar la IA de
+  // Hugging Face igual. Sólo esa página y sus archivos: el resto (YouTube, fotos) queda como siempre.
+  if (req.path === '/prueba-ia.html' || req.path.startsWith('/wllama/')) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  }
   next();
 });
 
