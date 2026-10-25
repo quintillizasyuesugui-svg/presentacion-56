@@ -355,8 +355,8 @@
   });
 
   // ---- Zoom: la foto de la pantalla en el celular ----
-  // Con dos dedos se agranda (hasta ×4), con uno se mueve, con doble toque vuelve a la foto
-  // entera; en la PC, la rueda del mouse agranda. La pantalla hace lo mismo al instante. Se
+  // Se ve la foto entera con una ventana encima (lo que muestra la pantalla, hasta ×4); doble
+  // toque vuelve a la foto entera; en la PC, la rueda del mouse agranda. La pantalla hace lo mismo al instante. Se
   // mandan como mucho unos 12 avisos por segundo (el guardián de pantallas corta en 30).
   const zoomMini = document.getElementById('zoomMini');
   const zoomFoto = document.getElementById('zoomFoto');
@@ -490,48 +490,65 @@
     if (!espejoWeb.hidden) zonaPintar();
   });
 
+  // La ventana (lo que muestra la pantalla) se mueve sólo agarrando ✥, y va para donde va el
+  // dedo: si se baja, la pantalla muestra lo de abajo. La esquina la agranda o achica (la de
+  // arriba a la izquierda queda fija). Dos dedos o la rueda también cambian el tamaño.
+  const zoomMango = document.getElementById('zoomMango');
+  const zoomEsquina = document.getElementById('zoomEsquina');
   const dedos = new Map();
   let gesto = null;
   let ultimoToque = 0;
   function distancia(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-  function centro(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
-  function empezarGesto() {
-    const lista = [...dedos.values()];
-    gesto = { z: zoom.z, cx: zoom.cx, cy: zoom.cy, lista: lista.map(p => ({ ...p })) };
+  function enFoto(p) {
+    const r = zoomMini.getBoundingClientRect();
+    return { x: (p.x - r.left) / r.width, y: (p.y - r.top) / r.height };
   }
   zoomMini.addEventListener('pointerdown', (e) => {
     try { zoomMini.setPointerCapture(e.pointerId); } catch { /* algunos navegadores no la dan */ }
-    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    empezarGesto();
+    const p = { x: e.clientX, y: e.clientY };
+    dedos.set(e.pointerId, p);
+    if (dedos.size >= 2) {
+      const [a, b] = [...dedos.values()];
+      gesto = { tipo: 'pellizco', d0: distancia(a, b), z: zoom.z };
+    } else if (e.target === zoomMango) {
+      e.preventDefault();
+      gesto = { tipo: 'mover', p0: enFoto(p), cx: zoom.cx, cy: zoom.cy };
+    } else if (e.target === zoomEsquina) {
+      e.preventDefault();
+      const lado = 1 / zoom.z;
+      gesto = { tipo: 'esquina', izq: zoom.cx - lado / 2, arr: zoom.cy - lado / 2 };
+    } else {
+      gesto = { tipo: 'toque', p0: p };
+    }
   });
   zoomMini.addEventListener('pointermove', (e) => {
     if (!dedos.has(e.pointerId) || !gesto) return;
-    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const r = zoomMini.getBoundingClientRect();
-    const ahora = [...dedos.values()];
-    if (ahora.length >= 2 && gesto.lista.length >= 2) {
-      const antes = gesto.lista;
-      const escala = distancia(ahora[0], ahora[1]) / Math.max(1, distancia(antes[0], antes[1]));
-      const c0 = centro(antes[0], antes[1]);
-      const c1 = centro(ahora[0], ahora[1]);
-      const z = gesto.z * escala;
-      cambiarZoom({ z, cx: gesto.cx - (c1.x - c0.x) / r.width / z, cy: gesto.cy - (c1.y - c0.y) / r.height / z });
-    } else if (ahora.length === 1 && gesto.lista.length === 1) {
-      const a = gesto.lista[0];
-      cambiarZoom({ cx: gesto.cx - (ahora[0].x - a.x) / r.width / gesto.z, cy: gesto.cy - (ahora[0].y - a.y) / r.height / gesto.z });
+    const p = { x: e.clientX, y: e.clientY };
+    dedos.set(e.pointerId, p);
+    if (gesto.tipo === 'pellizco' && dedos.size >= 2) {
+      const [a, b] = [...dedos.values()];
+      cambiarZoom({ z: gesto.z * distancia(a, b) / Math.max(1, gesto.d0) });
+    } else if (gesto.tipo === 'mover') {
+      const f = enFoto(p);
+      cambiarZoom({ cx: gesto.cx + (f.x - gesto.p0.x), cy: gesto.cy + (f.y - gesto.p0.y) });
+    } else if (gesto.tipo === 'esquina') {
+      const f = enFoto(p);
+      const lado = Math.max(0.25, Math.min(1, Math.max(f.x - gesto.izq, f.y - gesto.arr)));
+      cambiarZoom({ z: 1 / lado, cx: gesto.izq + lado / 2, cy: gesto.arr + lado / 2 });
     }
   });
   function soltar(e) {
     if (!dedos.has(e.pointerId)) return;
-    const quieto = gesto && gesto.lista.length === 1 && dedos.size === 1 &&
-      Math.abs(e.clientX - gesto.lista[0].x) < 8 && Math.abs(e.clientY - gesto.lista[0].y) < 8;
+    const quieto = gesto && gesto.tipo === 'toque' && dedos.size === 1 &&
+      Math.abs(e.clientX - gesto.p0.x) < 8 && Math.abs(e.clientY - gesto.p0.y) < 8;
     dedos.delete(e.pointerId);
     if (quieto) {
       const ahora = Date.now();
       if (ahora - ultimoToque < 320) { cambiarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true); ultimoToque = 0; }
       else ultimoToque = ahora;
     }
-    if (dedos.size) empezarGesto(); else { gesto = null; mandarZoom(true); }
+    if (!dedos.size) { const habia = gesto && gesto.tipo !== 'toque'; gesto = null; if (habia) mandarZoom(true); }
+    else gesto = null;
   }
   zoomMini.addEventListener('pointerup', soltar);
   zoomMini.addEventListener('pointercancel', soltar);
@@ -539,6 +556,10 @@
     e.preventDefault();
     cambiarZoom({ z: zoom.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12) }, true);
   }, { passive: false });
+  // + agranda la imagen (la ventana se achica), − la achica; «Normal» vuelve a la foto entera.
+  document.getElementById('zoomMas').addEventListener('click', () => cambiarZoom({ z: zoom.z * 1.25 }, true));
+  document.getElementById('zoomMenos').addEventListener('click', () => cambiarZoom({ z: zoom.z / 1.25 }, true));
+  document.getElementById('zoomNormal').addEventListener('click', () => cambiarZoom({ z: 1, cx: 0.5, cy: 0.5 }, true));
 
   // ---- Espejo: la página web de la pantalla, en chico ----
   // Cuando la diapositiva es una página web, en lugar de la foto para el zoom se muestra la misma

@@ -74,16 +74,25 @@
       <span class="cuadrito-icono" aria-hidden="true">🎬</span><span class="cuadrito-nombre">Video</span>
     </button>
   </div>
-  <!-- Zoom: la foto que se ve en la pantalla; con dos dedos se agranda y con uno se mueve, y la
-       pantalla hace lo mismo al instante. Doble toque: vuelve a la foto entera. -->
+  <!-- Zoom: la foto entera, con una ventana encima que es lo que muestra la pantalla. La ventana se
+       mueve con ✥ y se agranda o achica tirando de la esquina, con + − o con dos dedos. Doble toque:
+       vuelve a la foto entera. -->
   <section class="zoom-control" aria-label="Zoom en la pantalla">
     <div class="zoom-mini" id="zoomMini">
       <img id="zoomFoto" alt="" hidden>
-      <div class="zoom-visor" id="zoomVisor" hidden></div>
+      <div class="zoom-visor" id="zoomVisor" hidden>
+        <span class="zoom-mango" id="zoomMango" role="button" aria-label="Mover la ventana">✥</span>
+        <span class="zoom-esquina" id="zoomEsquina" role="button" aria-label="Agrandar o achicar la ventana"></span>
+      </div>
       <span class="zoom-tag" id="zoomTag" hidden>🔍 Normal</span>
       <p class="zoom-apagado" id="zoomApagado">🔍 Cuando toques «Mostrar», acá vas a ver la foto de la pantalla para hacer zoom.</p>
     </div>
-    <p class="zoom-ayuda" id="zoomAyuda" hidden>Dos dedos: agrandar · Un dedo: mover · Doble toque: normal</p>
+    <div class="zoom-ayuda" id="zoomAyuda" hidden>
+      <button type="button" class="zoom-boton" id="zoomMenos" aria-label="Achicar la imagen">−</button>
+      <button type="button" class="zoom-boton" id="zoomMas" aria-label="Agrandar la imagen">+</button>
+      <span class="zoom-ayuda-texto">✥ mover · esquina: tamaño</span>
+      <button type="button" class="zoom-boton zoom-normal" id="zoomNormal">↺ Normal</button>
+    </div>
   </section>
   <!-- Espejo: cuando la pantalla muestra una página web, acá se ve la misma página en chico.
        Lo que se toca acá pasa también en la pantalla (ver «Espejo» en control.js). -->
