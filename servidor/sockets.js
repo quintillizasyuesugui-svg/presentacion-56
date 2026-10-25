@@ -343,6 +343,8 @@ function registrarSockets(io) {
         paginaZoom: datos.paginaZoom === true,
         // Sube cada vez que la pantalla pasa sola a otra parte del menú: el espejo del celular la sigue.
         paginaPaso: Number.isInteger(datos.paginaPaso) && datos.paginaPaso > 0 ? Math.min(datos.paginaPaso, 1e9) : 0,
+        // Lo que le falta al temporizador de la pantalla, en ms (0 = no corre).
+        cuentaAuto: Number.isFinite(datos.cuentaAuto) ? Math.round(Math.min(86400000, Math.max(0, datos.cuentaAuto))) : 0,
         ancho: Number.isInteger(datos.ancho) ? Math.min(8000, Math.max(0, datos.ancho)) : 0,
         alto: Number.isInteger(datos.alto) ? Math.min(8000, Math.max(0, datos.alto)) : 0,
         zoom: zoomLimpio(z)

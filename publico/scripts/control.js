@@ -1226,6 +1226,12 @@
         if (!estado.mostrando) { updateNavButtonsState(); pintarPasos(); }
       }
       if (estado.mostrando) {
+        // El temporizador ya corre en la pantalla: la cuenta sale enseguida, no al próximo salto.
+        if (estado.cuentaAuto > 0) {
+          autoAdvanceEndAt = Date.now() + estado.cuentaAuto;
+          autoAdvanceOn = true;
+          updateAutoCountdownInline();
+        }
         fotoPantalla = { foto: estado.foto, total: estado.total };
         if (!showStarted) { showStarted = true; pintarPasos(); }
         updateNavButtonsState();

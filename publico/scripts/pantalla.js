@@ -1668,6 +1668,9 @@
       // Enlace de YouTube: el video del enlace, para «▶ Poner este video» en el celular.
       paginaVideo: slide && slide.pagina && paginaModo === 'youtube' ? videoDeYoutube(slide.pagina) : '',
       paginaPaso: pasoSolo,
+      // Cuánto le falta al temporizador (ms; 0 = no corre): un control que se abre tarde (por
+      // ejemplo al volver de Modo avanzado) muestra la cuenta enseguida, sin esperar al próximo salto.
+      cuentaAuto: autoAdvanceEndAt ? Math.max(0, autoAdvanceEndAt - Date.now()) : 0,
       ancho: window.innerWidth,
       alto: window.innerHeight,
       zoom: zoomActual
