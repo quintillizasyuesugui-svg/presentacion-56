@@ -1091,6 +1091,7 @@
     const logo = document.getElementById('miCuentaLogo');
     if (g.logo && logo) logo.outerHTML = g.logo;
     document.getElementById('miCuenta').hidden = false;
+    const proteger = document.getElementById('miCuentaProteger');
     const unida = (correo) => {
       titulo.textContent = correo;
       chip.textContent = '● Protegida';
@@ -1098,7 +1099,19 @@
       texto.textContent = 'Si olvidás el PIN, te mandamos un código a ese correo.';
       caja.hidden = true;
       error.hidden = true;
+      proteger.hidden = true;
     };
     if (cuenta.correo) { unida(cuenta.correo); return; }
-    g.boton(caja, auth.pin, unida, (t) => { error.textContent = t; error.hidden = false; });
+    // El botón de Google se arma recién al tocar «Proteger»: así la fila queda baja.
+    let armado = false;
+    proteger.hidden = false;
+    proteger.addEventListener('click', () => {
+      const abrir = caja.hidden;
+      caja.hidden = !abrir;
+      proteger.textContent = abrir ? 'Cerrar' : 'Proteger';
+      if (abrir && !armado) {
+        armado = true;
+        g.boton(caja, auth.pin, unida, (t) => { error.textContent = t; error.hidden = false; });
+      }
+    });
   }

@@ -689,3 +689,10 @@ body:has(.panel.video-activo:not([hidden])) .tarjeta-youtube { display: none; }
 .cartel-video .boton-completa.completa { border-color: #3ddc84; background: rgba(61, 220, 132, 0.14); color: #8ff0b8; }
 .cartel-video .boton-completa:focus-visible { outline: 2px solid var(--amber-300); outline-offset: 2px; }
 .cartel-video > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tablet (ver solo-celular.js): con zoom, «dvh» se agranda; se usa el alto ya achicado.
+   Acostada sobra ancho: la hoja se ensancha para no quedar angosta en el medio. */
+.es-tablet .hoja-medios { max-height: calc(var(--alto-tablet, 100dvh) * 0.9); }
+@media (orientation: landscape) {
+  .es-tablet .hoja-medios { max-width: 760px; }
+}

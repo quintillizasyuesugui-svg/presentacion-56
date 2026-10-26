@@ -9,16 +9,18 @@
   <title>Modo avanzado</title>
   <link rel="stylesheet" href="estilos/estilos.css">
   <link rel="stylesheet" href="estilos/multimedia.css">
+  <script src="scripts/solo-celular.js"></script>
   <!-- Los 27 tipos de letra de "Frase final" — se cargan acá y en pantalla.html,
        que es donde realmente se ven en las dos vistas previas. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@700;900&family=Lobster&family=Oswald:wght@600;700&family=Great+Vibes&family=Anton&family=Caveat:wght@700&family=Permanent+Marker&family=Bangers&family=Amatic+SC:wght@700&family=Fredoka:wght@600;700&family=Satisfy&family=Righteous&family=Kalam:wght@700&family=Cinzel+Decorative:wght@700&family=Bungee+Shade&family=Monoton&family=Luckiest+Guy&family=Shrikhand&family=Chewy&family=Titan+One&family=Faster+One&family=Bungee+Inline&display=swap" rel="stylesheet">
 </head>
-<body class="control">
+<body class="control pagina-avanzado">
 <div class="app">
 
   <div class="app-header">
+    <a class="volver-flecha" href="control.html" aria-label="Volver al control">←</a>
     <div class="header-id">
       <h1>Modo avanzado</h1>
       <span class="auth-name-badge" id="authNameBadge" hidden></span>
@@ -43,7 +45,11 @@
             <span class="action-desc" id="miCuentaTexto">Si olvidás el PIN, te llega un código al correo</span>
           </span>
         </span>
-        <span class="auth-google" id="miCuentaGoogle"></span>
+        <button type="button" class="btn-proteger" id="miCuentaProteger" hidden>Proteger</button>
+      </div>
+      <!-- El botón de Google (no se puede achicar ni cambiarle el texto) se despliega al tocar «Proteger» -->
+      <div class="mi-cuenta-google">
+        <span class="auth-google" id="miCuentaGoogle" hidden></span>
         <span class="auth-google-error" id="miCuentaError" hidden></span>
       </div>
     </div>
@@ -68,7 +74,7 @@
       <span class="action-icon">📄</span>
       <span class="action-text">
         <span class="action-title">Subir documento</span>
-        <span class="action-desc">PDF, Word, Excel o PowerPoint: una diapositiva por página</span>
+        <span class="action-desc">PDF, Word, Excel o PowerPoint</span>
       </span>
       <span class="action-chevron">›</span>
     </button>
@@ -109,10 +115,6 @@
   <div class="spacer"></div>
 
   <div id="lugarMiniReproductor"></div>
-
-  <div class="btn-row">
-    <a class="btn" href="control.html">⬅️ Volver</a>
-  </div>
 
 </div>
 

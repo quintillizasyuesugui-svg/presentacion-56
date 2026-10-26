@@ -3438,3 +3438,146 @@ body[data-reproductor="control"].voz-prendida .voice-status { padding: 0.45rem 0
 .boton-google-app .google-logo svg { width: 20px; height: 20px; }
 .boton-google-app:disabled { opacity: 0.7; cursor: default; }
 .boton-google-app:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+
+/* ---- Modo avanzado compacto: lo mismo de siempre, pero entra sin bajar en el celular ----
+   «Volver» es la flecha junto al título; cada tarjeta lleva una sola línea de texto. */
+.pagina-avanzado .app { gap: 12px; }
+.pagina-avanzado .app-header { justify-content: flex-start; padding: 0; }
+.volver-flecha {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.volver-flecha:hover { border-color: var(--primary-600); }
+.pagina-avanzado .header-id { flex: 1; flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 0; }
+.pagina-avanzado .header-id h1 { flex-basis: 100%; }
+.pagina-avanzado .app-header .status { margin-left: auto; align-self: flex-start; margin-top: 4px; }
+@media (max-width: 480px) {
+  /* En el celular queda sólo el punto de color; el texto lo leen los lectores de pantalla. */
+  .pagina-avanzado #statusText { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+.pagina-avanzado .advanced-panel { gap: 7px; padding-top: 12px; padding-bottom: 14px; }
+.pagina-avanzado .section-label { margin: 6px 0 0 2px; font-size: 0.7rem; }
+.pagina-avanzado .section-label:first-child { margin-top: 0; }
+.pagina-avanzado .action-card { gap: 11px; padding: 9px 12px; border-radius: var(--radius-sm); }
+.pagina-avanzado .action-icon { width: 38px; height: 38px; font-size: 1.15rem; border-radius: 10px; }
+.pagina-avanzado .action-title { font-size: 0.93rem; }
+.pagina-avanzado .action-desc { font-size: 0.76rem; display: block; white-space: nowrap; text-overflow: ellipsis; -webkit-line-clamp: unset; line-clamp: unset; }
+
+/* Google en una fila: logo, nombre con su estado y «Proteger» a la derecha. */
+.pagina-avanzado .mi-cuenta { flex-direction: row; align-items: center; padding: 9px 10px 9px 12px; }
+.pagina-avanzado .mi-cuenta .google-fila { flex: 1; gap: 10px; }
+.pagina-avanzado .mi-cuenta .google-logo { width: 34px; height: 34px; }
+.pagina-avanzado .mi-cuenta .action-text { display: block; }
+.pagina-avanzado .mi-cuenta .action-title { margin-right: 6px; }
+.pagina-avanzado .mi-cuenta .chip-google { padding: 1px 8px; font-size: 0.66rem; vertical-align: 1px; }
+.pagina-avanzado .mi-cuenta .action-desc { display: block; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.btn-proteger {
+  flex: none;
+  padding: 7px 14px;
+  background: #fff;
+  color: #1f1f1f;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-proteger[hidden] { display: none; }
+.mi-cuenta-google .auth-google { justify-content: center; margin-top: 8px; }
+.mi-cuenta-google .auth-google-error { margin-top: 6px; }
+
+/* ---- Control abierto en una PC (scripts/solo-celular.js): la ventana se parte en dos ----
+   El control queda escondido; a la izquierda el QR para el celular y a la derecha la pantalla. */
+.control-en-pc body > :not(#soloCelular) { display: none !important; }
+.control-en-pc body { display: block !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; }
+.solo-celular {
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.solo-celular-mitades {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(1000px, 100%);
+  min-height: 470px;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.solo-celular-mitad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 40px;
+  text-align: center;
+}
+.solo-celular-mitad.izq { background: var(--gray-850); }
+.solo-celular-mitad.der { background: linear-gradient(160deg, #0d2c3b, #0a1820); }
+.solo-celular-mitad h1, .solo-celular-mitad h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+.solo-celular-mitad p { margin: 0; max-width: 340px; color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; }
+.solo-celular-qr {
+  width: 180px;
+  height: 180px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 14px;
+  color: #1f1f1f;
+  font-size: 0.8rem;
+  display: grid;
+  place-items: center;
+}
+.solo-celular-qr svg { width: 100%; height: 100%; display: block; }
+.solo-celular-pantallita {
+  width: 220px;
+  height: 124px;
+  display: grid;
+  place-items: center;
+  background: #000;
+  border: 3px solid var(--primary-400);
+  border-radius: 12px;
+  font-size: 2.8rem;
+  box-shadow: 0 0 40px rgba(52, 205, 250, 0.25);
+}
+.solo-celular-mitad .btn { min-height: 52px; padding: 0 26px; text-decoration: none; }
+@media (max-width: 760px) {
+  .solo-celular-mitades { grid-template-columns: 1fr; min-height: 0; }
+  .solo-celular-mitad { padding: 28px 20px; }
+}
+
+/* ---- Tablet (scripts/solo-celular.js): el control del celular agrandado parejo con zoom ----
+   En horizontal sobra ancho: la columna se ensancha para no dejar franjas vacías. */
+.es-tablet .app { max-width: 640px; }
+.es-tablet body, .es-tablet body.control { min-height: var(--alto-tablet, 100dvh); }
+.es-tablet .lw-card { max-height: calc(var(--alto-tablet, 100dvh) - 20px); }
+/* Con zoom, «vh» se agranda junto con todo: se usa el alto ya achicado. */
+.es-tablet .zoom-mini { max-height: calc(var(--alto-tablet, 100vh) * 0.34); }
+.es-tablet .qr-invitacion-codigo { width: 110px; height: 110px; }
+/* Tablet acostada: sobra ancho, el control ocupa todo el ancho en vez de dejar franjas a los costados. */
+@media (orientation: landscape) {
+  .es-tablet .app { max-width: none; }
+}
+@media (orientation: landscape) {
+  .es-tablet .lw-card { max-width: 760px; }
+}
+/* Tablet sin huecos abajo: el panel principal se estira hasta el final de la pantalla
+   y en el modo avanzado las tarjetas crecen parejo para llenarlo. */
+.es-tablet .app > .panel:not(.nav-panel):not(.video-activo) { flex: 1 1 auto; }
+.es-tablet .pagina-avanzado .advanced-panel { display: flex; flex-direction: column; }
+.es-tablet .pagina-avanzado .advanced-panel > .action-card { flex: 1 1 auto; max-height: 130px; }
+.es-tablet .app > .panel:not(.nav-panel):not(.video-activo) ~ .spacer { display: none; }
