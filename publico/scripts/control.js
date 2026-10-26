@@ -1220,7 +1220,10 @@
     // otra persona. Se repite en cada reconexión, igual que en pantalla.html.
     function identificarSocket() { socket.emit('identificar', auth.pin); }
     // Recién identificado (al abrir o al volver de Gestionar): ¿la pantalla ya está mostrando?
-    socket.on('identificado', () => socket.emit('pantallaPedirEstado'));
+    socket.on('identificado', () => {
+      socket.emit('pantallaPedirEstado');
+      socket.emit('escribirVivoPedir');
+    });
     socket.on('pantallaEstado', (estado) => {
       if (!estado) return;
       // Ya contestó: o sigue donde iba («sigue») o no hay nada que esperar.
@@ -2060,43 +2063,41 @@
     ['#8b5cf6', '#ec4899'],
     ['#2dd4bf', '#38bdf8']
   ];
-  const LW_STEPS = ['letra', 'tamano', 'animacion', 'color', 'escribir'];
-  const LW_STEP_HINTS = {
-    letra: 'Paso 1 de 5 · Elegí el tipo de letra.',
-    tamano: 'Paso 2 de 5 · Elegí el tamaño de letra.',
-    animacion: 'Paso 3 de 5 · Elegí la animación.',
-    color: 'Paso 4 de 5 · Elegí el color.',
-    escribir: 'Paso 5 de 5 · Escribí — aparece en tu pantalla al toque. Letra, animación y color los podés seguir cambiando, el tamaño ya quedó fijo.'
-  };
+  // Colores sueltos de la fila «Un color»; el último círculo abre el selector para elegir otro.
+  const LW_SOLIDOS = [
+    ['#ffffff', 'Blanco'],
+    ['#facc15', 'Amarillo'],
+    ['#38bdf8', 'Celeste'],
+    ['#22c55e', 'Verde'],
+    ['#f472b6', 'Rosa']
+  ];
+  const LW_TAMANOS = { 0.7: 'Chico', 1: 'Normal', 1.4: 'Grande', 2: 'Enorme' };
+  // Lo que ya viene elegido al abrir por primera vez: se puede escribir sin tocar nada.
+  const LW_INICIAL = { font: 'sans', fontSize: 1, effect: 'fade', color: '#ffffff', color2: '' };
 
   const liveWriteBtn = document.getElementById('liveWriteBtn');
   const lwOverlay = document.getElementById('lwOverlay');
-  const lwStepHint = document.getElementById('lwStepHint');
   const lwPanels = document.querySelectorAll('#lwOverlay .fp-tab-panel');
+  const lwChips = document.querySelectorAll('#lwChips .lw-chip');
+  const lwEstado = document.getElementById('lwEstado');
+  const lwVista = document.getElementById('lwVista');
+  const lwVistaTexto = document.getElementById('lwVistaTexto');
   const lwFontGrid = document.getElementById('lwFontGrid');
   const lwEffectGrid = document.getElementById('lwEffectGrid');
   const lwFontSize = document.getElementById('lwFontSize');
   const lwFontSizeValue = document.getElementById('lwFontSizeValue');
+  const lwTamanos = document.getElementById('lwTamanos');
+  const lwSolidos = document.getElementById('lwSolidos');
   const lwColor = document.getElementById('lwColor');
   const lwColor1 = document.getElementById('lwColor1');
   const lwColor2 = document.getElementById('lwColor2');
   const lwComboGrid = document.getElementById('lwComboGrid');
-  const lwColorModeTabs = document.getElementById('lwColorModeTabs');
   const lwText = document.getElementById('lwText');
-  const lwBack = document.getElementById('lwBack');
-  const lwNext = document.getElementById('lwNext');
   const lwFinish = document.getElementById('lwFinish');
-  const lwLiveAdjustTabs = document.getElementById('lwLiveAdjustTabs');
-
-  let lwStepIndex = 0;
-  let lwState = { font: null, fontSize: 1, effect: null, color: '#ffffff', color2: '', text: '' };
-  // Las 4 son obligatorias: no alcanza con que tamaño/color ya tengan un
-  // valor por default, hay que tocarlos sí o sí para poder avanzar — igual
-  // que letra y efecto, que ya obligan por no tener nada seleccionado al abrir.
-  let lwSizeChosen = false;
-  let lwColorChosen = false;
+  // La letra, el tamaño, la animación y el color quedan elegidos de una vez a la otra.
+  let lwState = Object.assign({}, LW_INICIAL, { text: '' });
   let lwActive = false; // true mientras algo se está mostrando de verdad en la pantalla
-  let lwLiveAdjustTab = 'letra'; // cuál de los 3 (letra/animación/color) se ve en el último paso
+  let lwAjusteAbierto = 'letra'; // cuál de los 4 ajustes se ve abajo de los botones (null = ninguno)
 
   // Igual que en "Frase final": cada botón de efecto trae su propia mini
   // pantalla negra que repite la animación en loop con un texto fijo ("Hola")
@@ -2136,7 +2137,11 @@
       btn.addEventListener('click', () => onPick(item.key));
       container.appendChild(btn);
     });
-    if (items === LW_EFFECTS) lwStartEffectMiniLoop();
+  }
+  function lwMarcar(container, key) {
+    container.querySelectorAll('.fp-option-btn').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.key === key);
+    });
   }
 
   let lwEffectMiniTimer = null;
@@ -2160,155 +2165,182 @@
     if (lwEffectMiniTimer) { clearInterval(lwEffectMiniTimer); lwEffectMiniTimer = null; }
   }
 
-  // ---- Combinar 2 colores (mismo mecanismo que "Frase final") ----
-  function lwBuildComboGrid() {
+  // ---- Colores: círculos de un color y de mezcla de dos ----
+  function lwCirculo(fondo, titulo, alTocar) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lw-circulo';
+    btn.style.background = fondo;
+    btn.title = titulo;
+    btn.setAttribute('aria-label', titulo);
+    btn.addEventListener('click', alTocar);
+    return btn;
+  }
+  function lwBuildColores() {
+    lwSolidos.querySelectorAll('button.lw-circulo').forEach((b) => b.remove());
+    const propio = lwSolidos.querySelector('.lw-propio');
+    LW_SOLIDOS.forEach(([color, nombre]) => {
+      const btn = lwCirculo(color, nombre, () => lwElegirColor(color, ''));
+      btn.dataset.c1 = color;
+      lwSolidos.insertBefore(btn, propio);
+    });
     lwComboGrid.innerHTML = '';
     COLOR_COMBOS.forEach(([c1, c2]) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'color-swatch';
-      btn.style.background = 'linear-gradient(90deg, ' + c1 + ', ' + c2 + ')';
-      if (lwState.color === c1 && lwState.color2 === c2) btn.classList.add('selected');
-      btn.addEventListener('click', () => lwSelectCombo(c1, c2));
+      const btn = lwCirculo('linear-gradient(90deg, ' + c1 + ', ' + c2 + ')', 'Mezcla', () => lwElegirColor(c1, c2));
+      btn.dataset.c1 = c1;
+      btn.dataset.c2 = c2;
       lwComboGrid.appendChild(btn);
     });
   }
-
-  function lwMarkSelectedCombo() {
-    lwComboGrid.querySelectorAll('.color-swatch').forEach((btn, i) => {
-      const [c1, c2] = COLOR_COMBOS[i];
-      btn.classList.toggle('selected', lwState.color === c1 && lwState.color2 === c2);
+  function lwMarcarColor() {
+    let alguno = false;
+    document.querySelectorAll('#lwOverlay button.lw-circulo').forEach((btn) => {
+      const si = btn.dataset.c1 === lwState.color && (btn.dataset.c2 || '') === lwState.color2;
+      btn.classList.toggle('selected', si);
+      alguno = alguno || si;
     });
+    lwSolidos.querySelector('.lw-propio').classList.toggle('selected', !alguno && !lwState.color2);
   }
-
-  function lwSelectCombo(c1, c2) {
+  function lwNombreColor() {
+    if (lwState.color2) return 'Mezcla';
+    const fijo = LW_SOLIDOS.find(([c]) => c === lwState.color);
+    return fijo ? fijo[1] : 'Propio';
+  }
+  function lwElegirColor(c1, c2) {
     lwState.color = c1;
     lwState.color2 = c2;
-    lwColorChosen = true;
-    lwColor1.value = c1;
-    lwColor2.value = c2;
-    lwMarkSelectedCombo();
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
+    if (c2) { lwColor1.value = c1; lwColor2.value = c2; } else { lwColor.value = c1; }
+    lwCambio();
   }
+  lwColor.addEventListener('input', () => lwElegirColor(lwColor.value, ''));
+  lwColor1.addEventListener('input', () => lwElegirColor(lwColor1.value, lwColor2.value));
+  lwColor2.addEventListener('input', () => lwElegirColor(lwColor1.value, lwColor2.value));
 
-  function lwSelectColorMode(mode) {
-    lwColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.colorMode === mode);
-    });
-    document.querySelectorAll('#lwOverlay [data-color-panel]').forEach((panel) => {
-      panel.hidden = panel.dataset.colorPanel !== mode;
-    });
-    if (mode === 'solido') {
-      lwState.color2 = '';
-    } else if (!lwState.color2) {
-      lwState.color = lwColor1.value;
-      lwState.color2 = lwColor2.value;
-      lwMarkSelectedCombo();
-    }
-    lwColorChosen = true;
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
+  // ---- Tamaño ----
+  function lwPonerTamano(valor) {
+    lwState.fontSize = Math.min(2.2, Math.max(0.5, valor));
+    lwFontSize.value = lwState.fontSize;
+    lwCambio();
   }
-  lwColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => lwSelectColorMode(btn.dataset.colorMode));
+  lwFontSize.addEventListener('input', () => lwPonerTamano(parseFloat(lwFontSize.value)));
+  lwTamanos.querySelectorAll('[data-tam]').forEach((btn) => {
+    btn.addEventListener('click', () => lwPonerTamano(parseFloat(btn.dataset.tam)));
   });
-
-  lwColor1.addEventListener('input', () => {
-    lwState.color = lwColor1.value;
-    lwColorChosen = true;
-    lwMarkSelectedCombo();
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
-  });
-  lwColor2.addEventListener('input', () => {
-    lwState.color2 = lwColor2.value;
-    lwColorChosen = true;
-    lwMarkSelectedCombo();
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
-  });
-
-  function lwCanAdvance() {
-    const step = LW_STEPS[lwStepIndex];
-    if (step === 'letra') return !!lwState.font;
-    if (step === 'tamano') return lwSizeChosen;
-    if (step === 'animacion') return !!lwState.effect;
-    if (step === 'color') return lwColorChosen;
-    return true;
-  }
-
-  // En el último paso (escribir), letra/animación/color no se apilan los 3
-  // juntos — hay un menú de 3 botones y sólo se ve el que está elegido, igual
-  // que cualquier otro paso del asistente.
-  function lwApplyPanels() {
-    const step = LW_STEPS[lwStepIndex];
-    const isLast = step === 'escribir';
-    lwPanels.forEach((panel) => {
-      const key = panel.dataset.step;
-      if (isLast && (key === 'letra' || key === 'animacion' || key === 'color')) {
-        panel.hidden = key !== lwLiveAdjustTab;
-      } else {
-        panel.hidden = key !== step;
-      }
-    });
-    const efectoVisible = step === 'animacion' || (isLast && lwLiveAdjustTab === 'animacion');
-    if (efectoVisible) lwStartEffectMiniLoop(); else lwStopEffectMiniLoop();
-  }
-
-  function lwShowLiveAdjustTab(tab) {
-    lwLiveAdjustTab = tab;
-    document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.adjust === tab);
-    });
-    lwApplyPanels();
-  }
-  document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => lwShowLiveAdjustTab(btn.dataset.adjust));
-  });
-
-  function lwShowStep(i) {
-    lwStepIndex = i;
-    const step = LW_STEPS[i];
-    const isLast = i === LW_STEPS.length - 1;
-    lwApplyPanels();
-    lwLiveAdjustTabs.hidden = !isLast;
-    lwStepHint.textContent = LW_STEP_HINTS[step];
-    lwBack.hidden = i === 0;
-    lwNext.hidden = isLast;
-    lwFinish.hidden = !isLast;
-    lwNext.disabled = !lwCanAdvance();
-  }
 
   function lwSelectFont(key) {
     lwState.font = key;
-    lwBuildGrid(lwFontGrid, LW_FONTS, key, lwSelectFont);
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
+    lwCambio();
   }
   function lwSelectEffect(key) {
+    const cambio = key !== lwState.effect;
     lwState.effect = key;
-    lwBuildGrid(lwEffectGrid, LW_EFFECTS, key, lwSelectEffect);
-    lwNext.disabled = !lwCanAdvance();
+    lwCambio();
+    if (cambio) lwReproducirVista();
+  }
+
+  // «Ver las 27 letras»: se muestran las primeras y el resto se despliega acá mismo.
+  document.querySelectorAll('#lwOverlay .lw-ver-mas').forEach((btn) => {
+    const rejilla = document.getElementById(btn.dataset.mas);
+    const textoCerrado = btn.textContent;
+    btn.addEventListener('click', () => {
+      const abierta = rejilla.classList.toggle('lw-todo');
+      btn.textContent = abierta ? 'Ver menos ▴' : textoCerrado;
+      btn.dataset.textoCerrado = textoCerrado;
+    });
+  });
+  function lwCerrarVerMas() {
+    document.querySelectorAll('#lwOverlay .lw-ver-mas').forEach((btn) => {
+      document.getElementById(btn.dataset.mas).classList.remove('lw-todo');
+      if (btn.dataset.textoCerrado) btn.textContent = btn.dataset.textoCerrado;
+    });
+  }
+
+  // ---- Los 4 botones: abren de a uno su ajuste; tocar el abierto lo cierra ----
+  function lwMostrarAjuste(cual) {
+    lwAjusteAbierto = cual;
+    lwChips.forEach((chip) => {
+      const si = chip.dataset.adjust === cual;
+      chip.classList.toggle('active', si);
+      chip.setAttribute('aria-expanded', String(si));
+    });
+    lwPanels.forEach((panel) => { panel.hidden = panel.dataset.step !== cual; });
+    if (cual === 'animacion') lwStartEffectMiniLoop(); else lwStopEffectMiniLoop();
+    lwPintarVista(); // la vista previa cambia de alto según el ajuste abierto
+  }
+  lwChips.forEach((chip) => {
+    chip.addEventListener('click', () => lwMostrarAjuste(lwAjusteAbierto === chip.dataset.adjust ? null : chip.dataset.adjust));
+  });
+
+  // ---- Vista previa: la misma letra, color, tamaño y animación que tu pantalla ----
+  function lwReproducirVista() {
+    lwVista.className = 'lw-vista';
+    void lwVista.offsetWidth; // fuerza reflow para poder repetir la animación
+    lwVista.classList.add('fp-' + lwState.effect);
+    const lluvia = lwVista.querySelector('.fp-mini-rain');
+    if (lluvia) lluvia.remove();
+    const html = buildMiniRainHtml(lwState.effect);
+    if (html) lwVista.insertAdjacentHTML('afterbegin', html);
+  }
+  function lwPintarVista() {
+    const fuente = LW_FONTS.find((f) => f.key === lwState.font);
+    const vacio = !lwState.text.trim();
+    lwVistaTexto.textContent = vacio ? 'Hola' : lwState.text;
+    lwVistaTexto.classList.toggle('lw-ejemplo', vacio);
+    lwVistaTexto.style.fontFamily = fuente ? fuente.family : '';
+    if (lwState.color2) {
+      lwVistaTexto.style.background = 'linear-gradient(90deg, ' + lwState.color + ', ' + lwState.color2 + ')';
+      lwVistaTexto.style.webkitBackgroundClip = 'text';
+      lwVistaTexto.style.backgroundClip = 'text';
+      lwVistaTexto.style.webkitTextFillColor = 'transparent';
+      lwVistaTexto.style.color = 'transparent';
+    } else {
+      lwVistaTexto.style.background = 'none';
+      lwVistaTexto.style.webkitBackgroundClip = '';
+      lwVistaTexto.style.backgroundClip = '';
+      lwVistaTexto.style.webkitTextFillColor = '';
+      lwVistaTexto.style.color = lwState.color;
+    }
+    // Igual que la pantalla: si el texto no entra, se achica hasta que entre.
+    let escala = lwState.fontSize;
+    lwVistaTexto.style.setProperty('--fp-size-scale', escala);
+    let intentos = 0;
+    while (intentos++ < 40 && escala > 0.2 &&
+      (lwVistaTexto.scrollHeight > lwVista.clientHeight - 16 || lwVistaTexto.scrollWidth > lwVista.clientWidth - 16)) {
+      escala -= 0.05;
+      lwVistaTexto.style.setProperty('--fp-size-scale', escala);
+    }
+  }
+
+  // Pone al día botones, vista previa y tu pantalla después de cualquier cambio.
+  function lwCambio() {
+    const fuente = LW_FONTS.find((f) => f.key === lwState.font);
+    const efecto = LW_EFFECTS.find((e) => e.key === lwState.effect);
+    document.getElementById('lwChipLetra').textContent = fuente ? fuente.label : '';
+    document.getElementById('lwChipTamano').textContent = Math.round(lwState.fontSize * 100) + ' %';
+    document.getElementById('lwChipAnimacion').textContent = efecto ? efecto.label.replace(/^\S+\s/, '') : '';
+    document.getElementById('lwChipColor').textContent = lwNombreColor();
+    lwFontSizeValue.textContent = Math.round(lwState.fontSize * 100) + '%';
+    lwTamanos.querySelectorAll('[data-tam]').forEach((btn) => {
+      btn.classList.toggle('selected', parseFloat(btn.dataset.tam) === lwState.fontSize);
+    });
+    lwMarcar(lwFontGrid, lwState.font);
+    lwMarcar(lwEffectGrid, lwState.effect);
+    lwMarcarColor();
+    lwPintarVista();
     lwBroadcastIfActive();
   }
 
-  lwFontSize.addEventListener('input', () => {
-    lwState.fontSize = parseFloat(lwFontSize.value);
-    lwFontSizeValue.textContent = Math.round(lwState.fontSize * 100) + '%';
-    lwSizeChosen = true;
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
-  });
-  lwColor.addEventListener('input', () => {
-    lwState.color = lwColor.value;
-    lwColorChosen = true;
-    lwNext.disabled = !lwCanAdvance();
-    lwBroadcastIfActive();
-  });
   lwText.addEventListener('input', () => {
     lwState.text = lwText.value;
+    lwPintarVista();
     lwBroadcast();
+  });
+  document.getElementById('lwClear').addEventListener('click', () => {
+    lwText.value = '';
+    lwState.text = '';
+    lwPintarVista();
+    lwBroadcast();
+    lwText.focus();
   });
 
   // Manda el estado completo a TU pantalla (sala 'owner:', ver identificarSocket
@@ -2317,6 +2349,7 @@
   function lwBroadcast() {
     const hasText = lwState.text.trim().length > 0;
     lwActive = hasText;
+    lwPintarEstado();
     updateNavButtonsState();
     socket.emit('escribirVivoEstado', {
       active: hasText,
@@ -2328,45 +2361,54 @@
       color2: lwState.color2
     });
   }
-  // Reemite sólo si ya hay algo en pantalla — así, si volvés a "Animación" o
-  // "Color" a cambiar algo mientras estás escribiendo, se actualiza en el
-  // momento sin tener que retocar el texto.
+  // Reemite sólo si ya hay algo en pantalla — así un cambio de letra, tamaño,
+  // animación o color se ve en el momento sin tener que retocar el texto.
   function lwBroadcastIfActive() {
     if (lwActive) lwBroadcast();
   }
   function lwStop() {
     if (!lwActive) return;
     lwActive = false;
+    lwPintarEstado();
     updateNavButtonsState();
     socket.emit('escribirVivoEstado', { active: false, text: '', font: lwState.font, fontSize: lwState.fontSize, effect: lwState.effect, color: lwState.color, color2: lwState.color2 });
   }
+  function lwPintarEstado() {
+    lwEstado.classList.toggle('en-vivo', lwActive);
+    lwEstado.textContent = lwActive ? 'En tu pantalla' : 'Todavía no se ve';
+  }
 
-  function openLiveWrite() {
-    lwState = { font: null, fontSize: 1, effect: null, color: '#ffffff', color2: '', text: '' };
-    lwSizeChosen = false;
-    lwColorChosen = false;
-    lwText.value = '';
-    lwFontSize.value = 1;
-    lwFontSizeValue.textContent = '100%';
-    lwColor.value = '#ffffff';
-    lwColor1.value = '#38bdf8';
-    lwColor2.value = '#a855f7';
-    lwColorModeTabs.querySelectorAll('.fp-tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.colorMode === 'solido');
-    });
-    document.querySelectorAll('#lwOverlay [data-color-panel]').forEach((panel) => {
-      panel.hidden = panel.dataset.colorPanel !== 'solido';
-    });
-    lwLiveAdjustTab = 'letra';
-    document.querySelectorAll('#lwLiveAdjustTabs .fp-tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.adjust === 'letra');
-    });
-    lwBuildGrid(lwFontGrid, LW_FONTS, null, lwSelectFont);
-    lwBuildGrid(lwEffectGrid, LW_EFFECTS, null, lwSelectEffect);
-    lwBuildComboGrid();
-    lwShowStep(0);
+  function openLiveWrite() { lwAbrir(''); }
+  // Se cerró el control sin tocar «Ocultar» y el texto sigue en la pantalla: al volver
+  // se abre «Escribir en vivo» con ese mismo texto y estilo, listo para seguir o terminar.
+  socket.on('escribirVivoSeguir', (estado) => {
+    if (!estado || !estado.active || !lwOverlay.hidden) return;
+    lwState = {
+      font: estado.font, fontSize: estado.fontSize, effect: estado.effect,
+      color: estado.color, color2: estado.color2 || '', text: ''
+    };
+    lwAbrir(estado.text);
+  });
+
+  function lwAbrir(texto) {
+    lwState.text = texto;
+    lwText.value = texto;
+    lwActive = texto.trim().length > 0;
+    updateNavButtonsState();
+    lwFontSize.value = lwState.fontSize;
+    lwBuildGrid(lwFontGrid, LW_FONTS, lwState.font, lwSelectFont);
+    lwBuildGrid(lwEffectGrid, LW_EFFECTS, lwState.effect, lwSelectEffect);
+    lwBuildColores();
+    lwCerrarVerMas();
+    lwPintarEstado();
     lwOverlay.hidden = false;
+    lwMostrarAjuste('letra');
+    lwCambio();
+    lwReproducirVista();
     requestAnimationFrame(() => lwOverlay.classList.add('show'));
+    // En la PC el cursor queda listo para escribir; en el celular no, así el
+    // teclado no tapa la vista previa apenas se abre.
+    if (window.matchMedia('(pointer: fine)').matches) lwText.focus();
   }
   function closeLiveWrite() {
     lwStop();
@@ -2376,8 +2418,5 @@
   }
 
   liveWriteBtn.addEventListener('click', openLiveWrite);
-  lwNext.addEventListener('click', () => { if (lwCanAdvance()) lwShowStep(lwStepIndex + 1); });
-  lwBack.addEventListener('click', () => lwShowStep(lwStepIndex - 1));
   lwFinish.addEventListener('click', closeLiveWrite);
-  document.getElementById('lwCancel').addEventListener('click', closeLiveWrite);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lwOverlay.hidden) closeLiveWrite(); });

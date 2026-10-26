@@ -1556,6 +1556,111 @@ body.dragging-active { user-select: none; }
 .lw-cabecera h2 { margin-bottom: 0; }
 .lw-cabecera .btn { flex: none; }
 
+/* ---- Escribir en vivo: todo en una sola tarjeta que entra en el celular sin scroll ----
+   La vista previa es la única parte elástica: se achica para dejar lugar al ajuste abierto. */
+#lwOverlay { padding: 10px; }
+.lw-card {
+  max-width: 420px;
+  max-height: calc(100dvh - 20px);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 12px;
+  overflow: hidden;
+}
+.lw-card > * { flex: none; }
+.lw-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+.lw-estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--gray-600); }
+.lw-estado.en-vivo { color: var(--red-300); }
+.lw-estado.en-vivo::before { background: var(--red-500); box-shadow: 0 0 8px var(--red-500); }
+
+.lw-card > .lw-vista {
+  flex: 1 20 210px; /* cede espacio mucho antes que el ajuste abierto */
+  min-height: 72px;
+  max-height: 230px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #000;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-align: center;
+}
+.lw-vista > small { position: absolute; top: 6px; left: 10px; font-size: 0.66rem; color: var(--text-muted); z-index: 1; }
+.lw-vista-texto {
+  max-width: 100%;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: calc(clamp(1.3rem, 7vw, 2rem) * var(--fp-size-scale, 1));
+}
+.lw-vista-texto.lw-ejemplo { opacity: 0.55; }
+.lw-vista .fp-mini-rain span { animation-name: lwLluviaVista; animation-duration: 2.2s; }
+@keyframes lwLluviaVista { to { transform: translateY(240px) rotate(20deg); opacity: 0; } }
+
+.lw-card > .lw-texto { margin: 10px 0 8px; min-height: 0; resize: none; line-height: 1.4; font-family: inherit; }
+
+.lw-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lw-chip {
+  min-width: 0;
+  padding: 6px 2px;
+  background: var(--gray-850);
+  border: 1.5px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.lw-chip b { display: block; color: var(--text); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lw-chip.active { border-color: var(--primary-400); background: rgba(52, 205, 250, 0.1); color: var(--primary-300); }
+
+/* El ajuste abierto puede crecer («Ver las 27 letras») y entonces se desliza por dentro. */
+.lw-card > .lw-ajustes { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; }
+.lw-ajustes .fp-tab-panel { background: var(--gray-850); border: 1px solid var(--gray-700); border-radius: var(--radius-sm); padding: 10px; }
+.lw-rejilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lw-rejilla .fp-option-btn { min-width: 0; padding: 8px 4px; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--gray-900); }
+#lwFontGrid:not(.lw-todo) .fp-option-btn:nth-child(n+10),
+#lwEffectGrid:not(.lw-todo) .fp-option-btn:nth-child(n+7) { display: none; }
+.lw-rejilla .fp-effect-btn { display: flex; flex-direction: column; gap: 4px; padding: 5px; white-space: normal; }
+.lw-rejilla .fp-effect-btn .fp-mini-stage { height: 30px; }
+.lw-rejilla .fp-effect-btn .fp-mini-label { font-size: 0.68rem; line-height: 1.2; }
+.lw-ver-mas { display: block; width: 100%; margin-top: 6px; padding: 4px; background: none; border: 0; color: var(--text-muted); font: inherit; font-size: 0.75rem; cursor: pointer; }
+
+.lw-rango { margin-bottom: 10px; }
+.lw-rango .lw-a-grande { font-size: 1.3rem; font-weight: 700; }
+.lw-tamanos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lw-tamanos .fp-option-btn { padding: 8px 2px; font-weight: 700; font-size: 0.85rem; background: var(--gray-900); }
+
+.lw-ajustes .fp-section-label { margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.lw-circulos { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 10px; }
+.lw-circulo {
+  position: relative;
+  width: 100%;
+  max-width: 40px;
+  aspect-ratio: 1;
+  justify-self: center;
+  padding: 0;
+  border: 2px solid var(--gray-700);
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: hidden;
+}
+.lw-circulo.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--primary-400); }
+.lw-propio { background: conic-gradient(#ef4444, #facc15, #22c55e, #38bdf8, #a855f7, #ef4444); }
+.lw-propio input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.lw-mezcla-propia { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-muted); }
+.lw-mezcla-propia > span:first-child { flex: 1; }
+.lw-mezcla-propia input[type="color"] { width: 44px; height: 30px; padding: 2px; background: var(--gray-900); border: 1.5px solid var(--gray-700); border-radius: 8px; cursor: pointer; }
+
+.lw-card > .lw-pie { margin-top: auto; padding-top: 10px; gap: 8px; }
+.lw-pie .btn { min-height: 48px; padding: 0 10px; font-size: 0.95rem; white-space: nowrap; }
+
 .picker-list {
   display: flex;
   flex-direction: column;

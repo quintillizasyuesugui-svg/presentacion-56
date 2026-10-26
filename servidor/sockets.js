@@ -264,6 +264,13 @@ function registrarSockets(io) {
       else recuerdosVivo.delete(socket.ownerName);
       io.to('owner:' + socket.ownerName).emit('escribirVivoEstado', limpio);
     });
+    // El control que recién se abre pregunta si quedó texto en vivo en su pantalla
+    // (se cerró sin tocar «Ocultar»): así vuelve a «Escribir en vivo» y puede terminarlo.
+    socket.on('escribirVivoPedir', () => {
+      if (!socket.ownerName) return;
+      const vivo = recuerdosVivo.get(socket.ownerName);
+      if (vivo) socket.emit('escribirVivoSeguir', vivo);
+    });
 
     // ---- Música y videos ----
     // «medios»: el celular le da una orden a su pantalla (poner, pausar, volumen, mandar un

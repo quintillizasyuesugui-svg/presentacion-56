@@ -188,77 +188,79 @@
 </div>
 
 <!-- Escribir en vivo: lo que vas tipeando aparece al toque en tu pantalla
-     (fondo negro). Antes de escribir obliga a elegir, en este orden, letra,
-     tamaño, animación y color — recién ahí se habilita escribir. Es 100%
-     independiente por persona: usa la misma sala 'owner:' de siempre, así
-     nunca aparece ni afecta la pantalla de otro usuario. -->
+     (fondo negro). Se abre listo para escribir: letra, tamaño, animación y
+     color ya vienen elegidos y se cambian con los 4 botones, uno por vez.
+     Es 100% independiente por persona: usa la misma sala 'owner:' de
+     siempre, así nunca aparece ni afecta la pantalla de otro usuario. -->
 <div class="modal-overlay" id="lwOverlay" hidden>
-  <div class="modal-card fp-card">
-    <!-- Cancelar está siempre a la vista, por si se abrió sin querer: cierra y borra el texto de la pantalla -->
+  <div class="modal-card fp-card lw-card">
     <div class="lw-cabecera">
       <h2>Escribir en vivo</h2>
-      <button type="button" class="btn chico" id="lwCancel">✕ Cancelar</button>
-    </div>
-    <p id="lwStepHint"></p>
-
-    <div class="fp-tab-panel" data-step="tamano" hidden>
-      <div class="fp-range-row">
-        <input type="range" id="lwFontSize" min="0.5" max="2.2" step="0.1" value="1">
-        <span class="fp-range-value" id="lwFontSizeValue">100%</span>
-      </div>
+      <span class="lw-estado" id="lwEstado">Todavía no se ve</span>
     </div>
 
-    <div class="fp-tab-panel" data-step="escribir" hidden>
-      <textarea id="lwText" class="fp-text-input fp-textarea" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás. Podés poner varios versos, se acomoda solo." rows="4"></textarea>
-      <p class="editor-hint">Aparece en tu pantalla en el momento, letra por letra. El tamaño ya quedó fijo.</p>
-
-      <!-- Menú de ajuste en vivo: uno por vez, no los 3 apilados — tocás el
-           botón y abajo aparece sólo esa sección. -->
-      <div class="fp-tabs" id="lwLiveAdjustTabs" hidden>
-        <button type="button" class="fp-tab-btn" data-adjust="letra">🔤 Letra</button>
-        <button type="button" class="fp-tab-btn" data-adjust="animacion">✨ Animación</button>
-        <button type="button" class="fp-tab-btn" data-adjust="color">🎨 Color</button>
-      </div>
+    <!-- Copia chica de tu pantalla: misma letra, color, tamaño y animación -->
+    <div class="lw-vista" id="lwVista" aria-hidden="true">
+      <small>Así se ve en tu pantalla</small>
+      <span class="lw-vista-texto fp-anim-target" id="lwVistaTexto"></span>
     </div>
 
-    <!-- "letra" va acá (no primero) para que, en el paso de escribir, el menú
-         de arriba la muestre justo debajo de las pestañas — el paso 1 del
-         asistente la sigue mostrando igual, la posición en el HTML no le
-         afecta a eso. -->
-    <div class="fp-tab-panel" data-step="letra" hidden>
-      <div class="fp-grid fp-grid-h" id="lwFontGrid"></div>
+    <textarea id="lwText" class="fp-text-input lw-texto" placeholder="Escribí acá — aparece en tu pantalla apenas tipeás." rows="2"></textarea>
+
+    <div class="lw-chips" id="lwChips">
+      <button type="button" class="lw-chip" data-adjust="letra" aria-expanded="false">Letra<b id="lwChipLetra"></b></button>
+      <button type="button" class="lw-chip" data-adjust="tamano" aria-expanded="false">Tamaño<b id="lwChipTamano"></b></button>
+      <button type="button" class="lw-chip" data-adjust="animacion" aria-expanded="false">Animación<b id="lwChipAnimacion"></b></button>
+      <button type="button" class="lw-chip" data-adjust="color" aria-expanded="false">Color<b id="lwChipColor"></b></button>
     </div>
 
-    <div class="fp-tab-panel" data-step="animacion" hidden>
-      <div class="fp-grid fp-grid-h" id="lwEffectGrid"></div>
-    </div>
-
-    <div class="fp-tab-panel" data-step="color" hidden>
-      <div class="fp-tabs" id="lwColorModeTabs">
-        <button type="button" class="fp-tab-btn" data-color-mode="solido">🎨 Un color</button>
-        <button type="button" class="fp-tab-btn" data-color-mode="combinado">🌈 Combinar 2</button>
+    <div class="lw-ajustes" id="lwAjustes">
+      <div class="fp-tab-panel" data-step="letra" hidden>
+        <div class="lw-rejilla" id="lwFontGrid"></div>
+        <button type="button" class="lw-ver-mas" data-mas="lwFontGrid">Ver las 27 letras ▾</button>
       </div>
 
-      <div data-color-panel="solido">
-        <input type="color" id="lwColor" class="fp-color" value="#ffffff">
+      <div class="fp-tab-panel" data-step="tamano" hidden>
+        <div class="fp-range-row lw-rango">
+          <span aria-hidden="true">A</span>
+          <input type="range" id="lwFontSize" min="0.5" max="2.2" step="0.1" value="1" aria-label="Tamaño de letra">
+          <span class="lw-a-grande" aria-hidden="true">A</span>
+          <span class="fp-range-value" id="lwFontSizeValue">100%</span>
+        </div>
+        <div class="lw-tamanos" id="lwTamanos">
+          <button type="button" class="fp-option-btn" data-tam="0.7">Chico</button>
+          <button type="button" class="fp-option-btn" data-tam="1">Normal</button>
+          <button type="button" class="fp-option-btn" data-tam="1.4">Grande</button>
+          <button type="button" class="fp-option-btn" data-tam="2">Enorme</button>
+        </div>
       </div>
 
-      <div data-color-panel="combinado" hidden>
-        <div class="fp-section-label">Combinaciones</div>
-        <div class="color-combo-grid" id="lwComboGrid"></div>
-        <div class="fp-section-label">O armá la tuya</div>
-        <div class="color-combo-custom">
-          <input type="color" id="lwColor1" value="#38bdf8">
+      <div class="fp-tab-panel" data-step="animacion" hidden>
+        <div class="lw-rejilla" id="lwEffectGrid"></div>
+        <button type="button" class="lw-ver-mas" data-mas="lwEffectGrid">Ver las 25 animaciones ▾</button>
+      </div>
+
+      <div class="fp-tab-panel" data-step="color" hidden>
+        <div class="fp-section-label">Un color</div>
+        <div class="lw-circulos" id="lwSolidos">
+          <label class="lw-circulo lw-propio" title="Elegir otro color">
+            <input type="color" id="lwColor" value="#ffffff" aria-label="Otro color">
+          </label>
+        </div>
+        <div class="fp-section-label">Mezcla de dos</div>
+        <div class="lw-circulos" id="lwComboGrid"></div>
+        <div class="lw-mezcla-propia">
+          <span>O armá la tuya</span>
+          <input type="color" id="lwColor1" value="#38bdf8" aria-label="Primer color">
           <span class="color-combo-arrow">→</span>
-          <input type="color" id="lwColor2" value="#a855f7">
+          <input type="color" id="lwColor2" value="#a855f7" aria-label="Segundo color">
         </div>
       </div>
     </div>
 
-    <div class="btn-row">
-      <button type="button" class="btn" id="lwBack" hidden>⬅️ Atrás</button>
-      <button type="button" class="btn primary" id="lwNext">Siguiente</button>
-      <button type="button" class="btn danger-solid" id="lwFinish" hidden>✅ Listo, ocultar y cerrar</button>
+    <div class="btn-row lw-pie">
+      <button type="button" class="btn" id="lwClear">Borrar texto</button>
+      <button type="button" class="btn danger-solid" id="lwFinish">Ocultar y cerrar</button>
     </div>
   </div>
 </div>
