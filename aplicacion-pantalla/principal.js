@@ -1,6 +1,6 @@
 // Abre la pantalla de Conexiones (la misma de Render) en una ventana propia de Windows.
 // Los celulares siguen manejándola con el control, como en el navegador.
-const { app, BrowserWindow, WebContentsView, View, ipcMain, shell, session } = require('electron');
+const { app, BrowserWindow, WebContentsView, View, ipcMain, shell, session, powerSaveBlocker } = require('electron');
 const path = require('path');
 const volumen = require('./volumen');
 
@@ -375,6 +375,9 @@ app.whenReady().then(() => {
   sesionPagina.setPermissionRequestHandler((_contenido, _permiso, responder) => responder(false));
   sesionPagina.on('will-download', (evento) => evento.preventDefault());
   registrarPedidosDePagina();
+  // Mientras la app está abierta, Windows no apaga el monitor ni pone el protector de pantalla:
+  // la presentación puede quedar quieta en una diapositiva mucho rato.
+  powerSaveBlocker.start('prevent-display-sleep');
   crearVentana();
 });
 app.on('window-all-closed', () => app.quit());

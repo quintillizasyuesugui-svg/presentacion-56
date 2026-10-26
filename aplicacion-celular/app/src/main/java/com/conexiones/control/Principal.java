@@ -113,6 +113,9 @@ public class Principal extends Activity {
         web = new WebView(this);
         raiz.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(raiz);
+        // Con la app abierta el celular no apaga la pantalla: si se apagara, se corta la conexión
+        // con la PC en plena presentación. Al salir de la app vuelve a apagarse como siempre.
+        raiz.setKeepScreenOn(true);
 
         WebSettings ajustes = web.getSettings();
         ajustes.setJavaScriptEnabled(true);
