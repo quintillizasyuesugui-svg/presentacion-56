@@ -25,7 +25,7 @@ const LIMITES = {
   // Comprobar en Cloudinary la música o el video que se subió (usa el cupo por hora de su API).
   nube: { minimo: 3, maximo: 8, porCadaEnFila: 3, porPersona: 3, enFila: 120, esperaMaxMs: 3 * 60 * 1000 },
   // Recibir un archivo en este servidor (sólo al probar en la PC, sin Cloudinary): usa disco y memoria.
-  local: { minimo: 2, maximo: 3, porCadaEnFila: 4, porPersona: 2, enFila: 30, esperaMaxMs: 3 * 60 * 1000 },
+  local: { minimo: 2, maximo: 3, porCadaEnFila: 4, porPersona: 3, enFila: 30, esperaMaxMs: 3 * 60 * 1000 },
   // Preguntarle a YouTube el título de un enlace.
   youtube: { minimo: 4, maximo: 10, porCadaEnFila: 3, porPersona: 3, enFila: 80, esperaMaxMs: 60 * 1000 }
 };

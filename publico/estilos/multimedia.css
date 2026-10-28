@@ -790,3 +790,4 @@ body.compacto [hidden] { display: none !important; }
 body.control.compacto.eligiendo-imagenes { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px); }
 /* Tablet: el celular se agranda con zoom y «dvh» crece junto; se usa el alto ya achicado. */
 .es-tablet body.control.compacto { height: var(--alto-tablet, 100dvh); min-height: 0; }
+.nota-mi-lista { margin: 4px 2px 0; text-align: center; font-size: 0.78rem; line-height: 1.45; color: var(--primary-200); }

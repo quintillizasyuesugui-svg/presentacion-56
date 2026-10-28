@@ -514,6 +514,12 @@ const socket = io();
       }
       const vacio = $(tipo === 'musica' ? 'vacioMusica' : 'vacioVideo');
       if (vacio) vacio.hidden = filas.length > 0;
+      // Debajo de lo que se sube: dónde verlo y ordenarlo.
+      if (filas.length) {
+        filas.push(crear('p', { class: 'nota-mi-lista', text: tipo === 'musica'
+          ? '🎵 Acá ves cómo se procesan y suben. Las canciones ya subidas no se ven acá: para verlas y ordenarlas, tocá «📋 Mi lista y orden».'
+          : '🎬 Acá ves cómo se procesan y suben. Los videos ya subidos no se ven acá: para verlos y ordenarlos, tocá «📋 Mi lista y orden».' }));
+      }
       caja.replaceChildren(...filas);
     }
   }
@@ -533,9 +539,10 @@ const socket = io();
   function elegirPocos(archivos, tipo) {
     let lista = [...archivos];
     if (lista.length > POR_VEZ) {
+      const sobran = lista.length - POR_VEZ;
       avisar(tipo === 'musica'
-        ? `🎵 Elegí hasta ${POR_VEZ} canciones por vez. Se suben las ${POR_VEZ} primeras; las demás, cuando terminen.`
-        : `🎬 Elegí hasta ${POR_VEZ} videos por vez. Se suben los ${POR_VEZ} primeros; los demás, cuando terminen.`);
+        ? `🎵 Sólo se pueden subir ${POR_VEZ} canciones a la vez. Se suben las ${POR_VEZ} primeras. ${sobran === 1 ? 'La otra NO se sube: volvé a elegirla' : `Las otras ${sobran} NO se suben: volvé a elegirlas`} cuando terminen.`
+        : `🎬 Sólo se pueden subir ${POR_VEZ} videos a la vez. Se suben los ${POR_VEZ} primeros. ${sobran === 1 ? 'El otro NO se sube: volvé a elegirlo' : `Los otros ${sobran} NO se suben: volvé a elegirlos`} cuando terminen.`);
       lista = lista.slice(0, POR_VEZ);
     } else {
       const n = lista.length;

@@ -380,7 +380,8 @@
     fileInput.value = '';
     if (!fotos.length) return;
     if (fotos.length > FOTOS_POR_VEZ) {
-      showToast(`🖼️ Sólo se pueden subir ${FOTOS_POR_VEZ} fotos a la vez. Elegiste ${fotos.length}: se suben las primeras ${FOTOS_POR_VEZ}; las demás, en otra tanda.`);
+      const sobran = fotos.length - FOTOS_POR_VEZ;
+      showToast(`🖼️ Sólo se pueden subir ${FOTOS_POR_VEZ} fotos a la vez. Se suben las ${FOTOS_POR_VEZ} primeras. ${sobran === 1 ? 'La otra NO se sube: volvé a elegirla' : `Las otras ${sobran} NO se suben: volvé a elegirlas`} cuando terminen.`);
       fotos = fotos.slice(0, FOTOS_POR_VEZ);
     } else {
       showToast(`⬆️ Subiendo ${fotos.length === 1 ? '1 foto' : fotos.length + ' fotos'} (hasta ${FOTOS_POR_VEZ} a la vez).`);
