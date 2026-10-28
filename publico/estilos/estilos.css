@@ -1,4 +1,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
+/* Sin el cuadro celeste que Android pone al tocar: los botones ya se hunden al apretarlos
+   (:active) y el borde de :focus-visible sigue para teclado y control remoto. */
+html { -webkit-tap-highlight-color: transparent; }
 
 :root {
   /* Greys — foundation of the UI */
