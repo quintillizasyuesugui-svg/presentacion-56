@@ -9,6 +9,7 @@ const { registrarRutasAvanceAutomatico } = require('./avance-automatico');
 const { registrarRutasDiapositivas } = require('./diapositivas');
 const { registrarRutasDocumentos, retomarTrabajos, vaciarTrabajos } = require('./documentos');
 const { iniciarAlmacenes, vaciarRespaldos } = require('./almacen');
+const { iniciarReintentosDeBorrado } = require('./borrar-de-la-nube');
 const { registrarRutasAdministracion } = require('./administracion');
 const { registrarRutasCodigoQr } = require('./codigo-qr');
 const { registrarRutasMultimedia } = require('./multimedia');
@@ -89,6 +90,7 @@ app.use((err, req, res, next) => {
 async function arrancar() {
   await iniciarAlmacenes();
   await retomarTrabajos();
+  iniciarReintentosDeBorrado();
   servidor.listen(PUERTO, '0.0.0.0', () => console.log(`🚀 Cinema en http://0.0.0.0:${PUERTO}`));
 }
 

@@ -129,9 +129,9 @@
       return;
     }
     const pregunta = crear('p', 'persona-pregunta');
-    pregunta.append(`¿Borrar ${textoCuentas(n)}` + (diapositivas ? ` y sus ${textoDiapositivas(diapositivas)}?` : '?'),
+    pregunta.append(`¿Estás seguro de borrar ${textoCuentas(n)}` + (diapositivas ? ` y sus ${textoDiapositivas(diapositivas)}?` : '?'),
       crear('span', 'persona-lista-nombres', marcadas.map((p) => p.name).join(', ')),
-      crear('span', 'persona-advertencia', 'Se borra todo lo de estas personas y no se puede deshacer.'));
+      crear('span', 'persona-advertencia', 'Se borra para siempre todo lo de estas personas (fotos, música y videos): no se puede recuperar ni cancelar.'));
     const acciones = crear('div', 'persona-acciones');
     const cancelar = crear('button', 'btn', 'Cancelar');
     cancelar.type = 'button';

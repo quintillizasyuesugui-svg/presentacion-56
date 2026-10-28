@@ -20,6 +20,7 @@ const { CARPETA_MULTIMEDIA, PRESUPUESTO_MB, ESPACIO_MIN_MB, ESPACIO_MAX_MB, clou
 const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona, visiblePara, nombresDePersonas } = require('./personas');
 const { enFila, anotar, explicarEspacio } = require('./guardian');
+const { borrarDeLaNube } = require('./borrar-de-la-nube');
 
 const MB = 1024 * 1024;
 const LIMITE_BYTES = { musica: 15 * MB, video: 100 * MB };
@@ -188,7 +189,7 @@ async function agregar(registro) {
 async function borrarArchivo(registro) {
   if (registro.origen !== 'subido') return;
   if (registro.nube) {
-    if (nubeLista) await cloudinary.uploader.destroy(registro.id, { resource_type: 'video', invalidate: true }).catch(() => {});
+    await borrarDeLaNube(registro.id, 'video');
   } else if (registro.archivo) {
     // «archivo» lo puso el servidor al guardarlo: siempre es un nombre dentro de publico/multimedia.
     await fs.unlink(path.join(CARPETA_MULTIMEDIA, path.basename(registro.archivo))).catch(() => {});
@@ -363,14 +364,14 @@ function registrarRutasMultimedia(app, io) {
       const recurso = await enFila('nube', req.person.name, () => cloudinary.api.resource(publicId, { resource_type: 'video' }))
         .catch(async (err) => {
           // Si no se pudo comprobar, no queda nada suelto en Cloudinary ocupando lugar.
-          await cloudinary.uploader.destroy(publicId, { resource_type: 'video', invalidate: true }).catch(() => {});
+          await borrarDeLaNube(publicId, 'video');
           throw err;
         });
       try {
         comprobarTamano(firma.tipo, recurso.bytes);
         comprobarEspacio(req.person.name, recurso.bytes);
       } catch (err) {
-        await cloudinary.uploader.destroy(publicId, { resource_type: 'video', invalidate: true }).catch(() => {});
+        await borrarDeLaNube(publicId, 'video');
         throw err;
       }
       await agregar({

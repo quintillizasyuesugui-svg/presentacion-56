@@ -440,9 +440,15 @@ body[data-reproductor="control"] .panel.video-activo { padding: 16px; gap: 14px;
 .pestanas-gestion [aria-current="page"], .pestanas-gestion [aria-selected="true"] { background: var(--gray-700); color: var(--text); }
 .pestanas-gestion :focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
-.espacio-caja { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; }
-.espacio-caja b { font-variant-numeric: tabular-nums; }
+.espacio-caja { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--primary-700); background: var(--gray-850); font-size: 0.85rem; }
+.espacio-titulo { display: flex; align-items: center; gap: 10px; }
+.espacio-titulo b { color: var(--primary-100); font-size: 0.95rem; }
+.espacio-candado { font-size: 1.5rem; line-height: 1; }
+.espacio-usado { color: var(--text-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 .espacio-caja p { color: var(--text-muted); font-size: 0.78rem; line-height: 1.45; }
+.espacio-caja p:empty { display: none; }
+/* Pedazos de la fila que se rompe al borrar (los arma romperFila en multimedia.js). */
+.pedazo-vidrio { position: fixed; z-index: 70; margin: 0; pointer-events: none; will-change: transform, opacity; visibility: visible !important; }
 .espacio-riel { height: 10px; border-radius: 5px; background: var(--gray-700); overflow: hidden; }
 .espacio-riel i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--primary-400), #a855f7); transition: width 400ms var(--ease-out); }
 .espacio-riel.lleno i { background: linear-gradient(90deg, var(--amber-400), var(--red-400)); }

@@ -17,6 +17,8 @@
 
   const imageList = document.getElementById('imageList');
   const emptyHint = document.getElementById('emptyHint');
+  const cuantasImagenes = document.getElementById('cuantasImagenes');
+  let esAdmin = false;
   const fileInput = document.getElementById('fileInput');
   const uploadBtn = document.getElementById('uploadBtn');
 
@@ -185,8 +187,8 @@
     const cuantas = elegidas.size;
     if (!cuantas) return;
     const ok = await askConfirm(cuantas === 1
-      ? '¿Eliminar 1 imagen? Esta acción no se puede deshacer.'
-      : `¿Eliminar ${cuantas} imágenes? Esta acción no se puede deshacer.`);
+      ? '¿Estás seguro de eliminar 1 imagen? Se borra para siempre: no se puede recuperar ni cancelar.'
+      : `¿Estás seguro de eliminar ${cuantas} imágenes? Se borran para siempre: no se pueden recuperar ni cancelar.`);
     if (!ok || borrando) return;
     // No se apaga el botón (se vería gris justo cuando el tacho abre la tapa): mientras se
     // borra, la barra entera deja de recibir toques.
@@ -230,6 +232,8 @@
 
   function render() {
     emptyHint.hidden = images.length > 0;
+    cuantasImagenes.textContent = (images.length === 1 ? 'Tienes 1 imagen' : `Tienes ${images.length} imágenes`) +
+      (esAdmin ? ' · como admin ves las de todos' : '');
     pintarBarrasDeElegir();
     listaImagenes.poner(images);
   }
@@ -352,7 +356,7 @@
   }
 
   async function remove(id) {
-    const ok = await askConfirm('¿Eliminar esta imagen? Esta acción no se puede deshacer.');
+    const ok = await askConfirm('¿Estás seguro de eliminar esta imagen? Se borra para siempre: no se puede recuperar ni cancelar.');
     if (!ok) return;
     try {
       const res = await authFetch('/api/images/' + id, { method: 'DELETE' });
@@ -473,6 +477,7 @@
 
   // Primero identificar quién es (pide PIN o registra) — recién ahí carga sus imágenes.
   ensureAuthed().then((auth) => {
+    esAdmin = !!auth.isAdmin;
     authNameBadge.hidden = false;
     authNameBadge.textContent = authBadgeText(auth);
     logoutBtn.hidden = false;

@@ -87,8 +87,7 @@ const socket = io();
   function pintarEspacio() {
     const { usado, total } = datos.espacio;
     const pct = total ? Math.min(100, (100 * usado) / total) : 100;
-    $('espacioTexto').innerHTML = '';
-    $('espacioTexto').append('👤 ', crear('b', { text: `Tu espacio: ${fmtMb(usado)} de ${fmtMb(total)}` }), '. Es sólo tuyo.');
+    $('espacioTexto').textContent = `Usaste ${fmtMb(usado)} de ${fmtMb(total)}`;
     $('espacioRiel').firstElementChild.style.width = pct + '%';
     $('espacioRiel').classList.toggle('lleno', pct >= 90);
     $('espacioExplicacion').textContent = '📦 ' + datos.explicacion + ' Los enlaces de YouTube no ocupan espacio.';
@@ -267,6 +266,77 @@ const socket = io();
     }
   }
 
+  // ---------- animación al borrar: la fila se rompe como vidrio ----------
+  // La fila tiembla, se parte en triángulos (copias de la fila recortadas con clip-path) y los
+  // pedazos caen girando. Después las filas de abajo suben a ocupar el lugar. Con «reducir
+  // movimiento» la fila sólo se desvanece.
+  const CURVA_SALIDA = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  const CURVA_MOVER = 'cubic-bezier(0.77, 0, 0.175, 1)';
+  const MAXIMO_ROTAS = 8; // con más, se rompen las primeras que se ven y el resto se va sin pedazos
+  const azar = (a, b) => a + Math.random() * (b - a);
+
+  function triangulosDe(ancho, alto) {
+    const N = 7;
+    const arriba = [0];
+    for (let i = 1; i < N; i++) arriba.push(ancho * i / N + azar(-ancho / (N * 3), ancho / (N * 3)));
+    arriba.push(ancho);
+    const abajo = arriba.map((x, i) => (i === 0 || i === N ? x : x + azar(-ancho / (N * 2.5), ancho / (N * 2.5))));
+    const piezas = [];
+    for (let i = 0; i < N; i++) {
+      piezas.push({ puntos: `${arriba[i]}px 0,${arriba[i + 1]}px 0,${abajo[i + 1]}px ${alto}px`, cx: (arriba[i] + arriba[i + 1] + abajo[i + 1]) / 3, cy: alto / 3 });
+      piezas.push({ puntos: `${arriba[i]}px 0,${abajo[i + 1]}px ${alto}px,${abajo[i]}px ${alto}px`, cx: (arriba[i] + abajo[i + 1] + abajo[i]) / 3, cy: alto * 2 / 3 });
+    }
+    return piezas;
+  }
+
+  async function romperFila(fila, demora) {
+    await fila.animate({ transform: ['translateX(0)', 'translateX(-3px)', 'translateX(3px)', 'translateX(-2px)', 'translateX(0)'] },
+      { duration: 160, delay: demora, easing: 'linear' }).finished;
+    const r = fila.getBoundingClientRect();
+    const pedazos = triangulosDe(r.width, r.height).map((t) => {
+      const copia = fila.cloneNode(true);
+      copia.classList.add('pedazo-vidrio');
+      copia.removeAttribute('data-id');
+      Object.assign(copia.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', clipPath: `polygon(${t.puntos})`, transformOrigin: `${t.cx}px ${t.cy}px` });
+      document.body.append(copia);
+      const dx = (t.cx - r.width / 2) / r.width * 70 + azar(-12, 12);
+      return copia.animate({
+        transform: ['translate(0, 0) rotate(0deg)', `translate(${dx}px, ${azar(70, 140)}px) rotate(${azar(-55, 55)}deg)`],
+        opacity: [1, 1, 0], offset: [0, 0.55, 1]
+      }, { duration: azar(480, 620), easing: CURVA_MOVER, fill: 'forwards' });
+    });
+    fila.style.visibility = 'hidden';
+    await Promise.all(pedazos.map(a => a.finished));
+    pedazos.forEach(a => a.effect.target.remove());
+  }
+
+  async function romperFilas(ids) {
+    const quitar = new Set(ids);
+    const filas = [...document.querySelectorAll('.lista-medios .fila-medio')].filter(f => quitar.has(f.dataset.id));
+    if (!filas.length || typeof filas[0].animate !== 'function') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      await Promise.all(filas.map(f => f.animate({ opacity: [1, 0] }, { duration: 200, easing: 'ease', fill: 'forwards' }).finished));
+      return;
+    }
+    const alto = window.innerHeight;
+    const aLaVista = filas.filter(f => { const r = f.getBoundingClientRect(); return r.bottom > 0 && r.top < alto; }).slice(0, MAXIMO_ROTAS);
+    filas.filter(f => !aLaVista.includes(f)).forEach(f => { f.style.opacity = '0'; });
+    await Promise.all(aLaVista.map((f, i) => romperFila(f, i * 60)));
+  }
+
+  function posicionesDeFilas() {
+    return new Map([...document.querySelectorAll('.lista-medios .fila-medio')].map(f => [f.dataset.id, f.getBoundingClientRect().top]));
+  }
+  function subirFilas(antes) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (const fila of document.querySelectorAll('.lista-medios .fila-medio')) {
+      const corrida = antes.has(fila.dataset.id) ? antes.get(fila.dataset.id) - fila.getBoundingClientRect().top : 0;
+      if (corrida && typeof fila.animate === 'function') {
+        fila.animate({ transform: [`translateY(${corrida}px)`, 'translateY(0px)'] }, { duration: 220, easing: CURVA_SALIDA });
+      }
+    }
+  }
+
   // ---------- borrar (una o varias) ----------
   const capa = $('confirmar');
   let porBorrar = null;
@@ -275,9 +345,9 @@ const socket = io();
     const items = datos.elementos.filter(e => ids.includes(e.id));
     const libera = items.reduce((s, e) => s + (e.bytes || 0), 0);
     const nombre = tipo === 'musica' ? (ids.length === 1 ? 'canción' : 'canciones') : (ids.length === 1 ? 'video' : 'videos');
-    $('confirmarTitulo').textContent = `¿Borrar ${ids.length} ${nombre}?`;
+    $('confirmarTitulo').textContent = `¿Estás seguro de borrar ${ids.length} ${nombre}?`;
     const ajenos = [...new Set(items.map(e => e.owner).filter(o => o && o !== auth.name))];
-    $('confirmarTexto').textContent = 'No se puede deshacer.' +
+    $('confirmarTexto').textContent = 'Se borra para siempre: no se puede recuperar ni cancelar.' +
       (libera ? ` Se liberan ${fmtMb(libera)}.` : '') +
       (ajenos.length ? ` Es de: ${ajenos.join(', ')}.` : '') +
       ' Si algo está sonando en una pantalla, se detiene.';
@@ -298,16 +368,22 @@ const socket = io();
     const { tipo, ids } = porBorrar;
     $('confirmarSi').disabled = true;
     try {
-      datos = await pedir('/api/multimedia/borrar', { ids });
+      const nuevos = await pedir('/api/multimedia/borrar', { ids });
+      cerrarConfirmar();
+      // Se rompe recién cuando el servidor confirmó el borrado: si falla, la fila sigue entera.
+      await romperFilas(ids);
+      const antes = posicionesDeFilas();
+      datos = nuevos;
       seleccion[tipo].clear();
       seleccionando[tipo] = false;
       pintarTodo();
+      subirFilas(antes);
       avisar(`🗑️ Listo: se ${ids.length === 1 ? 'borró 1' : 'borraron ' + ids.length}.`, true);
     } catch (err) {
       avisar(err.message);
+      cerrarConfirmar();
     } finally {
       $('confirmarSi').disabled = false;
-      cerrarConfirmar();
     }
   });
 

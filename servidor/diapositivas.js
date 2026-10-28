@@ -14,6 +14,7 @@ const { requierePersona, visiblePara } = require('./personas');
 const { enFila } = require('./guardian');
 const { definirConfianza } = require('./limite-registros');
 const { limpiarDireccion, tituloDe } = require('./validadores-pagina');
+const { borrarDeLaNube } = require('./borrar-de-la-nube');
 const crypto = require('crypto');
 
 // Una página web también es una diapositiva: { id, src: '', pagina: dirección, titulo, owner }.
@@ -124,7 +125,7 @@ async function subirImagen(contenido, tipo, owner, nombreLocal) {
 async function borrarImagenSubida(registro) {
   if (registro.pagina) return; // una página web no dejó nada guardado
   if (registro.id.startsWith('presentacion/')) {
-    if (nubeLista) await cloudinary.uploader.destroy(registro.id).catch(() => {});
+    await borrarDeLaNube(registro.id, 'image');
   } else {
     // El id viene del orden guardado, así que no puede salirse de publico/diapositivas.
     await fs.unlink(path.join(CARPETA_DIAPOSITIVAS, registro.id)).catch(() => {});
@@ -398,9 +399,7 @@ function registrarRutasDiapositivas(app, io) {
         if (!registro.originals) throw new ErrorPedido(400, 'Esta diapositiva no es una unión.');
         return [...orden.slice(0, posicion), ...registro.originals, ...orden.slice(posicion + 1)];
       });
-      if (registro.id.startsWith('presentacion/') && nubeLista) {
-        await cloudinary.uploader.destroy(registro.id).catch(() => {});
-      }
+      if (registro.id.startsWith('presentacion/')) await borrarDeLaNube(registro.id, 'image');
       avisarCambio(req.person.isAdmin ? null : [req.person.name]);
       res.json(visiblePara(req.person, siguiente));
     } catch (err) {
