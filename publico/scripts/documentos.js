@@ -432,7 +432,7 @@
     // Si el documento que se está mirando ya no espera elección (se canceló o se empezó a subir), se cierra la vista.
     if (vistaActual && !lista.some((t) => t.id === vistaActual.id && t.fase === 'eligiendo')) cerrarVista();
     lista.forEach((t) => {
-      if (antes.get(t.id) === 'procesando' && t.fase === 'listo') avisar('✓ ' + t.nombre + ': ' + TrabajosDocumentos.textoResultado(t), true);
+      if (antes.get(t.id) === 'procesando' && t.fase === 'listo') avisar('✓ ' + t.nombre + ': ' + TrabajosDocumentos.textoResultado(t) + '. Se subieron a 🖼️ Imágenes.', true);
     });
     // Al abrir o recargar la página con documentos en marcha, la ventana se abre sola para seguir el avance.
     if (!yaSeAbrioSola && lista.some(TrabajosDocumentos.esActivo)) {

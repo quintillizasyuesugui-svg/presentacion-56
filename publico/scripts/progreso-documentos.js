@@ -18,13 +18,31 @@
   // Va dentro de la página, arriba de todo: si flotara encima, taparía el nombre y «Cerrar sesión».
   (document.querySelector('.app') || document.body).prepend(aviso);
 
+  // Al terminar un documento se avisa unos segundos dónde quedaron sus imágenes.
+  const fases = new Map();
+  let hastaCuando = 0;
+  let hayActivos = false;
   TrabajosDocumentos.escuchar((lista) => {
     const activos = lista.filter(TrabajosDocumentos.esActivo);
     const trabajando = activos.filter((t) => t.fase !== 'eligiendo');
+    hayActivos = activos.length > 0;
+    const recien = lista.find((t) => fases.has(t.id) && fases.get(t.id) !== 'listo' && t.fase === 'listo');
+    lista.forEach((t) => fases.set(t.id, t.fase));
     if (!activos.length) {
-      aviso.hidden = true;
+      if (recien) {
+        const n = recien.resultado ? recien.resultado.subidas : 0;
+        aviso.href = 'gestionar.html';
+        texto.textContent = `✅ ${recien.nombre}: ${n} ${n === 1 ? 'imagen subida' : 'imágenes subidas'} a 🖼️ Imágenes ›`;
+        barra.hidden = true;
+        aviso.hidden = false;
+        hastaCuando = Date.now() + 7000;
+        setTimeout(() => { if (Date.now() >= hastaCuando && !hayActivos) aviso.hidden = true; }, 7100);
+      } else if (Date.now() >= hastaCuando) {
+        aviso.hidden = true;
+      }
       return;
     }
+    aviso.href = 'avanzado.html';
     aviso.hidden = false;
     const t = trabajando[0] || activos[0];
     const otros = activos.length > 1 ? ` (+${activos.length - 1})` : '';

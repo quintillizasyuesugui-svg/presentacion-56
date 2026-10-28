@@ -31,6 +31,7 @@ const EXTENSIONES = {
 const CARPETA_NUBE = 'presentacion/multimedia';
 const VIGENCIA_FIRMA_MS = 2 * 60 * 60 * 1000;
 const FIRMAS_SIN_TERMINAR_POR_PERSONA = 6;
+const RECIENTE_MS = 15 * 60 * 1000;
 const LARGO_NOMBRE = 120;
 
 class ErrorPedido extends Error {
@@ -331,7 +332,8 @@ function registrarRutasMultimedia(app, io) {
       comprobarTamano(tipo, Number(bytes));
       comprobarEspacio(req.person.name, Number(bytes));
       const modo = modoDeSubida();
-      const sinTerminar = [...firmasPendientes.values()].filter(f => f.owner === req.person.name).length;
+      // Sólo cuentan las de los últimos minutos: una subida que se cortó ya no frena las nuevas.
+      const sinTerminar = [...firmasPendientes.values()].filter(f => f.owner === req.person.name && f.creada > Date.now() - RECIENTE_MS).length;
       if (modo === 'nube' && sinTerminar >= FIRMAS_SIN_TERMINAR_POR_PERSONA) {
         anotar('usuarios', req.person.name, 'no le dio más permisos de subida', `tenía ${sinTerminar} subidas sin terminar`);
         throw new ErrorPedido(429, `🛡️ Tenés ${sinTerminar} subidas empezadas sin terminar. Esperá a que terminen (o recargá la página) antes de subir más.`);
@@ -343,10 +345,10 @@ function registrarRutasMultimedia(app, io) {
       const timestamp = Math.floor(Date.now() / 1000);
       const firmados = { public_id: publicId, timestamp };
       const signature = cloudinary.utils.api_sign_request(firmados, cloudinary.config().api_secret);
-      firmasPendientes.set(publicId, { owner: req.person.name, tipo, nombre: nombreVisible(nombre), vence: Date.now() + VIGENCIA_FIRMA_MS });
+      firmasPendientes.set(publicId, { owner: req.person.name, tipo, nombre: nombreVisible(nombre), creada: Date.now(), vence: Date.now() + VIGENCIA_FIRMA_MS });
       res.json({
         modo,
-        url: `https://api.cloudinary.com/v1_1/${cloudinary.config().cloud_name}/video/upload`,
+        url: `${cloudinary.config().upload_prefix || 'https://api.cloudinary.com'}/v1_1/${cloudinary.config().cloud_name}/video/upload`,
         campos: { api_key: cloudinary.config().api_key, timestamp, public_id: publicId, signature }
       });
     } catch (err) {

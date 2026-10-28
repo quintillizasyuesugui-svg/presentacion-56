@@ -702,3 +702,91 @@ body:has(.panel.video-activo:not([hidden])) .tarjeta-youtube { display: none; }
 @media (orientation: landscape) {
   .es-tablet .hoja-medios { max-width: 760px; }
 }
+
+/* ==================================================
+   Diseño compacto de Gestionar, Música y videos y Subir (body.compacto):
+   la página ocupa justo la pantalla y no se mueve; lo largo se mueve dentro de .caja-lista.
+   ================================================== */
+body.control.compacto { height: 100dvh; min-height: 0; overflow: hidden; padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+body.compacto [hidden] { display: none !important; }
+.compacto .app { min-height: 0; gap: 10px; }
+.compacto .app > * { flex: none; }
+.compacto .app > .btn-row { margin-top: 0; }
+.compacto .app > .btn-row .btn { flex: 1; min-height: 44px; }
+
+/* Espacio en dos renglones cortos, con la «i» de los límites */
+.espacio-caja.compacta { gap: 6px; padding: 9px 12px; }
+.espacio-caja.compacta .espacio-titulo { gap: 8px; }
+.espacio-caja.compacta .espacio-candado { font-size: 1.1rem; }
+.espacio-caja.compacta .espacio-titulo b { flex: 1; font-size: 0.88rem; }
+.espacio-linea { display: flex; align-items: center; gap: 10px; }
+.espacio-linea .espacio-riel { flex: 1; height: 7px; }
+.espacio-linea .espacio-usado { white-space: nowrap; font-size: 0.76rem; }
+.boton-info { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--gray-600); background: none; color: var(--gray-300); font-family: inherit; font-weight: 700; font-size: 0.78rem; line-height: 1; display: grid; place-items: center; cursor: pointer; }
+.boton-info:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+
+/* Botones de subir: tarjetas con ícono y pocas palabras */
+.tarjetas-subir { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tarjetas-subir.una { grid-template-columns: 1fr; }
+.tarjeta-subir { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--gray-700); background: var(--gray-850); color: var(--text); text-align: left; font: inherit; text-decoration: none; cursor: pointer; transition: border-color 160ms var(--ease-out), transform 120ms var(--ease-out); }
+.tarjeta-subir .ico { flex: none; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 1.15rem; background: var(--gray-700); }
+.tarjeta-subir b { display: block; font-size: 0.92rem; line-height: 1.15; }
+.tarjeta-subir small { display: block; margin-top: 2px; font-size: 0.7rem; color: var(--text-muted); }
+.tarjeta-subir.principal { border-color: var(--primary-500); background: linear-gradient(135deg, rgba(23, 182, 234, 0.22), rgba(23, 182, 234, 0.06)); }
+.tarjeta-subir.principal .ico { background: var(--primary-500); color: #04121a; }
+.tarjeta-subir.abierta { border-color: var(--primary-500); }
+.tarjeta-subir:active { transform: scale(0.98); }
+.tarjeta-subir:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+
+/* Enlace (página web o YouTube) en una sola fila */
+.enlace-compacto { display: flex; gap: 6px; padding: 6px; border-radius: 14px; border: 1px solid var(--primary-600); background: var(--gray-900); }
+.enlace-compacto .campo { flex: 1; min-width: 0; padding: 9px 11px; }
+.enlace-compacto .btn.chico { min-height: 40px; flex: none; }
+.boton-tramo.activo { border-color: var(--primary-400); background: var(--primary-700, rgba(23, 182, 234, 0.25)); }
+.compacto .enlace-youtube { gap: 6px; }
+.compacto .tramo { padding: 0 4px; }
+
+/* Barra de Seleccionar / orden */
+.compacto .barra-elegir { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.compacto .barra-elegir .nota-orden { flex: 1; min-width: 0; font-size: 0.72rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compacto .barra-elegir .btn.chico { min-height: 36px; padding: 6px 10px; font-size: 0.78rem; flex: none; }
+.compacto .barra-seleccion { flex-wrap: nowrap; }
+.compacto .ayuda-orden { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* La caja que se mueve por dentro: ocupa todo lo que sobra */
+.compacto .app > .caja-lista,
+.compacto .panel:not([hidden]),
+.compacto .seccion-compacta:not([hidden]) { flex: 1 1 0; min-height: 0; }
+.compacto .panel, .compacto .seccion-compacta { display: flex; flex-direction: column; gap: 8px; }
+.compacto .panel > *, .compacto .seccion-compacta > * { flex: none; }
+.compacto .panel { padding: 10px; }
+.caja-lista { flex: 1 1 0 !important; min-height: 90px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: 14px; border: 1px solid var(--gray-700); background: var(--gray-900); padding: 8px; }
+.caja-lista .image-list, .caja-lista .lista-medios, .caja-lista .subidas { gap: 6px; }
+.caja-lista .empty-hint { padding: 18px 8px; font-size: 0.85rem; line-height: 1.5; }
+.compacto .image-row { padding: 6px 8px; gap: 10px; }
+.compacto .fila-medio { padding-top: 6px; padding-bottom: 6px; }
+.subida-titulo { display: flex; justify-content: space-between; gap: 8px; }
+.subida-titulo b { min-width: 0; }
+.subida-titulo span { flex: none; white-space: nowrap; }
+.compacto .subida { padding: 8px 10px; font-size: 0.78rem; }
+.compacto .subida-riel { height: 5px; margin-top: 5px; }
+
+/* Hoja de límites (la «i») */
+.hoja-limites { align-items: flex-end; padding: 0; }
+.hoja-limites .modal-card { max-width: 480px; border-radius: 22px 22px 0 0; display: flex; flex-direction: column; gap: 10px; padding: 18px 18px max(20px, env(safe-area-inset-bottom)); }
+.hoja-limites b { font-size: 1rem; }
+.hoja-limites ul { margin: 0; padding-left: 18px; color: var(--gray-200); font-size: 0.86rem; line-height: 1.55; }
+.hoja-limites li:empty { display: none; }
+
+/* Celulares bajitos: un poco más apretado */
+@media (max-height: 680px) {
+  .compacto .app { gap: 7px; }
+  .compacto .app-header h1 { font-size: 1.15rem; }
+  .tarjeta-subir { min-height: 50px; padding: 7px 10px; }
+  .tarjeta-subir .ico { width: 30px; height: 30px; font-size: 1rem; }
+  .espacio-caja.compacta { padding: 7px 10px; gap: 4px; }
+}
+/* Mientras se eligen imágenes, la barra fija de «Eliminar» no tapa el final de la lista. */
+body.control.compacto.eligiendo-imagenes { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px); }
+/* Tablet: el celular se agranda con zoom y «dvh» crece junto; se usa el alto ya achicado. */
+.es-tablet body.control.compacto { height: var(--alto-tablet, 100dvh); min-height: 0; }

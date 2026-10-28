@@ -28,9 +28,9 @@ const socket = io();
   let datos = { elementos: [], espacio: { usado: 0, total: 0 }, explicacion: '', subida: 'no', limites: { musica: 15 * MB, video: 100 * MB } };
   const seleccion = { musica: new Set(), video: new Set() };
   const seleccionando = { musica: false, video: false };
-  // Listas plegadas: se ven las primeras VISIBLES_PLEGADA y un botón «Ver todas».
-  const VISIBLES_PLEGADA = 5;
-  const desplegada = { musica: false, video: false };
+  // La lista se mueve dentro de su caja, así que se ve entera (el botón «Ver todas» queda escondido).
+
+  const desplegada = { musica: true, video: true };
   let filtroPersona = new URLSearchParams(location.search).get('de') || ''; // el admin llega desde «Personas»
 
   // ---------- aviso ----------
@@ -153,9 +153,9 @@ const socket = io();
 
     // Se puede ordenar (arrastrando ≡ o con ▲▼) cuando todo lo que se ve es de uno mismo.
     const ordenable = !seleccionando[tipo] && items.length > 1 && propios.length === items.length;
-    const visibles = desplegada[tipo] ? items : items.slice(0, VISIBLES_PLEGADA);
+    const visibles = items;
     const boton = tipo === 'musica' ? $('verTodasMusica') : $('verTodasVideos');
-    boton.hidden = items.length <= VISIBLES_PLEGADA;
+    boton.hidden = true;
     boton.textContent = desplegada[tipo] ? 'Ver menos ▴' : `Ver todas (${items.length}) ▾`;
 
     // Con miles de filas sólo se dibujan las que se ven (lista-virtual.js)
@@ -388,15 +388,21 @@ const socket = io();
   });
 
   // ---------- subir ----------
-  function leerDuracion(blob, tipo) {
+  // Las canciones van directo al ayudante de subidas (subidas-fondo.js), que sube de a 3 y
+  // sigue aunque te vayas a otra pantalla. Los videos primero se achican a 720p acá mismo
+  // (eso sólo se puede con la página abierta: si querés salir, se pregunta) y apenas uno queda
+  // listo pasa al ayudante, mientras se achica el siguiente.
+  const POR_VEZ = 3;
+
+  function leerDuracion(blob) {
     return new Promise((listo) => {
-      const el = document.createElement(tipo === 'video' ? 'video' : 'audio');
+      const el = document.createElement('video');
       const url = URL.createObjectURL(blob);
       const fin = (d) => { URL.revokeObjectURL(url); listo(Number.isFinite(d) ? d : 0); };
       el.preload = 'metadata';
       el.onloadedmetadata = () => fin(el.duration);
       el.onerror = () => fin(0);
-      setTimeout(() => fin(0), 10000);
+      setTimeout(() => fin(0), 4000);
       el.src = url;
     });
   }
@@ -435,109 +441,180 @@ const socket = io();
     const par = (n) => Math.max(2, Math.round((n * escala) / 2) * 2);
     const opcionesVideo = { codec: 'avc', bitrate: BITRATE, width: par(ancho), height: par(alto), fit: 'fill' };
 
-    async function intentar(codecAudio) {
+    const TRABADO_MS = 25000;
+    let seTrabo = false;
+    // Primero con el chip de video del celular (mucho más rápido); si no se puede, sin él.
+    async function intentar(codecAudio, conChip) {
       const salida = new M.Output({ format: new M.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new M.BufferTarget() });
-      const conversion = await M.Conversion.init({
-        input: entrada,
-        output: salida,
-        video: opcionesVideo,
-        audio: { codec: codecAudio, bitrate: 128000 },
-        showWarnings: false
-      });
+      let conversion;
+      try {
+        conversion = await M.Conversion.init({
+          input: entrada,
+          output: salida,
+          video: conChip ? { ...opcionesVideo, hardwareAcceleration: 'prefer-hardware' } : opcionesVideo,
+          audio: { codec: codecAudio, bitrate: 128000 },
+          showWarnings: false
+        });
+      } catch (err) {
+        if (conChip) return null;
+        throw err;
+      }
       const perdioAudio = conversion.discardedTracks.some(d => d.track.type === 'audio' && d.reason !== 'discarded_by_user');
       if (!conversion.isValid || perdioAudio) return null;
-      conversion.onProgress = (p) => alAvanzar(p);
-      await conversion.execute();
+      // En algunos celulares el achicado se queda quieto para siempre: si no avanza en
+      // 25 s se corta y el video se sube como está.
+      let ultimo = Date.now();
+      conversion.onProgress = (p) => { ultimo = Date.now(); alAvanzar(p); };
+      const vigia = setInterval(() => {
+        if (Date.now() - ultimo > TRABADO_MS) { seTrabo = true; conversion.cancel(); }
+      }, 2000);
+      try {
+        await conversion.execute();
+      } catch (err) {
+        if (seTrabo) throw new Error('El achicado se trabó.');
+        if (conChip) return null;
+        throw err;
+      } finally {
+        clearInterval(vigia);
+      }
       return new Blob([salida.target.buffer], { type: 'video/mp4' });
     }
-    const resultado = (await intentar('aac')) || (await intentar('opus'));
+    const resultado = (await intentar('aac', true)) || (await intentar('opus', true)) ||
+      (await intentar('aac', false)) || (await intentar('opus', false));
     if (!resultado || resultado.size >= archivo.size) return { archivo, comprimido: false };
     const nombre = archivo.name.replace(/\.[^.]+$/, '') + '.mp4';
     return { archivo: new File([resultado], nombre, { type: 'video/mp4' }), comprimido: true, antes: archivo.size };
   }
 
-  function enviarConProgreso(url, formulario, cabeceras, alAvanzar) {
-    return new Promise((listo, fallo) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url);
-      for (const [k, v] of Object.entries(cabeceras || {})) xhr.setRequestHeader(k, v);
-      xhr.upload.onprogress = (e) => { if (e.lengthComputable) alAvanzar(e.loaded / e.total); };
-      xhr.onload = () => {
-        let json = {};
-        try { json = JSON.parse(xhr.responseText); } catch { /* respuesta vacía */ }
-        if (xhr.status >= 200 && xhr.status < 300) listo(json);
-        else fallo(new Error(json.error ? (json.error.message || json.error) : 'No se pudo subir.'));
-      };
-      xhr.onerror = () => fallo(new Error('Se cortó la conexión mientras se subía.'));
-      xhr.send(formulario);
-    });
-  }
-
-  function filaDeSubida(contenedor, nombre) {
-    const estado = crear('span', { text: 'Preparando…' });
+  // Filas de lo que se está subiendo: las del ayudante y los videos que se están achicando.
+  let enAyudante = [];
+  const achicandoAca = []; // { nombre, pct, error }
+  function filaSubida(nombre, texto, pct, clase) {
     const barra = crear('i');
-    const fila = crear('div', { class: 'subida' }, [crear('b', { text: nombre }), estado, crear('div', { class: 'subida-riel' }, [barra])]);
-    contenedor.prepend(fila);
-    return {
-      paso(texto, fraccion) {
-        estado.textContent = texto;
-        if (fraccion != null) barra.style.width = Math.round(fraccion * 100) + '%';
-      },
-      listo(texto) { fila.classList.add('lista'); estado.textContent = texto; barra.style.width = '100%'; setTimeout(() => fila.remove(), 8000); },
-      error(texto) { fila.classList.add('error'); estado.textContent = texto; }
-    };
+    barra.style.width = Math.round(pct) + '%';
+    return crear('div', { class: 'subida' + (clase ? ' ' + clase : '') }, [
+      crear('div', { class: 'subida-titulo' }, [crear('b', { text: nombre }), crear('span', { text: texto })]),
+      crear('div', { class: 'subida-riel' }, [barra])
+    ]);
+  }
+  function pintarSubidas() {
+    if (!haySubida) return;
+    for (const [tipo, caja] of [['musica', $('subidasMusica')], ['video', $('subidasVideo')]]) {
+      const filas = [];
+      if (tipo === 'video') {
+        for (const a of achicandoAca) {
+          filas.push(a.error ? filaSubida(a.nombre, '❌ ' + a.error, 0, 'error') : filaSubida(a.nombre, `Achicando a 720p… ${a.pct} %`, a.pct));
+        }
+      }
+      for (const t of enAyudante.filter(x => x.tipo === tipo)) {
+        if (t.estado === 'listo') filas.push(filaSubida(t.nombre, 'Lista ✓', 100, 'lista'));
+        else if (t.estado === 'error') filas.push(filaSubida(t.nombre, '❌ ' + t.error, 0, 'error'));
+        else if (t.estado === 'subiendo') filas.push(filaSubida(t.nombre, `Subiendo… ${Math.round((t.avance || 0) * 100)} %`, (t.avance || 0) * 100));
+        else filas.push(filaSubida(t.nombre, 'Esperando turno…', 0));
+      }
+      const vacio = $(tipo === 'musica' ? 'vacioMusica' : 'vacioVideo');
+      if (vacio) vacio.hidden = filas.length > 0;
+      caja.replaceChildren(...filas);
+    }
+  }
+  if (haySubida) {
+    SubidasFondo.escuchar((lista) => { enAyudante = lista; pintarSubidas(); });
+    SubidasFondo.alTerminar((m) => { if (m.trabajo === 'musica' || m.trabajo === 'video') cargar(); });
   }
 
-  async function subirUno(original, tipo, contenedor) {
-    const ui = filaDeSubida(contenedor, original.name);
-    try {
-      let archivo = original;
-      if (tipo === 'video') {
-        ui.paso('Achicando el video a 720p… 0 %', 0);
-        const r = await comprimirVideo(original, (p) => ui.paso(`Achicando el video a 720p… ${Math.round(p * 100)} %`, p));
-        archivo = r.archivo;
-        if (r.comprimido) ui.paso(`Achicado: de ${fmtMb(r.antes)} a ${fmtMb(archivo.size)}`, 0);
+  function comprobar(archivo, tipo) {
+    const ext = (archivo.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+    const validas = tipo === 'musica' ? ['.mp3', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wav'] : ['.mp4', '.m4v', '.webm', '.mov'];
+    if (!validas.includes(ext)) return tipo === 'musica' ? 'Ese formato no va: usá MP3, M4A, OGG o WAV.' : 'Ese formato no va: usá MP4, WEBM o MOV.';
+    if (archivo.size > datos.limites[tipo] && tipo === 'musica') return `Pesa ${fmtMb(archivo.size)} y el máximo es ${fmtMb(datos.limites[tipo])}.`;
+    return '';
+  }
+
+  function elegirPocos(archivos, tipo) {
+    let lista = [...archivos];
+    if (lista.length > POR_VEZ) {
+      avisar(tipo === 'musica'
+        ? `🎵 Elegí hasta ${POR_VEZ} canciones por vez. Se suben las ${POR_VEZ} primeras; las demás, cuando terminen.`
+        : `🎬 Elegí hasta ${POR_VEZ} videos por vez. Se suben los ${POR_VEZ} primeros; los demás, cuando terminen.`);
+      lista = lista.slice(0, POR_VEZ);
+    } else {
+      const n = lista.length;
+      avisar(n === 1 ? '⬆️ Subiendo 1. Podés elegir hasta 3 a la vez.' : `⬆️ Subiendo ${n} a la vez.`, true);
+    }
+    return lista;
+  }
+
+  function subirCanciones(archivos) {
+    const buenas = [];
+    for (const a of elegirPocos(archivos, 'musica')) {
+      const error = comprobar(a, 'musica');
+      if (error) avisar(`«${a.name}»: ${error}`);
+      else buenas.push({ tipo: 'musica', nombre: a.name, archivo: a });
+    }
+    SubidasFondo.encolar(buenas);
+  }
+
+  async function subirVideos(archivos) {
+    const lista = elegirPocos(archivos, 'video');
+    const fila = lista.map(a => ({ nombre: a.name, pct: 0, error: '' }));
+    achicandoAca.push(...fila);
+    pintarSubidas();
+    // De a uno se achica (el chip de video es uno solo); el que termina ya empieza a subir.
+    for (let i = 0; i < lista.length; i++) {
+      const original = lista[i];
+      const f = fila[i];
+      try {
+        const error = comprobar(original, 'video');
+        if (error) throw new Error(error);
+        SubidasFondo.achicando(f.nombre, 0);
+        const r = await comprimirVideo(original, (p) => {
+          f.pct = Math.round(p * 100);
+          SubidasFondo.achicando(f.nombre, f.pct);
+          pintarSubidas();
+        });
+        const archivo = r.archivo;
+        if (archivo.size > datos.limites.video) {
+          throw new Error(`Pesa ${fmtMb(archivo.size)} y el máximo es ${fmtMb(datos.limites.video)}. Para videos largos usá un enlace de YouTube.`);
+        }
+        // La duración sólo la necesita la subida local de prueba (Cloudinary la mide sola).
+        const duracion = datos.subida === 'local' ? await leerDuracion(archivo) : 0;
+        achicandoAca.splice(achicandoAca.indexOf(f), 1);
+        // Primero pasa al ayudante y recién después deja de contar como «achicando»: así la
+        // barra de arriba nunca dice «listo» en el medio.
+        SubidasFondo.encolar([{ tipo: 'video', nombre: archivo.name, archivo, duracion }]);
+        SubidasFondo.achicando(f.nombre, null);
+      } catch (err) {
+        SubidasFondo.achicando(f.nombre, null);
+        f.error = err.message;
+        setTimeout(() => { const k = achicandoAca.indexOf(f); if (k >= 0) achicandoAca.splice(k, 1); pintarSubidas(); }, 9000);
       }
-      if (archivo.size > datos.limites[tipo]) {
-        throw new Error(`Pesa ${fmtMb(archivo.size)} y el máximo es ${fmtMb(datos.limites[tipo])}.` + (tipo === 'video' ? ' Para videos largos usá un enlace de YouTube.' : ''));
-      }
-      const duracion = await leerDuracion(archivo, tipo);
-      const firma = await pedir('/api/multimedia/firma', { tipo, nombre: archivo.name, bytes: archivo.size });
-      const avance = (f) => ui.paso(`Subiendo… ${Math.round(f * 100)} %`, f);
-      if (firma.modo === 'nube') {
-        const formulario = new FormData();
-        for (const [k, v] of Object.entries(firma.campos)) formulario.append(k, v);
-        formulario.append('file', archivo);
-        const subido = await enviarConProgreso(firma.url, formulario, {}, avance);
-        ui.paso('Guardando…', 1);
-        datos = await pedir('/api/multimedia/registrar', { public_id: subido.public_id || firma.campos.public_id });
-      } else {
-        const formulario = new FormData();
-        formulario.append('tipo', tipo);
-        formulario.append('duracion', String(duracion));
-        formulario.append('archivo', archivo);
-        datos = await enviarConProgreso(firma.url, formulario, { 'x-pin': auth.pin }, avance);
-      }
-      pintarTodo();
-      ui.listo('✅ Listo: ya está en tu lista');
-    } catch (err) {
-      ui.error('❌ ' + err.message);
+      pintarSubidas();
     }
   }
 
-  // De a 2 a la vez desde el mismo celular: rápido sin trabar la conexión.
-  async function subirVarios(archivos, tipo, contenedor) {
-    const fila = [...archivos];
-    const trabajador = async () => { while (fila.length) await subirUno(fila.shift(), tipo, contenedor); };
-    await Promise.all([trabajador(), trabajador()]);
-    cargar();
-  }
-
   if (haySubida) {
-    $('subirMusicaBtn').addEventListener('click', () => $('archivoMusica').click());
-    $('subirVideoBtn').addEventListener('click', () => $('archivoVideo').click());
-    $('archivoMusica').addEventListener('change', (e) => { subirVarios(e.target.files, 'musica', $('subidasMusica')); e.target.value = ''; });
-    $('archivoVideo').addEventListener('change', (e) => { subirVarios(e.target.files, 'video', $('subidasVideo')); e.target.value = ''; });
+    $('subirMusicaBtn').addEventListener('click', () => SubidasFondo.elegir($('archivoMusica')));
+    $('subirVideoBtn').addEventListener('click', () => SubidasFondo.elegir($('archivoVideo')));
+    $('archivoMusica').addEventListener('change', (e) => { const a = [...e.target.files]; e.target.value = ''; if (a.length) subirCanciones(a); });
+    // Una tanda de videos espera a que termine de achicarse la anterior.
+    let colaVideos = Promise.resolve();
+    $('archivoVideo').addEventListener('change', (e) => { const a = [...e.target.files]; e.target.value = ''; if (a.length) colaVideos = colaVideos.then(() => subirVideos(a)); });
+    // YouTube: se abre con su tarjeta; ✂️ muestra «desde / hasta».
+    $('abrirYoutubeBtn').addEventListener('click', () => {
+      const abrir = $('formYoutube').hidden;
+      $('formYoutube').hidden = !abrir;
+      $('abrirYoutubeBtn').setAttribute('aria-expanded', String(abrir));
+      $('abrirYoutubeBtn').classList.toggle('abierta', abrir);
+      if (abrir) $('enlaceYoutube').focus();
+      else $('tramoYoutube').hidden = true;
+    });
+    $('tramoBtn').addEventListener('click', () => {
+      const ver = $('tramoYoutube').hidden;
+      $('tramoYoutube').hidden = !ver;
+      $('tramoBtn').setAttribute('aria-pressed', String(ver));
+      $('tramoBtn').classList.toggle('activo', ver);
+      if (ver) $('inicioYoutube').focus();
+    });
   }
 
   // ---------- YouTube ----------

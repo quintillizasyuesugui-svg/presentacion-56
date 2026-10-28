@@ -8,7 +8,7 @@
   <script src="scripts/solo-celular.js"></script>
   <link rel="stylesheet" href="estilos/multimedia.css">
 </head>
-<body class="control">
+<body class="control compacto">
 <div class="app">
 
   <div class="app-header">
@@ -29,51 +29,65 @@
   </nav>
 
   <!-- Espacio propio de cada persona (el 📦 Guardián del Almacenamiento explica por qué es ese) -->
-  <div class="espacio-caja" id="espacioCaja">
-    <div class="espacio-titulo"><span class="espacio-candado" aria-hidden="true">🔒</span><b>Esto es tuyo y de nadie más</b></div>
-    <span class="espacio-usado" id="espacioTexto">Cargando tu espacio…</span>
-    <div class="espacio-riel" id="espacioRiel"><i></i></div>
-    <p id="espacioExplicacion"></p>
+  <div class="espacio-caja compacta" id="espacioCaja">
+    <div class="espacio-titulo"><span class="espacio-candado" aria-hidden="true">🔒</span><b>Esto es tuyo y de nadie más</b><button type="button" class="boton-info" data-info="limitesMedios" aria-label="Ver los límites">i</button></div>
+    <div class="espacio-linea"><div class="espacio-riel" id="espacioRiel"><i></i></div><span class="espacio-usado" id="espacioTexto">Cargando tu espacio…</span></div>
+    <p id="espacioExplicacion" hidden></p>
   </div>
 
-  <section class="panel" id="seccionMusica" aria-labelledby="pestanaMusica">
-    <button type="button" class="subir-grande" id="subirMusicaBtn">➕ Subir canciones
-      <small>Varias a la vez · MP3, M4A, OGG o WAV · hasta 15 MB cada una</small>
-    </button>
+  <section class="seccion-compacta" id="seccionMusica" aria-labelledby="pestanaMusica">
+    <div class="tarjetas-subir una">
+      <button type="button" class="tarjeta-subir principal" id="subirMusicaBtn"><span class="ico" aria-hidden="true">🎵</span><span><b>Subir canciones</b><small>Hasta 3 a la vez · MP3 · 15 MB c/u</small></span></button>
+    </div>
     <input type="file" id="archivoMusica" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.wav" multiple hidden>
-    <div class="subidas" id="subidasMusica"></div>
+    <div class="caja-lista">
+      <div class="subidas" id="subidasMusica"></div>
+      <p class="empty-hint" id="vacioMusica">Acá vas a ver lo que subís.<br>Para ordenar, tocá «📋 Mi lista y orden».</p>
+    </div>
   </section>
 
-  <section class="panel" id="seccionVideos" aria-labelledby="pestanaVideos" hidden>
-    <button type="button" class="subir-grande" id="subirVideoBtn">📤 Subir video
-      <small>MP4, WEBM o MOV · se achica a 720p · hasta 100 MB</small>
-    </button>
+  <section class="seccion-compacta" id="seccionVideos" aria-labelledby="pestanaVideos" hidden>
+    <div class="tarjetas-subir">
+      <button type="button" class="tarjeta-subir principal" id="subirVideoBtn"><span class="ico" aria-hidden="true">📤</span><span><b>Video</b><small>Hasta 3 · 100 MB c/u</small></span></button>
+      <button type="button" class="tarjeta-subir" id="abrirYoutubeBtn" aria-expanded="false" aria-controls="formYoutube"><span class="ico" aria-hidden="true">▶️</span><span><b>YouTube</b><small>No ocupa espacio</small></span></button>
+    </div>
     <input type="file" id="archivoVideo" accept="video/*,.mp4,.m4v,.webm,.mov" multiple hidden>
-    <div class="subidas" id="subidasVideo"></div>
 
-    <h2 class="titulo-bloque">🔗 Enlace de YouTube <small>(no ocupa espacio, sin límite de minutos)</small></h2>
-    <form class="enlace-youtube" id="formYoutube">
-      <label for="enlaceYoutube">Pegá el enlace del video (público o no listado)</label>
-      <div class="fila-enlace">
-        <input type="url" class="campo" id="enlaceYoutube" placeholder="https://youtu.be/…" autocomplete="off" required>
+    <form class="enlace-youtube" id="formYoutube" hidden>
+      <div class="enlace-compacto">
+        <input type="url" class="campo" id="enlaceYoutube" placeholder="Pegá el enlace de YouTube" aria-label="Enlace de YouTube" autocomplete="off" required>
+        <button type="button" class="btn chico boton-tramo" id="tramoBtn" aria-pressed="false" aria-controls="tramoYoutube" title="Mostrar sólo una parte" aria-label="Mostrar sólo una parte">✂️</button>
         <button type="submit" class="btn primary chico" id="guardarYoutube">Guardar</button>
       </div>
-      <details>
-        <summary>Mostrar sólo una parte (opcional)</summary>
-        <div class="tramo">
-          <label for="inicioYoutube">Desde</label>
-          <input type="text" class="campo" id="inicioYoutube" inputmode="numeric" placeholder="1:10">
-          <label for="finYoutube">hasta</label>
-          <input type="text" class="campo" id="finYoutube" inputmode="numeric" placeholder="2:30">
-        </div>
-      </details>
+      <div class="tramo" id="tramoYoutube" hidden>
+        <label for="inicioYoutube">Desde</label>
+        <input type="text" class="campo" id="inicioYoutube" inputmode="numeric" placeholder="1:10">
+        <label for="finYoutube">hasta</label>
+        <input type="text" class="campo" id="finYoutube" inputmode="numeric" placeholder="2:30">
+      </div>
     </form>
 
+    <div class="caja-lista">
+      <div class="subidas" id="subidasVideo"></div>
+      <p class="empty-hint" id="vacioVideo">Acá vas a ver lo que subís.<br>Para ordenar, tocá «📋 Mi lista y orden».</p>
+    </div>
   </section>
+
+  <template id="limitesMedios">
+    <b>Límites de música y videos</b>
+    <ul>
+      <li>Hasta 3 canciones o 3 videos por vez; se suben de a 3.</li>
+      <li>Canciones: MP3, M4A, OGG o WAV, hasta 15 MB cada una.</li>
+      <li>Videos: MP4, WEBM o MOV, hasta 100 MB. Se achican a 720p en tu celular.</li>
+      <li>YouTube no ocupa espacio y no tiene límite de minutos.</li>
+      <li>Mientras se sube, podés ir a otra pantalla: sigue sola. Si un video se está achicando, te avisa antes.</li>
+      <li data-copiar="espacioExplicacion"></li>
+    </ul>
+  </template>
 
   <div class="btn-row fila-volver">
     <a class="btn" href="control.html" id="volverControl">⬅️ Volver</a>
-    <a class="btn primary" href="multimedia.html" id="verLista">📋 Ver y ordenar mi lista</a>
+    <a class="btn primary" href="multimedia.html" id="verLista">📋 Mi lista y orden</a>
   </div>
 
 </div>
@@ -82,6 +96,8 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="scripts/autenticacion.js"></script>
+<script src="scripts/subir-nube.js"></script>
+<script src="scripts/subidas-fondo.js"></script>
 <script src="scripts/lista-virtual.js"></script>
 <script src="scripts/multimedia.js"></script>
 

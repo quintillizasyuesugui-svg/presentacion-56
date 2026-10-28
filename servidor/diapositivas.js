@@ -177,6 +177,16 @@ function propiaDe(orden, id, persona, queHacer) {
   return posicion;
 }
 
+// Permisos de subida directa a Cloudinary: public_id → { owner, vence }.
+const FORMATOS_IMAGEN = 'gif,jpg,png,webp';
+const FIRMAS_IMAGEN_POR_PERSONA = 60; // hasta 40 por vez, con margen para reintentos
+const VIGENCIA_FIRMA_IMAGEN_MS = 60 * 60 * 1000;
+const firmasImagenes = new Map();
+setInterval(() => {
+  const ahora = Date.now();
+  for (const [id, f] of firmasImagenes) if (f.vence < ahora) firmasImagenes.delete(id);
+}, 10 * 60 * 1000).unref();
+
 const subida = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: 20 },
@@ -236,6 +246,56 @@ function registrarRutasDiapositivas(app, io) {
       res.json(visiblePara(req.person, orden));
     } catch (err) {
       responderError(res, err, 'Error al subir la imagen.');
+    }
+  });
+
+  // ---- Subir imágenes directo a Cloudinary (sin pasar por este servidor) ----
+  // Paso 1: POST /api/images/firma — da el permiso firmado para UNA imagen.
+  // Paso 2: el celular la sube a Cloudinary y manda acá lo que Cloudinary le contestó.
+  // Cloudinary firma su respuesta (public_id + version) con la clave secreta: si la firma
+  // coincide, la imagen de verdad se subió y no hace falta preguntarle de nuevo.
+  app.post('/api/images/firma', requierePersona, (req, res) => {
+    if (!nubeLista) return res.status(400).json({ error: ERROR_SIN_NUBE, modo: 'no' });
+    const ahora = Date.now();
+    const suyas = [...firmasImagenes.values()].filter(f => f.owner === req.person.name && f.vence > ahora).length;
+    if (suyas >= FIRMAS_IMAGEN_POR_PERSONA) {
+      return res.status(429).json({ error: `Tenés ${suyas} imágenes empezadas sin terminar. Esperá a que terminen antes de subir más.` });
+    }
+    const publicId = `presentacion/slides/${crypto.randomUUID()}`;
+    const timestamp = Math.floor(ahora / 1000);
+    const firmados = { allowed_formats: FORMATOS_IMAGEN, public_id: publicId, timestamp };
+    const signature = cloudinary.utils.api_sign_request(firmados, cloudinary.config().api_secret);
+    firmasImagenes.set(publicId, { owner: req.person.name, vence: ahora + VIGENCIA_FIRMA_IMAGEN_MS });
+    res.json({
+      modo: 'nube',
+      url: `${cloudinary.config().upload_prefix || 'https://api.cloudinary.com'}/v1_1/${cloudinary.config().cloud_name}/image/upload`,
+      campos: { api_key: cloudinary.config().api_key, ...firmados, signature }
+    });
+  });
+
+  app.post('/api/images/registrar', requierePersona, async (req, res) => {
+    const { public_id: publicId, version, signature, format } = req.body || {};
+    const firma = firmasImagenes.get(String(publicId || ''));
+    try {
+      if (!firma || firma.owner !== req.person.name) throw new ErrorPedido(400, 'Esa subida no está autorizada. Probá de nuevo.');
+      if (!cloudinary.utils.verify_api_response_signature(String(publicId), String(version), String(signature || ''))) {
+        throw new ErrorPedido(400, 'Cloudinary no confirmó esa imagen. Probá de nuevo.');
+      }
+      firmasImagenes.delete(publicId);
+      const formato = String(format || '').toLowerCase();
+      if (!FORMATOS_IMAGEN.split(',').includes(formato)) {
+        await borrarDeLaNube(publicId, 'image');
+        throw new ErrorPedido(400, 'Ese formato de imagen no se puede mostrar.');
+      }
+      const src = cloudinary.url(publicId, { secure: true, version: String(version), format: formato, resource_type: 'image', type: 'upload' });
+      const orden = await almacenOrden.modificar((o) => {
+        if (o.some(r => r.id === publicId)) return SIN_CAMBIOS;
+        o.push({ id: publicId, src, owner: req.person.name });
+      });
+      avisarCambio(req.person.isAdmin ? null : [req.person.name]);
+      res.json(visiblePara(req.person, orden));
+    } catch (err) {
+      responderError(res, err, 'No se pudo guardar la imagen.');
     }
   });
 

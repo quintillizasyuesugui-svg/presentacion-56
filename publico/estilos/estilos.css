@@ -2870,6 +2870,33 @@ body.con-qr-invitacion .waiting { padding-bottom: calc(2rem + 170px); transition
   .doc-aviso-barra.indeterminado span { animation: none; width: 100% !important; opacity: 0.5; }
 }
 
+/* Barra fina de «Subiendo N archivos» arriba de cada pantalla (scripts/subidas-fondo.js) */
+.barra-subidas {
+  flex: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--gray-900);
+  border: 1px solid var(--primary-700);
+  font-size: 0.78rem;
+}
+.barra-subidas[hidden] { display: none; }
+.barra-subidas-texto { display: flex; justify-content: space-between; gap: 10px; }
+.barra-subidas-texto .bs-que { font-weight: 700; color: var(--primary-100); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra-subidas-texto .bs-cuanto { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.barra-subidas-riel { height: 4px; border-radius: var(--radius-pill); background: var(--gray-700); overflow: hidden; }
+.barra-subidas-riel i { display: block; width: 0; height: 100%; background: var(--primary-400); transition: width 300ms linear; }
+.barra-subidas.lista { border-color: var(--green-500); }
+.barra-subidas.lista .bs-que { color: var(--green-300); }
+.barra-subidas.lista .barra-subidas-riel i { background: var(--green-400); }
+.barra-subidas.con-error { border-color: var(--amber-400); }
+.barra-subidas.con-error .bs-que { color: var(--amber-300, #fcd34d); }
+.barra-subidas.con-error .barra-subidas-riel i { background: var(--amber-400); }
+.toast.aviso-subidas { white-space: normal; max-width: min(92vw, 380px); text-align: center; }
+
 /* ---- Personas (sólo admin, scripts/administracion.js) ---- */
 
 /* Las tarjetas del menú usan display:flex: sin esto, «hidden» no las ocultaría. */

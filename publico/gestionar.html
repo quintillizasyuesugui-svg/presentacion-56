@@ -8,7 +8,7 @@
   <script src="scripts/solo-celular.js"></script>
   <link rel="stylesheet" href="estilos/multimedia.css">
 </head>
-<body class="control">
+<body class="control compacto">
 <div class="app">
 
   <div class="app-header">
@@ -29,36 +29,45 @@
     <a href="multimedia.html#videos">🎬 Videos</a>
   </nav>
 
-  <div class="espacio-caja">
-    <div class="espacio-titulo"><span class="espacio-candado" aria-hidden="true">🔒</span><b>Esto es tuyo y de nadie más</b></div>
+  <div class="espacio-caja compacta">
+    <div class="espacio-titulo"><span class="espacio-candado" aria-hidden="true">🔒</span><b>Esto es tuyo y de nadie más</b><button type="button" class="boton-info" data-info="limitesImagenes" aria-label="Ver los límites">i</button></div>
     <span class="espacio-usado" id="cuantasImagenes">Cargando tus imágenes…</span>
   </div>
 
-  <div class="panel">
-    <div class="btn-row">
-      <button class="btn primary" id="uploadBtn">➕ Subir imágenes</button>
-    </div>
-    <input type="file" id="fileInput" accept="image/*" multiple hidden>
-
-    <!-- Página web: se pega el enlace y queda en la lista como una diapositiva más -->
-    <form class="caja-pagina" id="paginaForm">
-      <label for="paginaDireccion">🌐 Página web</label>
-      <div class="caja-pagina-fila">
-        <input type="url" id="paginaDireccion" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Pegá el enlace de tu página">
-        <button type="submit" class="btn" id="paginaBtn">Agregar</button>
-      </div>
-      <p class="caja-pagina-nota">Se muestra en la pantalla como una diapositiva más. Para manejarla desde el celular, la página tiene que estar preparada para Conexiones.</p>
-    </form>
-
-    <!-- Elegir varias imágenes para eliminarlas juntas (igual que en Música y videos) -->
-    <div class="barra-seleccion barra-elegir" id="barraElegir" hidden>
-      <button type="button" class="btn chico" id="elegirBtn">☑️ Seleccionar</button>
-      <button type="button" class="btn chico secondary" id="marcarTodasBtn" hidden>Marcar todas</button>
-    </div>
-
-    <div class="image-list" id="imageList"></div>
-    <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Subí la primera.</p>
+  <div class="tarjetas-subir">
+    <button type="button" class="tarjeta-subir principal" id="uploadBtn"><span class="ico" aria-hidden="true">🖼️</span><span><b>Fotos</b><small>Hasta 40 a la vez</small></span></button>
+    <button type="button" class="tarjeta-subir" id="abrirPaginaBtn" aria-expanded="false" aria-controls="paginaForm"><span class="ico" aria-hidden="true">🌐</span><span><b>Página web</b><small>Pegá un enlace</small></span></button>
   </div>
+  <input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+  <!-- Página web: se pega el enlace y queda en la lista como una diapositiva más -->
+  <form class="enlace-compacto" id="paginaForm" hidden>
+    <input type="url" class="campo" id="paginaDireccion" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Pegá el enlace de la página" aria-label="Enlace de la página web">
+    <button type="submit" class="btn primary chico" id="paginaBtn">Agregar</button>
+  </form>
+
+  <!-- Elegir varias imágenes para eliminarlas juntas (igual que en Música y videos) -->
+  <div class="barra-seleccion barra-elegir" id="barraElegir" hidden>
+    <span class="nota-orden">Arrastrá o usá ▲▼ para ordenar</span>
+    <button type="button" class="btn chico secondary" id="marcarTodasBtn" hidden>Marcar todas</button>
+    <button type="button" class="btn chico" id="elegirBtn">☑️ Seleccionar</button>
+  </div>
+
+  <!-- La lista se mueve dentro de su caja: la página queda quieta -->
+  <div class="caja-lista">
+    <div class="image-list" id="imageList"></div>
+    <p class="empty-hint" id="emptyHint" hidden>Todavía no hay imágenes. Tocá «Fotos».</p>
+  </div>
+
+  <template id="limitesImagenes">
+    <b>Límites de imágenes</b>
+    <ul>
+      <li>Hasta 40 fotos por vez; se suben de a 3.</li>
+      <li>JPG, PNG, WEBP o GIF. Se achican solas a 1920 px.</li>
+      <li>Sin límite de cantidad: sólo las ves vos.</li>
+      <li>Una página web se ve como una diapositiva más. Para manejarla desde el celular, tiene que estar preparada para Conexiones.</li>
+    </ul>
+  </template>
 
   <div id="lugarMiniReproductor"></div>
 
@@ -96,6 +105,8 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="scripts/autenticacion.js"></script>
+<script src="scripts/subir-nube.js"></script>
+<script src="scripts/subidas-fondo.js"></script>
 <script src="scripts/lista-virtual.js"></script>
 <script src="scripts/gestionar.js"></script>
 <script src="scripts/trabajos-documentos.js"></script>
