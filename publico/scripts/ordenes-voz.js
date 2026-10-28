@@ -162,6 +162,21 @@
     const deVolumen = dice(palabras, 'volumen');
     const corta4 = palabras.length <= 4;
 
+    // «Filo apágate» la deja dormida (el micrófono sigue oyendo, pero no obedece nada);
+    // «Filo enciéndete» la despierta. Sólo frases cortas hechas de estas palabras.
+    if (palabras.length <= 4) {
+      const junto = palabras.join(' ').replace(/\b(apaga|enciende|prende|despierta|activa) te\b/g, '$1te');
+      const dichas = junto.split(' ');
+      const RELLENO = ['filo', 'ya', 'ahora', 'por', 'favor', 'oye', 'hola', 'te'];
+      const APAGARSE = ['apagate', 'duermete', 'desconectate', 'descansa'];
+      const PRENDERSE = ['enciendete', 'prendete', 'despierta', 'despiertate', 'activate'];
+      const conFilo = dichas.includes('filo');
+      const soloEso = (lista, sueltas) => dichas.some(p => lista.includes(p) || (conFilo && sueltas.includes(p))) &&
+        dichas.every(p => RELLENO.includes(p) || lista.includes(p) || sueltas.includes(p));
+      if (soloEso(APAGARSE, ['apaga', 'apagar', 'duerme'])) return { tipo: 'filoEncendida', si: false };
+      if (soloEso(PRENDERSE, ['enciende', 'encender', 'prende', 'prender', 'activa'])) return { tipo: 'filoEncendida', si: true };
+    }
+
     // Filo contesta hablando: «Filo cállate», «no hables» la callan; «Filo habla» la prende.
     if (palabras.length <= 4) {
       const callar = palabras.some(p => ['callate', 'calla', 'callada', 'shh', 'shhh'].includes(p)) ||
@@ -199,8 +214,19 @@
     }
 
     // Botones del control por voz (frases cortas): pantalla completa, actualizar, listas, ayuda.
-    if (palabras.length <= 6 && dice(palabras, 'lugar') && palabras.includes('completa')) {
-      return { tipo: 'boton', id: palabras.some(p => ['celular', 'telefono', 'mio', 'mi'].includes(p)) ? 'fsPhoneBtn' : 'fsPcBtn' };
+    // «pantalla completa», «pon el video en pantalla completa», «la presentación en pantalla
+    // completa», «quita la pantalla completa». Sin decir «celular» es la pantalla de la PC.
+    if (palabras.length <= 8 && palabras.includes('completa') &&
+        (dice(palabras, 'lugar') || para || palabras.some(p => ['presentacion', 'diapositiva', 'diapositivas', 'youtube'].includes(p)))) {
+      if (palabras.some(p => ['celular', 'telefono', 'mio', 'mi'].includes(p))) return { tipo: 'boton', id: 'fsPhoneBtn' };
+      const salir = dice(palabras, 'apagar') || palabras.some(p => ['sal', 'salir', 'salte', 'salgas', 'cierra', 'cerrar', 'cierrala', 'quitala'].includes(p));
+      return { tipo: 'completa', salir };
+    }
+    // Página web en pantalla: «siguiente página web», «pon la página web anterior». Hace falta
+    // decir «web»: sin eso, «página siguiente» es la imagen siguiente.
+    if (palabras.length <= 7 && palabras.includes('web')) {
+      if (palabras.some(p => ['siguiente', 'proxima', 'adelante'].includes(p))) return { tipo: 'boton', id: 'espejoSiguiente' };
+      if (palabras.some(p => ['anterior', 'atras', 'previa'].includes(p))) return { tipo: 'boton', id: 'espejoAnterior' };
     }
     if (corta4 && dice(palabras, 'actualizar')) return { tipo: 'boton', id: 'actualizarBtn' };
     if (corta4 && dice(palabras, 'ayuda')) return { tipo: 'ayuda' };
@@ -383,7 +409,9 @@
     'volumen al máximo', 'silencio', 'quita el silencio', 'volumen cero', 'volumen cincuenta', 'baja a cero', 'sube veinte', 'baja diez',
     'última diapositiva', 'primera diapositiva', 'sube el volumen de la PC', 'baja el volumen de la PC', 'pon video', 'video uno', 'video dos', 'siguiente video', 'quita el video',
     'agranda la imagen', 'achica la imagen', 'más grande', 'más chico', 'tamaño normal',
-    'derecha', 'izquierda', 'arriba', 'abajo'
+    'derecha', 'izquierda', 'arriba', 'abajo',
+    'Filo apágate', 'Filo enciéndete', 'pantalla completa', 'quita la pantalla completa',
+    'siguiente página web', 'página web anterior'
   ];
 
   // El número que se dijo en una frase corta («el segundo», «pon el tres»), o null.

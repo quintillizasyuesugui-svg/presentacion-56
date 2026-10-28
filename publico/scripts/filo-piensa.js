@@ -65,7 +65,7 @@
     'zoom.arriba': zoomN('arriba'),
     'zoom.abajo': zoomN('abajo'),
     'zoom.cuadrado': () => ({ tipo: 'zoom', accion: 'forma', forma: 'cuadrado' }),
-    'boton.completa': () => ({ tipo: 'boton', id: 'fsPcBtn' }),
+    'boton.completa': () => ({ tipo: 'completa', salir: false }),
     'boton.actualizar': () => ({ tipo: 'boton', id: 'actualizarBtn' }),
     'ayuda': () => ({ tipo: 'ayuda' }),
     'cerrar': () => ({ tipo: 'cerrar' }),

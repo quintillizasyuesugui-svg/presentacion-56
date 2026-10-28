@@ -69,6 +69,11 @@ public class Principal extends Activity {
     // trabado y la voz dejaba de escuchar.
     private boolean vozRecrear = false;
     private final Runnable vozSeguir = this::escuchar;
+    // Mientras Filo habla no se vuelve a abrir el micrófono ni se silencia el celular: antes, si
+    // el reconocedor arrancaba de nuevo justo en ese momento, el «bip» la tapaba o la cortaba
+    // (pasaba mucho con audífonos). Se suelta sola a los 8 s por si la página no avisa el final.
+    private boolean filoSuena = false;
+    private final Runnable filoCallada = () -> filoSuena = false;
     // Android 13 o más: el micrófono se abre una sola vez y queda escuchando hasta apagarlo
     // (sin volver a arrancar ni hacer «bip» después de cada frase). Si el celular no lo
     // permite, se vuelve a la forma de antes: una frase por vez.
@@ -76,16 +81,26 @@ public class Principal extends Activity {
     private boolean vozEnSeguida = false;
     private int vozFallosSeguida = 0;
     // Mientras escucha, el reconocedor avisa el nivel del sonido varias veces por segundo. Si
-    // pasan 10 s sin ningún aviso quedó colgado: se tira y se arma uno nuevo.
+    // pasa un rato sin ningún aviso quedó colgado: se tira y se arma uno nuevo. Cada vez que se
+    // arma uno nuevo suena un «bip»; con audífonos algunos celulares no avisan el nivel del
+    // sonido y eso hacía «bip» cada 10 s. Ahora, con la escucha seguida, se espera 45 s, y si
+    // rearmarlo no sirvió de nada, cada vez el doble (hasta 5 min).
     private long vozVivaEn = 0;
+    private int vozTrabadaVeces = 0;
     private final Runnable vozTrabada = new Runnable() {
         @Override public void run() {
             if (!vozActiva || vozPausada) return;
-            if (System.currentTimeMillis() - vozVivaEn < 10000) { web.postDelayed(this, 4000); return; }
+            long espera = vozEnSeguida ? Math.min(300000L, 45000L << Math.min(vozTrabadaVeces, 3)) : 10000L;
+            if (System.currentTimeMillis() - vozVivaEn < espera) { web.postDelayed(this, 4000); return; }
+            vozTrabadaVeces++;
             vozRecrear = true;
             escuchar();
         }
     };
+    private void vozViva() {
+        vozVivaEn = System.currentTimeMillis();
+        vozTrabadaVeces = 0;
+    }
 
     private WebView web;
     private FrameLayout raiz;
@@ -419,6 +434,12 @@ public class Principal extends Activity {
         public void hablando(boolean si) {
             if (!paginaPropia) return;
             runOnUiThread(() -> {
+                filoSuena = si;
+                web.removeCallbacks(filoCallada);
+                if (si) {
+                    silenciarAvisos(false);
+                    web.postDelayed(filoCallada, 8000);
+                }
                 // Con la escucha seguida el micrófono no se corta: la página ya no toma como
                 // orden lo que se oye mientras Filo habla.
                 if (vozEnSeguida && vozActiva && !vozPausada) return;
@@ -448,6 +469,7 @@ public class Principal extends Activity {
         web.removeCallbacks(vozSeguir);
         web.removeCallbacks(vozTrabada);
         if (!vozActiva || vozPausada) return;
+        if (filoSuena) { escucharEn(300); return; }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) { avisarVoz("no-disponible"); return; }
         if (vozRecrear && reconocedor != null) {
             try { reconocedor.destroy(); } catch (Exception ignorado) { }
@@ -497,6 +519,7 @@ public class Principal extends Activity {
     // celular no reproduce nada: la música y los videos suenan en la pantalla); al apagarla
     // vuelve a como estaba.
     private void silenciarAvisos(boolean silenciar) {
+        if (silenciar && filoSuena) return;
         if (silenciar == vozSilencio) return;
         vozSilencio = silenciar;
         try {
@@ -524,7 +547,7 @@ public class Principal extends Activity {
         // Escucha seguida: cada frase llega acá y el micrófono sigue abierto.
         @Override
         public void onSegmentResults(Bundle resultados) {
-            vozVivaEn = System.currentTimeMillis();
+            vozViva();
             vozFallosSeguida = 0;
             avisarOido(resultados);
         }
@@ -565,8 +588,8 @@ public class Principal extends Activity {
             // (para oír a Filo) y el micrófono sigue abierto.
             if (vozEnSeguida) web.postDelayed(() -> { if (vozActiva && vozEnSeguida) silenciarAvisos(false); }, 800);
         }
-        @Override public void onBeginningOfSpeech() { vozVivaEn = System.currentTimeMillis(); }
-        @Override public void onRmsChanged(float nivel) { vozVivaEn = System.currentTimeMillis(); }
+        @Override public void onBeginningOfSpeech() { vozViva(); }
+        @Override public void onRmsChanged(float nivel) { vozViva(); }
         @Override public void onBufferReceived(byte[] datos) { }
         @Override public void onEndOfSpeech() { }
         @Override public void onPartialResults(Bundle parciales) { }

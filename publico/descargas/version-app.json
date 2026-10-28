@@ -1,21 +1,21 @@
 {
-  "codigo": 11,
-  "version": "1.0.10",
+  "codigo": 12,
+  "version": "1.0.11",
   "peso": "1,9 MB",
   "apk": "descargas/conexiones-control.apk",
   "apkExterno": "https://presentacion-56.onrender.com/descargas/conexiones-control.apk",
   "novedades": [
     {
-      "icono": "🔆",
-      "texto": "El celular ya no se apaga mientras manejás la presentación"
+      "icono": "🔕",
+      "texto": "Menos «bip»: el micrófono no se vuelve a abrir mientras Filo habla"
     },
     {
-      "icono": "🔐",
-      "texto": "«Continuar con Google» se abre dentro de la app con tus cuentas, sin salir a Chrome"
+      "icono": "😴",
+      "texto": "«Filo apágate» y «Filo enciéndete», sin tocar el micrófono"
     },
     {
-      "icono": "⏱️",
-      "texto": "Temporizador por voz: «pon el temporizador a 10 segundos», «aumenta», «apágalo»"
+      "icono": "⛶",
+      "texto": "«Pantalla completa» por voz para videos y la presentación"
     }
   ]
 }

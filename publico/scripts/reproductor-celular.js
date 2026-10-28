@@ -581,6 +581,10 @@
       return `⏱ ${Math.floor(destino / 60)}:${String(Math.round(destino % 60)).padStart(2, '0')}`;
     }
 
+    // Lista vacía: se avisa qué falta (Filo lo dice con su voz) en vez de no hacer nada.
+    if (!lista.length && !(orden.accion === 'reproducir' && actual)) {
+      return para === 'video' ? 'No hay videos: subí uno o buscá en YouTube' : 'No hay música: subí canciones primero';
+    }
     const poner = (elemento) => {
       mandar(para, para === 'video' ? 'mandar' : 'elegir', elemento.id);
       return (para === 'video' ? '🎬 ' : '🎵 ') + elemento.nombre;

@@ -1321,6 +1321,22 @@
   }
   vozHablaBtn.addEventListener('click', () => ponerFiloHabla(!filoHabla));
   pintarFilo();
+  // «Filo apágate» / «Filo enciéndete»: dormida no obedece nada salvo despertarse. Se recuerda
+  // en este celular, igual que si habla o no.
+  const vozTexto = document.querySelector('#voiceStatus .voice-texto');
+  const vozTextoComun = vozTexto ? vozTexto.textContent : '';
+  let filoDormida = false;
+  try { filoDormida = localStorage.getItem('filoDormida') === 'si'; } catch { /* sin almacenamiento */ }
+  function pintarFiloDormida() {
+    document.body.classList.toggle('filo-dormida', filoDormida);
+    if (vozTexto) vozTexto.textContent = filoDormida ? '😴 Filo apagada · decí «Filo enciéndete»' : vozTextoComun;
+  }
+  function ponerFiloDormida(si) {
+    filoDormida = si;
+    try { localStorage.setItem('filoDormida', si ? 'si' : 'no'); } catch { /* sin almacenamiento */ }
+    pintarFiloDormida();
+  }
+  pintarFiloDormida();
   // Antes se dejaba de oír órdenes 4 s fijos cada vez que Filo hablaba (sus frases duran 1 s):
   // por eso a veces parecía que no escuchaba. Ahora sólo mientras suena de verdad.
   // En la app del celular, además, el micrófono se pausa mientras ella habla y sigue al terminar.
@@ -1376,6 +1392,8 @@
     const texto = String(hecho || '');
     if (!orden) return /no entend/i.test(texto) ? 'no_entendi' : null;
     if (/^No hay imágenes/.test(texto)) return 'no_hay_imagenes';
+    if (/^No hay música/.test(texto)) return 'no_hay_musica';
+    if (/^No hay videos/.test(texto)) return 'no_hay_videos';
     if (/^(No |Todavía|primero|ese botón|el buscador|decime|no hay)/i.test(texto) || /sólo está/.test(texto)) return 'no_puedo';
     const a = orden.accion;
     switch (orden.tipo) {
@@ -1383,13 +1401,17 @@
       case 'cerrarRespuesta': return orden.si ? 'cerrada' : 'sigues';
       case 'ytElegido': return 'video';
       case 'cerrar': return 'cerrar';
+      case 'filoEncendida': return orden.si ? 'filo_encendida' : 'filo_apagada';
+      case 'completa': return orden.salir ? 'pantalla_normal' : 'pantalla_completa';
       case 'ayuda': return 'ayuda';
       case 'youtube': return 'buscar';
       case 'temporizador':
         if (a === 'cual') return null; // el tiempo se lee en la burbuja
         if (/ya estaba apagado/.test(texto)) return 'temporizador_apagado';
         return { prender: 'temporizador_prendido', poner: 'temporizador_prendido', apagar: 'temporizador_apagado', mas: 'temporizador_mas', menos: 'temporizador_menos' }[a] || 'listo';
-      case 'boton': return orden.id === 'actualizarBtn' ? 'actualizo' : /^fs/.test(orden.id) ? 'pantalla_completa' : 'listo';
+      case 'boton':
+        if (/^espejo/.test(orden.id)) return orden.id === 'espejoSiguiente' ? 'siguiente' : 'anterior';
+        return orden.id === 'actualizarBtn' ? 'actualizo' : /^fs/.test(orden.id) ? 'pantalla_completa' : 'listo';
       case 'diapositiva':
         if (a === 'mostrar' || a === 'siguiente' || a === 'anterior') return a;
         return Number(a) === totalSlides && totalSlides > 1 ? 'ultima' : 'diapositiva';
@@ -1595,7 +1617,7 @@
       if (hojaCerrarAbierta()) return;
       const nueva = window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
       const mismaQueFilo = nueva && ordenDeFilo && nueva.tipo === ordenDeFilo.tipo &&
-        nueva.accion === ordenDeFilo.accion && nueva.valor === ordenDeFilo.valor;
+        nueva.accion === ordenDeFilo.accion && nueva.valor === ordenDeFilo.valor && nueva.para === ordenDeFilo.para;
       if (!nueva || mismaQueFilo) return;
       filoAudio.pause();
       filoVez++;
@@ -1614,6 +1636,16 @@
   // ordenDada: una orden que ya pensó la IA (sin volver a decidir).
   function cumplirOrdenDeVoz(alternativas, ordenDada) {
     const oido = String(alternativas[0] || '').trim();
+    // Filo apagada: el micrófono sigue oyendo, pero sólo obedece «Filo enciéndete».
+    if (filoDormida) {
+      const orden = ordenDada || window.OrdenesVoz.interpretarVoz(alternativas, totalSlides);
+      if (orden && orden.tipo === 'filoEncendida' && orden.si) {
+        ponerFiloDormida(false);
+        ordenParaFilo = orden;
+        showHeard(oido, '✨ Filo encendida');
+      }
+      return;
+    }
     // Con la pregunta «¿Cerrar tu pantalla?» abierta sólo se escucha la respuesta: «sí» (o
     // «cerrar») cierra, «no» (o «seguir») la deja como está.
     if (hojaCerrarAbierta()) {
@@ -1673,11 +1705,24 @@
     if (orden.tipo === 'boton') {
       const boton = document.getElementById(orden.id);
       if (!boton || boton.hidden || boton.disabled || !boton.offsetParent) {
-        showHeard(oido, orden.id === 'zonaBtn' ? '«✂ Zona» sólo está con una página web en pantalla' : 'ese botón no está ahora');
+        showHeard(oido, orden.id === 'zonaBtn' ? '«✂ Zona» sólo está con una página web en pantalla'
+          : /^espejo/.test(orden.id) ? 'No hay una página web en pantalla' : 'ese botón no está ahora');
         return;
       }
       boton.click();
       showHeard(oido, '👆 ' + (boton.textContent || '').trim().slice(0, 30));
+      return;
+    }
+    if (orden.tipo === 'filoEncendida') {
+      if (orden.si) { showHeard(oido, '✨ Filo ya estaba encendida'); return; }
+      showHeard(oido, '😴 Filo apagada · decí «Filo enciéndete»');
+      ponerFiloDormida(true);
+      return;
+    }
+    if (orden.tipo === 'completa') {
+      if (!hayPantalla) { showHeard(oido, 'primero abrí la pantalla'); return; }
+      socket.emit('cine', orden.salir ? { salir: true } : undefined);
+      showHeard(oido, orden.salir ? '⛶ Pantalla normal' : '⛶ Pantalla completa');
       return;
     }
     if (orden.tipo === 'filo') {
@@ -1695,7 +1740,7 @@
       showHeard(oido, '«siguiente», «atrás», «diapositiva 5», «última» · «pon música», «pon la canción …», ' +
         '«canción al azar», «¿qué canción es?», «ve al minuto 2», «termina la música» · «volumen 30», «sube 20», ' +
         '«baja a 0», «quita el silencio» · «agranda 50», «achica 30», «al doble», «derecha 20», «un cuadrado» · ' +
-        '«pantalla completa», «actualiza», «zona»');
+        '«pantalla completa», «quita la pantalla completa», «actualiza», «zona» · «Filo apágate», «Filo enciéndete»');
       return;
     }
     if (orden.tipo === 'temporizador') { temporizadorPorVoz(orden, oido); return; }
@@ -1861,6 +1906,8 @@
         // Sin permiso de micrófono no tiene sentido seguir reintentando
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           voiceActive = false;
+          // Si fue el arranque solo el que no se permitió, se recuerda igual: al tocar «🎤 Voz» vuelve.
+          if (!vozArrancoSola) recordarVoz(false);
           setVoiceUI(false);
         }
       };
@@ -1898,14 +1945,15 @@
       }
     }, demora || 0);
   }
-  // Si el reconocedor se queda colgado sin avisar nada por 15 s, se corta y arranca de nuevo.
+  // Si el reconocedor se queda colgado sin avisar nada por 45 s, se corta y arranca de nuevo.
+  // (Antes eran 15 s: cada arranque hace «bip» en Android y en silencio sonaba seguido.)
   function vigilarVoz() {
     clearTimeout(vozTrabada);
     vozTrabada = setTimeout(() => {
       if (!voiceActive || !recognition) return;
       try { recognition.abort(); } catch { /* ya estaba parado */ }
       volverAEscuchar(400);
-    }, 15000);
+    }, 45000);
   }
 
   // En la app Conexiones Control escucha el reconocedor de voz del propio celular (el navegador
@@ -1919,6 +1967,7 @@
     },
     aviso(motivo) {
       voiceActive = false;
+      recordarVoz(false);
       setVoiceUI(false);
       alert(motivo === 'sin-permiso'
         ? 'Para darle órdenes por voz, la app necesita permiso para usar el micrófono. Tocá «🎤 Voz» de nuevo y elegí «Permitir».'
@@ -1926,7 +1975,13 @@
     }
   };
 
+  // El micrófono queda como lo dejaron: si estaba prendido, al abrir el control vuelve a
+  // escuchar solo (así se llama a Filo sin tocar «🎤 Voz» cada vez).
+  function recordarVoz(si) {
+    try { localStorage.setItem('vozSiempre', si ? 'si' : 'no'); } catch { /* sin almacenamiento */ }
+  }
   function toggleVoice() {
+    recordarVoz(!voiceActive);
     if (vozDeLaApp) {
       voiceActive = !voiceActive;
       if (voiceActive) vozDeLaApp.empezar(idiomaDeVoz(), JSON.stringify(window.OrdenesVoz.FRASES_DE_AYUDA));
@@ -1951,6 +2006,19 @@
       setVoiceUI(true);
     }
   }
+  let vozArrancoSola = false;
+  (() => {
+    let guardada = null;
+    try { guardada = localStorage.getItem('vozSiempre'); } catch { /* sin almacenamiento */ }
+    if (guardada !== 'si') return;
+    if (!vozDeLaApp && !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    setTimeout(() => {
+      if (voiceActive) return;
+      vozArrancoSola = true;
+      toggleVoice();
+      setTimeout(() => { vozArrancoSola = false; }, 5000);
+    }, 600);
+  })();
 
   // El botón "Pantalla" puede referirse a dos pantallas distintas (el celular
   // con el control, o la PC/proyector con pantalla.html) — antes hacía las
