@@ -52,7 +52,7 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
 
 ## 🎵 Música y videos
 - **Subir** (`/subir-multimedia.html`, botón «➕ Subir» en Gestionar → 🎵 Música o 🎬 Videos). Música MP3/M4A/OGG/WAV hasta 15 MB; video
-  MP4/WEBM/MOV hasta 100 MB. Los videos se achican a 720p **en el celular** antes de subir
+  MP4/WEBM/MOV hasta 500 MB. Los videos se achican a 720p **en el celular** antes de subir
   (Mediabunny, `publico/vendor/`), así gastan menos espacio. Con Cloudinary, el celular sube
   directo a Cloudinary con una firma del servidor (el archivo no pasa por la memoria de Render).
 - **YouTube**: se guarda sólo el enlace (no ocupa espacio). Tiene que ser público o no listado;
@@ -77,6 +77,17 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   principio (desde el celular no se puede: el navegador sólo acepta un toque en la PC; con la
   app de PC nunca queda sin sonido). «Cerrar pantalla» en el celular o «Cerrar sesión» en la
   pantalla lo olvidan todo. Se guarda en la memoria del servidor: si Render se reinicia, se pierde.
+- **Almacén grande (videos de más de 100 MB, hasta 500 MB)**: el sistema elige solo dónde va cada
+  video. Hasta 100 MB, a Cloudinary (⚡ espacio rápido); más grandes, a un dataset **privado** de
+  Hugging Face (📦 almacén grande, `servidor/almacen-grande.js`). El celular manda el video al
+  servidor en trozos de 6 MB y el servidor lo pasa a Hugging Face. Para verlo, la pantalla recibe
+  un enlace firmado que dura un rato: el video va directo de Hugging Face a la pantalla, sin pasar
+  por Render (en la prueba, un video de 116 MB empezó en 1,4 s). Al borrar, se borra también del
+  historial de Hugging Face para no seguir ocupando espacio. Variables en Render: `HF_TOKEN`
+  (clave de escritura de Hugging Face; sin ella todo funciona como antes, hasta 100 MB) y,
+  opcionales, `HF_DATASET`, `GRANDE_PRESUPUESTO_MB` (100 GB), `GRANDE_MIN_MB` (1000) y
+  `GRANDE_MAX_MB` (5000). La caja «Esto es tuyo y de nadie más» (abajo de cada pantalla) muestra
+  las dos barras.
 - **Espacio por persona**: `PRESUPUESTO_MB` (12 GB) se reparte entre las personas
   registradas, entre `ESPACIO_MIN_MB` (100) y `ESPACIO_MAX_MB` (2000). Con pocas personas cada
   una tiene más; con muchas, menos. El admin puede fijarle un espacio propio a alguien.

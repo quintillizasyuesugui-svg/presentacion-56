@@ -144,10 +144,42 @@
     alAvanzar(1);
   }
 
+  // Almacén grande: el video va a NUESTRO servidor en trozos (él lo pasa a Hugging Face).
+  // Cada trozo se reintenta solo si se corta la conexión; el último espera a que termine.
+  async function subirAlAlmacenGrande(firma, archivo, pin, alAvanzar) {
+    const trozo = firma.trozo || TROZO;
+    for (let desde = 0; desde < archivo.size; desde += trozo) {
+      const hasta = Math.min(archivo.size, desde + trozo);
+      for (let intento = 1; ; intento++) {
+        let res;
+        try {
+          res = await fetch(firma.url, {
+            method: 'POST',
+            body: archivo.slice(desde, hasta),
+            headers: { 'Content-Type': 'application/octet-stream', 'x-pin': pin, 'x-subida': firma.id, 'Content-Range': `bytes ${desde}-${hasta - 1}/${archivo.size}` }
+          });
+        } catch (err) {
+          if (intento >= INTENTOS) throw new Error('Se cortó la conexión mientras se subía.');
+          await esperar(1500 * intento);
+          continue;
+        }
+        let datos = {};
+        try { datos = await res.json(); } catch { /* respuesta vacía */ }
+        if (res.ok) break;
+        if (res.status >= 500 && res.status !== 502 && intento < INTENTOS) { await esperar(1500 * intento); continue; }
+        throw new Error(datos.error || 'No se pudo subir.');
+      }
+      // El 90 % es mandar los trozos; el último 10 % es el paso a Hugging Face.
+      alAvanzar((hasta / archivo.size) * 0.9);
+    }
+  }
+
   // Canción o video (el video ya viene achicado por la página, si se pudo).
   async function subirMedio(t, pin, alAvanzar) {
-    const firma = await pedirJson('/api/multimedia/firma', pin, { tipo: t.tipo, nombre: t.nombre, bytes: t.archivo.size });
-    if (firma.modo === 'nube') {
+    const firma = await pedirJson('/api/multimedia/firma', pin, { tipo: t.tipo, nombre: t.nombre, bytes: t.archivo.size, duracion: t.duracion || 0 });
+    if (firma.modo === 'grande') {
+      await subirAlAlmacenGrande(firma, t.archivo, pin, alAvanzar);
+    } else if (firma.modo === 'nube') {
       const subido = await subirACloudinary(firma.url, firma.campos, t.archivo, t.nombre, (f) => alAvanzar(f * 0.95));
       await pedirJson('/api/multimedia/registrar', pin, { public_id: subido.public_id || firma.campos.public_id });
     } else {

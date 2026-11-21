@@ -27,7 +27,9 @@ const LIMITES = {
   // Recibir un archivo en este servidor (sólo al probar en la PC, sin Cloudinary): usa disco y memoria.
   local: { minimo: 2, maximo: 3, porCadaEnFila: 4, porPersona: 3, enFila: 30, esperaMaxMs: 3 * 60 * 1000 },
   // Preguntarle a YouTube el título de un enlace.
-  youtube: { minimo: 4, maximo: 10, porCadaEnFila: 3, porPersona: 3, enFila: 80, esperaMaxMs: 60 * 1000 }
+  youtube: { minimo: 4, maximo: 10, porCadaEnFila: 3, porPersona: 3, enFila: 80, esperaMaxMs: 60 * 1000 },
+  // Subir un video grande a Hugging Face: de a uno o dos (cada uno usa ~110 MB de memoria).
+  grande: { minimo: 1, maximo: 2, porCadaEnFila: 4, porPersona: 1, enFila: 30, esperaMaxMs: 15 * 60 * 1000 }
 };
 const CUPO_NUBE_POR_HORA = Number(process.env.CUPO_NUBE_POR_HORA) || 400;
 // Mensajes en tiempo real por conexión: de sobra para arrastrar una barra o escribir rápido.

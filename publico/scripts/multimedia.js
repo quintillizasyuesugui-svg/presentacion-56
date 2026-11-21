@@ -84,12 +84,29 @@ const socket = io();
   pestana();
 
   // ---------- espacio ----------
+  // Corto para las barras: «116 MB», «1,5 GB», «5 GB».
+  function corto(bytes) {
+    const mb = bytes / (1024 * 1024);
+    if (mb < 1000) return (mb < 10 ? Math.round(mb * 10) / 10 : Math.round(mb)).toLocaleString('es') + ' MB';
+    return (Math.round(mb / 100) / 10).toLocaleString('es') + ' GB';
+  }
+
   function pintarEspacio() {
     const { usado, total } = datos.espacio;
     const pct = total ? Math.min(100, (100 * usado) / total) : 100;
-    $('espacioTexto').textContent = `Usaste ${fmtMb(usado)} de ${fmtMb(total)}`;
+    const grande = datos.espacioGrande;
+    // Con almacén grande, las dos barras van en una línea con textos cortos («38 MB/2 GB»).
+    $('espacioTexto').textContent = grande ? `${corto(usado)}/${corto(total)}` : `Usaste ${fmtMb(usado)} de ${fmtMb(total)}`;
     $('espacioRiel').firstElementChild.style.width = pct + '%';
     $('espacioRiel').classList.toggle('lleno', pct >= 90);
+    $('espacioIconoRapido').hidden = !grande;
+    $('espacioGrande').hidden = !grande;
+    if (grande) {
+      const pg = grande.total ? Math.min(100, (100 * grande.usado) / grande.total) : 100;
+      $('espacioTextoGrande').textContent = `${corto(grande.usado)}/${corto(grande.total)}`;
+      $('espacioRielGrande').firstElementChild.style.width = pg + '%';
+      $('espacioRielGrande').classList.toggle('lleno', pg >= 90);
+    }
     $('espacioExplicacion').textContent = '📦 ' + datos.explicacion + ' Los enlaces de YouTube no ocupan espacio.';
   }
 
@@ -182,6 +199,7 @@ const socket = io();
   function crearFilaMedio({ tipo, sel, ordenable, dueno, total }, e, n) {
     const marcada = sel.has(e.id);
     const detalles = [];
+    if (e.grande) detalles.push('📦 Almacén grande');
     if (e.origen === 'youtube') detalles.push('🔗 YouTube' + (e.inicio != null || e.fin != null ? ` (${fmtTiempo(e.inicio || 0)} a ${e.fin != null ? fmtTiempo(e.fin) : 'el final'})` : ''));
     if (e.duracion) detalles.push(fmtTiempo(e.duracion));
     detalles.push(e.bytes ? fmtMb(e.bytes) : '0 MB');
@@ -580,11 +598,15 @@ const socket = io();
           pintarSubidas();
         });
         const archivo = r.archivo;
-        if (archivo.size > datos.limites.video) {
-          throw new Error(`Pesa ${fmtMb(archivo.size)} y el máximo es ${fmtMb(datos.limites.video)}. Para videos largos usá un enlace de YouTube.`);
+        const maximo = datos.limites.videoGrande || datos.limites.video;
+        if (archivo.size > maximo) {
+          throw new Error(`Pesa ${fmtMb(archivo.size)} y el máximo es ${fmtMb(maximo)}. Para videos largos usá un enlace de YouTube.`);
         }
-        // La duración sólo la necesita la subida local de prueba (Cloudinary la mide sola).
-        const duracion = datos.subida === 'local' ? await leerDuracion(archivo) : 0;
+        // El sistema elige solo dónde va: hasta 100 MB al espacio rápido, más grande al almacén grande.
+        const vaAlGrande = archivo.size > datos.limites.video;
+        if (vaAlGrande) avisar(`📦 «${archivo.name}» es un video grande: se guarda en el almacén grande. Tarda un poco más en subir.`, true);
+        // La duración la necesitan la subida local de prueba y el almacén grande (Cloudinary la mide sola).
+        const duracion = datos.subida === 'local' || vaAlGrande ? await leerDuracion(archivo) : 0;
         achicandoAca.splice(achicandoAca.indexOf(f), 1);
         // Primero pasa al ayudante y recién después deja de contar como «achicando»: así la
         // barra de arriba nunca dice «listo» en el medio.

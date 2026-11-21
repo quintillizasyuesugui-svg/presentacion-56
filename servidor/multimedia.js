@@ -8,6 +8,8 @@
 //    el servidor comprueba en Cloudinary qué se subió de verdad y recién ahí lo anota.
 //  - Sin Cloudinary y con DOCUMENTOS_SIN_NUBE_LOCAL=1 (para probar en la PC): en
 //    publico/multimedia/.
+//  - Videos de más de 100 MB (hasta 500 MB): al almacén grande de Hugging Face (ver
+//    almacen-grande.js). Tienen su propio espacio aparte del de Cloudinary.
 // Los enlaces de YouTube sólo guardan el enlace: no ocupan espacio.
 //
 // Cada persona tiene su propio espacio, que se calcula solo repartiendo PRESUPUESTO_MB entre
@@ -15,15 +17,20 @@
 const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
+const express = require('express');
 const multer = require('multer');
-const { CARPETA_MULTIMEDIA, PRESUPUESTO_MB, ESPACIO_MIN_MB, ESPACIO_MAX_MB, cloudinary, nubeLista } = require('./configuracion');
+const { CARPETA_MULTIMEDIA, PRESUPUESTO_MB, ESPACIO_MIN_MB, ESPACIO_MAX_MB, GRANDE_PRESUPUESTO_MB, GRANDE_MIN_MB, GRANDE_MAX_MB, cloudinary, nubeLista } = require('./configuracion');
+const { almacenGrandeListo, subirAlAlmacenGrande, borrarDelAlmacenGrande, enlaceParaVer } = require('./almacen-grande');
 const { crearAlmacen, SIN_CAMBIOS } = require('./almacen');
 const { requierePersona, visiblePara, nombresDePersonas } = require('./personas');
 const { enFila, anotar, explicarEspacio } = require('./guardian');
 const { borrarDeLaNube } = require('./borrar-de-la-nube');
 
 const MB = 1024 * 1024;
-const LIMITE_BYTES = { musica: 15 * MB, video: 100 * MB };
+const LIMITE_BYTES = { musica: 15 * MB, video: 100 * MB, videoGrande: 500 * MB };
+const TROZO_GRANDE = 6 * MB;
+const CARPETA_TROZOS = path.join(os.tmpdir(), 'conexiones-grandes');
 const EXTENSIONES = {
   musica: ['.mp3', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wav', '.weba'],
   video: ['.mp4', '.m4v', '.webm', '.mov']
@@ -90,8 +97,27 @@ function modoDeSubida() {
 }
 
 // ---- Espacio ----
+// Lo del espacio rápido (Cloudinary) y lo del almacén grande se cuentan por separado.
 function usadoPor(nombre) {
-  return almacenMultimedia.actual().reduce((suma, r) => suma + (r.owner === nombre ? (r.bytes || 0) : 0), 0);
+  return almacenMultimedia.actual().reduce((suma, r) => suma + (r.owner === nombre && !r.grande ? (r.bytes || 0) : 0), 0);
+}
+
+function usadoGrandePor(nombre) {
+  return almacenMultimedia.actual().reduce((suma, r) => suma + (r.owner === nombre && r.grande ? (r.bytes || 0) : 0), 0);
+}
+
+function espacioGrandeDe(nombre) {
+  const mb = repartirEspacio(nombresDePersonas().length, GRANDE_PRESUPUESTO_MB, GRANDE_MIN_MB, GRANDE_MAX_MB);
+  return { usado: usadoGrandePor(nombre), total: mb * MB };
+}
+
+function comprobarEspacioGrande(nombre, bytesNuevos) {
+  const { usado, total } = espacioGrandeDe(nombre);
+  if (usado + bytesNuevos > total) {
+    const libre = Math.max(0, total - usado);
+    anotar('almacenamiento', nombre, 'no le alcanzó el almacén grande', `quería subir ${enMb(bytesNuevos)} y le quedaban ${enMb(libre)}`);
+    throw new ErrorPedido(413, `🛡️ No te alcanza el almacén grande: este video pesa ${enMb(bytesNuevos)} y te quedan ${enMb(libre)} de ${enMb(total)}. Borrá algún video grande o usá un enlace de YouTube.`);
+  }
 }
 
 // Calculador: el presupuesto se reparte entre las personas, sin bajar del mínimo ni pasar del máximo.
@@ -141,8 +167,12 @@ function enMb(bytes) {
   return (Math.round((bytes / MB) * 10) / 10).toLocaleString('es') + ' MB';
 }
 
-function comprobarTamano(tipo, bytes) {
+function comprobarTamano(tipo, bytes, grande = false) {
   if (!(bytes > 0)) throw new ErrorPedido(400, 'El archivo está vacío.');
+  if (grande) {
+    if (bytes > LIMITE_BYTES.videoGrande) throw new ErrorPedido(413, `Cada video puede pesar hasta ${enMb(LIMITE_BYTES.videoGrande)}; este pesa ${enMb(bytes)}. Para videos más largos usá un enlace de YouTube.`);
+    return;
+  }
   if (bytes > LIMITE_BYTES[tipo]) {
     const que = tipo === 'musica' ? 'Cada canción' : 'Cada video';
     throw new ErrorPedido(413, `${que} puede pesar hasta ${enMb(LIMITE_BYTES[tipo])}; este pesa ${enMb(bytes)}.` +
@@ -178,7 +208,8 @@ function resumenPara(persona) {
     espacio: espacioDe(persona.name),
     explicacion: explicacionDe(persona.name),
     subida: modoDeSubida(),
-    limites: { musica: LIMITE_BYTES.musica, video: LIMITE_BYTES.video }
+    espacioGrande: almacenGrandeListo ? espacioGrandeDe(persona.name) : null,
+    limites: { musica: LIMITE_BYTES.musica, video: LIMITE_BYTES.video, videoGrande: almacenGrandeListo ? LIMITE_BYTES.videoGrande : 0 }
   };
 }
 
@@ -189,7 +220,9 @@ async function agregar(registro) {
 
 async function borrarArchivo(registro) {
   if (registro.origen !== 'subido') return;
-  if (registro.nube) {
+  if (registro.grande) {
+    await borrarDelAlmacenGrande(registro.rutaHf, registro.sha);
+  } else if (registro.nube) {
     await borrarDeLaNube(registro.id, 'video');
   } else if (registro.archivo) {
     // «archivo» lo puso el servidor al guardarlo: siempre es un nombre dentro de publico/multimedia.
@@ -247,16 +280,17 @@ function segundosValidos(n) {
 }
 
 // ---- Para administración ----
+// Lo guardado en Cloudinary (el almacén grande tiene su propia cuenta).
 function usadoTotal() {
-  return almacenMultimedia.actual().reduce((suma, r) => suma + (r.bytes || 0), 0);
+  return almacenMultimedia.actual().reduce((suma, r) => suma + (r.grande ? 0 : (r.bytes || 0)), 0);
 }
 
 function espacioPorPersona() {
   const porDueno = {};
   for (const r of almacenMultimedia.actual()) {
     if (!r.owner) continue;
-    const p = porDueno[r.owner] || (porDueno[r.owner] = { usado: 0, canciones: 0, videos: 0 });
-    p.usado += r.bytes || 0;
+    const p = porDueno[r.owner] || (porDueno[r.owner] = { usado: 0, usadoGrande: 0, canciones: 0, videos: 0 });
+    if (r.grande) p.usadoGrande += r.bytes || 0; else p.usado += r.bytes || 0;
     if (r.tipo === 'musica') p.canciones++; else p.videos++;
   }
   return porDueno;
@@ -312,12 +346,76 @@ const subidaLocal = multer({
   defParamCharset: 'utf8'
 });
 
+// ---- Subidas al almacén grande ----
+// id → { id, owner, nombre, ext, bytes, duracion, recibidos, ruta, ultimo, terminando }
+const subidasGrandes = new Map();
+const VENCE_SUBIDA_GRANDE_MS = 30 * 60 * 1000; // sin trozos nuevos en 30 min, se descarta
+setInterval(() => {
+  const limite = Date.now() - VENCE_SUBIDA_GRANDE_MS;
+  for (const [id, s] of subidasGrandes) {
+    if (s.ultimo < limite && !s.terminando) {
+      subidasGrandes.delete(id);
+      fs.unlink(s.ruta).catch(() => {});
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
+function empezarSubidaGrande(owner, nombre, bytes, duracion) {
+  const suyas = [...subidasGrandes.values()].filter(s => s.owner === owner);
+  if (suyas.length >= 3) throw new ErrorPedido(429, '🛡️ Ya tenés 3 videos grandes subiéndose. Esperá a que terminen.');
+  // Lo que ya se está subiendo también cuenta, para no pasarse del espacio subiendo varios a la vez.
+  comprobarEspacioGrande(owner, bytes + suyas.reduce((t, s) => t + s.bytes, 0));
+  const id = crypto.randomUUID();
+  const ext = path.extname(String(nombre || '')).toLowerCase() || '.mp4';
+  const ruta = path.join(CARPETA_TROZOS, id + ext);
+  require('fs').mkdirSync(CARPETA_TROZOS, { recursive: true });
+  require('fs').writeFileSync(ruta, '');
+  subidasGrandes.set(id, { id, owner, nombre: nombreVisible(nombre), ext, bytes, duracion: duracionValida(duracion), recibidos: 0, ruta, ultimo: Date.now() });
+  return { modo: 'grande', url: '/api/multimedia/grande/trozo', id, trozo: TROZO_GRANDE };
+}
+
+async function terminarSubidaGrande(s, persona) {
+  s.terminando = true;
+  const rutaHf = `videos/${s.id}${s.ext}`;
+  try {
+    comprobarEspacioGrande(persona.name, s.bytes);
+    const sha = await enFila('grande', persona.name, () => subirAlAlmacenGrande(s.ruta, rutaHf));
+    await agregar({
+      id: 'grande/' + s.id,
+      tipo: 'video',
+      origen: 'subido',
+      nube: false,
+      grande: true,
+      rutaHf,
+      sha,
+      nombre: s.nombre,
+      duracion: s.duracion,
+      bytes: s.bytes,
+      src: '/api/multimedia/grande/ver/' + s.id,
+      owner: persona.name,
+      creado: new Date().toISOString()
+    });
+    return resumenPara(persona);
+  } catch (err) {
+    if (err instanceof ErrorPedido || (err && err.guardian)) throw err;
+    console.error('Falló la subida al almacén grande:', err.message || err);
+    throw new ErrorPedido(502, 'El almacén grande no recibió el video. Probá de nuevo en un rato.');
+  } finally {
+    subidasGrandes.delete(s.id);
+    fs.unlink(s.ruta).catch(() => {});
+  }
+}
+
 function registrarRutasMultimedia(app, io) {
   ioActual = io;
 
   app.get('/api/multimedia', requierePersona, (req, res) => {
     try {
       res.json(resumenPara(req.person));
+      // Deja listos los enlaces de sus videos grandes: al tocar «Mostrar» arrancan sin esperar.
+      for (const r of almacenMultimedia.actual()) {
+        if (r.grande && r.owner === req.person.name) enlaceParaVer(r.rutaHf).catch(() => {});
+      }
     } catch (err) {
       responderError(res, err, 'Algo salió mal en el servidor. Probá de nuevo en un momento.');
     }
@@ -326,10 +424,12 @@ function registrarRutasMultimedia(app, io) {
   // Paso 1 de una subida: comprueba tamaño, formato y espacio, y dice cómo subir.
   app.post('/api/multimedia/firma', requierePersona, (req, res) => {
     try {
-      const { tipo, nombre, bytes } = req.body || {};
+      const { tipo, nombre, bytes, duracion } = req.body || {};
       comprobarTipo(tipo);
       comprobarExtension(tipo, nombre);
-      comprobarTamano(tipo, Number(bytes));
+      const grande = tipo === 'video' && Number(bytes) > LIMITE_BYTES.video && almacenGrandeListo;
+      comprobarTamano(tipo, Number(bytes), grande);
+      if (grande) return res.json(empezarSubidaGrande(req.person.name, nombre, Number(bytes), Number(duracion)));
       comprobarEspacio(req.person.name, Number(bytes));
       const modo = modoDeSubida();
       // Sólo cuentan las de los últimos minutos: una subida que se cortó ya no frena las nuevas.
@@ -432,6 +532,42 @@ function registrarRutasMultimedia(app, io) {
     } catch (err) {
       if (archivo) await fs.unlink(archivo.path).catch(() => {});
       responderError(res, err, 'No se pudo guardar lo que subiste.');
+    }
+  });
+
+  // Almacén grande, paso 2: llegan los trozos en orden. Con el último se sube a Hugging Face.
+  app.post('/api/multimedia/grande/trozo', requierePersona, express.raw({ type: 'application/octet-stream', limit: TROZO_GRANDE + MB }), async (req, res) => {
+    try {
+      const s = subidasGrandes.get(String(req.get('x-subida') || ''));
+      if (!s || s.owner !== req.person.name) throw new ErrorPedido(400, 'Esa subida no está autorizada o ya venció. Probá de nuevo.');
+      const rango = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(String(req.get('content-range') || ''));
+      const trozo = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!rango || !trozo) throw new ErrorPedido(400, 'Trozo inválido.');
+      const desde = Number(rango[1]), hasta = Number(rango[2]), total = Number(rango[3]);
+      if (total !== s.bytes || hasta - desde + 1 !== trozo.length || trozo.length > TROZO_GRANDE) throw new ErrorPedido(400, 'Trozo inválido.');
+      // El celular reintenta un trozo si se cortó la conexión: si ya había llegado, no se repite.
+      if (hasta + 1 <= s.recibidos) return res.json({ recibidos: s.recibidos });
+      if (desde !== s.recibidos || s.terminando) throw new ErrorPedido(409, 'Se perdió un trozo del video. Probá subirlo de nuevo.');
+      await fs.appendFile(s.ruta, trozo);
+      s.recibidos += trozo.length;
+      s.ultimo = Date.now();
+      if (s.recibidos < s.bytes) return res.json({ recibidos: s.recibidos });
+      res.json(await terminarSubidaGrande(s, req.person));
+    } catch (err) {
+      responderError(res, err, 'No se pudo subir el video al almacén grande.');
+    }
+  });
+
+  // Ver un video del almacén grande: lleva al enlace firmado de Hugging Face (dura un rato).
+  app.get('/api/multimedia/grande/ver/:id', async (req, res) => {
+    const r = almacenMultimedia.actual().find(x => x.id === 'grande/' + req.params.id && x.grande);
+    if (!r) return res.status(404).json({ error: 'Ese video ya no existe.' });
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.redirect(302, await enlaceParaVer(r.rutaHf));
+    } catch (err) {
+      console.error(err.message || err);
+      res.status(502).json({ error: 'El almacén grande no contestó. Probá de nuevo en un momento.' });
     }
   });
 

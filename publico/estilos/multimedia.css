@@ -722,6 +722,14 @@ body.compacto [hidden] { display: none !important; }
 .espacio-linea { display: flex; align-items: center; gap: 10px; }
 .espacio-linea .espacio-riel { flex: 1; height: 7px; }
 .espacio-linea .espacio-usado { white-space: nowrap; font-size: 0.76rem; }
+/* Con almacén grande: ⚡ rápido y 📦 grande en la misma línea (pasan a dos si no entran). */
+.espacio-linea { flex-wrap: wrap; row-gap: 4px; }
+.espacio-icono { flex: none; font-size: 0.85rem; line-height: 1; }
+.espacio-icono[hidden], .espacio-grande[hidden] { display: none !important; }
+.espacio-grande { flex: 1 1 140px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.espacio-grande .espacio-riel { flex: 1; height: 7px; min-width: 30px; }
+.espacio-riel.grande i { background: linear-gradient(90deg, var(--amber-400), #f97316); }
+.espacio-linea > .espacio-riel { min-width: 30px; }
 .boton-info { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--gray-600); background: none; color: var(--gray-300); font-family: inherit; font-weight: 700; font-size: 0.78rem; line-height: 1; display: grid; place-items: center; cursor: pointer; }
 .boton-info:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 

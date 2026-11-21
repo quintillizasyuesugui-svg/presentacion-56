@@ -31,6 +31,16 @@ const PRESUPUESTO_MB = Number(process.env.PRESUPUESTO_MB) || 12000;
 const ESPACIO_MIN_MB = Number(process.env.ESPACIO_MIN_MB) || 100;
 const ESPACIO_MAX_MB = Number(process.env.ESPACIO_MAX_MB) || 2000;
 
+// Almacén grande: videos de más de 100 MB (hasta 500 MB) en un dataset privado de Hugging Face.
+// HF_TOKEN es una clave de escritura (sólo en las variables de Render, nunca en el código).
+// Se reparte igual que el espacio de Cloudinary: GRANDE_PRESUPUESTO_MB entre las personas, sin
+// bajar de GRANDE_MIN_MB ni pasar de GRANDE_MAX_MB (100 GB en total, hasta 5 GB por persona).
+const HF_TOKEN = process.env.HF_TOKEN || null;
+const HF_DATASET = process.env.HF_DATASET || 'dwaddawdw/conexiones-videos';
+const GRANDE_PRESUPUESTO_MB = Number(process.env.GRANDE_PRESUPUESTO_MB) || 100000;
+const GRANDE_MIN_MB = Number(process.env.GRANDE_MIN_MB) || 1000;
+const GRANDE_MAX_MB = Number(process.env.GRANDE_MAX_MB) || 5000;
+
 // ---- Cloudinary (almacenamiento permanente para lo que se sube desde /gestionar.html) ----
 // Las imágenes que vienen con el repo se despliegan siempre junto al código (git las
 // conserva). Lo que se sube en vivo desde el celular, en cambio, se pierde en cada
@@ -61,6 +71,11 @@ module.exports = {
   PRESUPUESTO_MB,
   ESPACIO_MIN_MB,
   ESPACIO_MAX_MB,
+  HF_TOKEN,
+  HF_DATASET,
+  GRANDE_PRESUPUESTO_MB,
+  GRANDE_MIN_MB,
+  GRANDE_MAX_MB,
   cloudinary,
   nubeLista
 };
