@@ -133,7 +133,9 @@
       if (pedido || (d && d.empezo)) return;
       pedido = requestAnimationFrame(() => { pedido = 0; dibujar(false); });
     }
-    window.addEventListener('scroll', alDesplazar, { passive: true });
+    // En la fase de captura llegan tanto el desplazamiento de la página como el de la caja que
+    // tiene la lista adentro (ese no sube hasta window: sin esto, al bajar quedaba vacía).
+    document.addEventListener('scroll', alDesplazar, { passive: true, capture: true });
     window.addEventListener('resize', () => { if (!(d && d.empezo)) { paso = 0; dibujar(true); } }, { passive: true });
     // Al aparecer (pestaña que estaba escondida) recién se puede medir
     if (window.ResizeObserver) {
