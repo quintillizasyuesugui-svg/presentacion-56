@@ -58,7 +58,7 @@ test('control.html: LW_FONTS tiene exactamente las mismas keys, en el mismo orde
   assert.deepEqual(keys, FRASE_FONTS);
 });
 
-test('avanzado.html: FRASE_FONTS (editor) coincide con la lista que valida server.js', () => {
+test('avanzado.html: FRASE_FONTS (editor) coincide con la lista que valida servidor/validadores-frase.js', () => {
   const keys = extractArrayKeys(readFile('avanzado.html'), 'FRASE_FONTS');
   assert.deepEqual(keys, FRASE_FONTS);
 });
@@ -68,7 +68,7 @@ test('pantalla.html: FRASE_FONT_FAMILIES tiene una entrada por cada tipo de letr
   assert.deepEqual(keys, FRASE_FONTS);
 });
 
-test('avanzado.html: FRASE_EFFECTS (editor) coincide con la lista que valida server.js', () => {
+test('avanzado.html: FRASE_EFFECTS (editor) coincide con la lista que valida servidor/validadores-frase.js', () => {
   const keys = extractArrayKeys(readFile('avanzado.html'), 'FRASE_EFFECTS');
   assert.deepEqual(keys, FRASE_EFFECTS);
 });

@@ -1,18 +1,48 @@
 # Conexiones - Presentación Interactiva
 
+Presentaciones que se manejan desde el celular: la PC (o el proyector) muestra y el celular controla.
+
+## 📑 Índice
+
+**Para usar Conexiones**
+- [⬇️ Descargar las apps](#descargar-las-apps)
+- [🎬 Qué hace](#que-hace)
+- [🎤 Órdenes por voz](#ordenes-por-voz)
+- [🎵 Música y videos](#musica-y-videos)
+- [🌐 Página web como diapositiva](#pagina-web-como-diapositiva)
+- [📄 Subir documento (Modo avanzado)](#subir-documento-modo-avanzado)
+- [📲 Apps de PC y celular](#apps-de-pc-y-celular)
+
+**Técnico (servidor, Render y seguridad)**
+- [📁 Estructura](#estructura)
+- [🧪 Probar en la PC](#probar-en-la-pc)
+- [🖥️ Despliegue en Render.com](#despliegue-en-rendercom)
+- [☁️ Imágenes permanentes con Cloudinary](#imagenes-permanentes-con-cloudinary)
+- [🗄️ Base de datos (recomendada)](#base-de-datos-recomendada)
+- [🔒 PIN por persona](#pin-por-persona)
+- [🎟️ Invitación de clase y porteros (muchas escuelas a la vez)](#invitacion-de-clase-y-porteros-muchas-escuelas-a-la-vez)
+- [🛡️ Los 4 guardianes (`servidor/guardian.js`)](#los-4-guardianes-servidorguardianjs)
+- [📱 Features](#features)
+
+<a id="descargar-las-apps"></a>
+
 ## ⬇️ Descargar las apps
 Apretá el enlace y se descarga:
 
 - 🖥️ **PC (Windows):** [Apretá acá para descargar Conexiones Pantalla](https://github.com/quintillizasyuesugui-svg/presentacion-56/releases/download/apps-1.0.0/Conexiones-Pantalla-Instalador-1.4.2.exe) — instalador, 105 MB
 - 📱 **Celular (Android):** [Apretá acá para descargar Conexiones Control](https://presentacion-56.onrender.com/descargas/conexiones-control.apk) — APK, 33 KB (siempre la última versión)
 
-## 🎬 Demo
+<a id="que-hace"></a>
+
+## 🎬 Qué hace
 Controla diapositivas en tiempo real:
 - **Pantalla** (`/pantalla.html`): Muestra imágenes
 - **Control** (`/control.html`): Botones anterior/mostrar/siguiente/fullscreen/voz
 - **Gestionar imágenes** (`/gestionar.html`, antes `/manage.html` — el enlace viejo sigue funcionando): Subir, ordenar y borrar diapositivas desde el celular. «☑️ Seleccionar» pone una casilla en cada imagen para marcar varias (o «Marcar todas») y eliminarlas juntas; pregunta antes de borrar. Al eliminar, el tacho abre la tapa y de cada imagen sale la hoja, se arruga en un bollo de papel y cae adentro (con «reducir movimiento» en el celular, sólo se desvanecen)
 - **Modo avanzado** (`/avanzado.html`): tamaño y posición, unir imágenes, subir documento, frase final y avance automático
 - **Música y videos** (`/multimedia.html`, pestañas en Gestionar): subir canciones y videos o guardar enlaces de YouTube, y manejarlos desde el celular mientras presentás
+
+<a id="ordenes-por-voz"></a>
 
 ## 🎤 Órdenes por voz
 En el control, «🎤 Voz» deja manejar la presentación hablando. Qué quiso decir cada frase lo
@@ -49,6 +79,8 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   nombrar el volumen, la música o el video, así no obedece a quien está explicando algo.
 - El control muestra lo que oyó y lo que hizo; si no entendió una frase corta, lo dice.
 - En el navegador escucha Chrome; en la app, el reconocedor del celular.
+
+<a id="musica-y-videos"></a>
 
 ## 🎵 Música y videos
 - **Subir** (`/subir-multimedia.html`, botón «➕ Subir» en Gestionar → 🎵 Música o 🎬 Videos). Música MP3/M4A/OGG/WAV hasta 15 MB; video
@@ -92,6 +124,8 @@ decide `publico/scripts/ordenes-voz.js` (probado con frases de ejemplo en
   registradas, entre `ESPACIO_MIN_MB` (100) y `ESPACIO_MAX_MB` (2000). Con pocas personas cada
   una tiene más; con muchas, menos. El admin puede fijarle un espacio propio a alguien.
 - Al borrar una cuenta se borran también su música y sus videos.
+
+<a id="pagina-web-como-diapositiva"></a>
 
 ## 🌐 Página web como diapositiva
 
@@ -188,18 +222,33 @@ Lo que se toca en el espejo pasa también en la pantalla.
 - El servidor nunca abre la página: sólo guarda la dirección (`servidor/validadores-pagina.js`).
   El recuadro de la pantalla no puede abrir ventanas ni sacarla de Conexiones.
 
-## 🛡️ Los 4 guardianes (`servidor/guardian.js`)
-Para que con muchos usuarios no se atore el servidor gratis:
-- **👤 Usuarios**: nadie acapara (máximo de subidas en curso por persona, turnos justos) y
-  cuenta quién está conectado.
-- **👷 Tareas**: «empleados» que suben imágenes (también las páginas de PDF y documentos),
-  música y videos en paralelo. Si crece la fila contrata más (hasta un máximo) y después
-  vuelven al mínimo. El próximo turno es para quien menos tareas tiene en curso.
-- **📦 Almacenamiento**: reparte el espacio, cuida el cupo por hora de Cloudinary
-  (`CUPO_NUBE_POR_HORA`, 400) y explica por qué cuando a alguien no le alcanza.
-- **📺 Pantallas**: la música y los videos de cada persona van sólo a su pantalla y frena a
-  quien manda más de 30 mensajes por segundo.
-Trabajan solos en el servidor; ya no se muestran en el celular.
+<a id="subir-documento-modo-avanzado"></a>
+
+## 📄 Subir documento (Modo avanzado)
+
+Subí un **PDF, Word, Excel o PowerPoint** y cada página se convierte en una diapositiva:
+
+1. Tocá «Subir documento» y elegí uno o varios archivos (hasta 25 MB cada uno).
+2. El servidor detecta las páginas («Detecté 5 páginas») y muestra las miniaturas en una fila:
+   se desliza con el dedo o con las flechas ◀ ▶. Tocá una página para verla en grande
+   (con ◀ Anterior / Siguiente ▶ y «Volver»); el círculo ✓ la marca o la quita.
+   Nada se agrega al show hasta tocar «Subir».
+3. Elegí la calidad (Liviana / Normal / Alta, en WebP) y si recortar los márgenes blancos.
+4. «Subir»: el progreso se ve en vivo. **Podés salir o recargar la página**: el servidor sigue
+   trabajando y, al volver, la barra continúa donde iba. En Control y Gestionar aparece un aviso
+   con el avance. Al terminar dice cuánto pesa (por ejemplo «0,5 MB; el documento pesaba 0,9 MB, −45 %»).
+
+- Cada persona ve y maneja sólo sus documentos; el admin (`ADMIN_PIN`) ve los de todos.
+- Los documentos se procesan de a uno para no pasar la memoria de Render; si hay varios, los
+  demás esperan con «Esperando turno».
+- Los PDF funcionan en cualquier servidor. **Word, Excel y PowerPoint necesitan LibreOffice**:
+  en Render hay que usar el servicio con **Docker** (`despliegue/Dockerfile` ya lo instala, con fuentes
+  compatibles con las de Office). Sin LibreOffice, la app avisa «Guardalo como PDF y subilo».
+- Si Render reinicia el servidor mientras procesa, **el trabajo no se pierde**: al volver a arrancar
+  sigue desde la página donde iba (las ya subidas no se repiten). Para eso, en Render hace falta la
+  base de datos (`DATABASE_URL`); sin ella el estado queda en el disco, que Render borra al reiniciar.
+
+<a id="apps-de-pc-y-celular"></a>
 
 ## 📲 Apps de PC y celular
 - **Conexiones Pantalla** (`aplicacion-pantalla/`, Windows): abre `pantalla.html` de Render en
@@ -242,29 +291,9 @@ Trabajan solos en el servidor; ya no se muestran en el celular.
   de firma). Si no está, el APK se descarga solo y sólo hay que tocar «Instalar» (Android no deja
   instalar sin ese toque). En iPhone (o fuera de Render) va a `control.html`.
 
-## 📄 Subir documento (Modo avanzado)
+---
 
-Subí un **PDF, Word, Excel o PowerPoint** y cada página se convierte en una diapositiva:
-
-1. Tocá «Subir documento» y elegí uno o varios archivos (hasta 25 MB cada uno).
-2. El servidor detecta las páginas («Detecté 5 páginas») y muestra las miniaturas en una fila:
-   se desliza con el dedo o con las flechas ◀ ▶. Tocá una página para verla en grande
-   (con ◀ Anterior / Siguiente ▶ y «Volver»); el círculo ✓ la marca o la quita.
-   Nada se agrega al show hasta tocar «Subir».
-3. Elegí la calidad (Liviana / Normal / Alta, en WebP) y si recortar los márgenes blancos.
-4. «Subir»: el progreso se ve en vivo. **Podés salir o recargar la página**: el servidor sigue
-   trabajando y, al volver, la barra continúa donde iba. En Control y Gestionar aparece un aviso
-   con el avance. Al terminar dice cuánto pesa (por ejemplo «0,5 MB; el documento pesaba 0,9 MB, −45 %»).
-
-- Cada persona ve y maneja sólo sus documentos; el admin (`ADMIN_PIN`) ve los de todos.
-- Los documentos se procesan de a uno para no pasar la memoria de Render; si hay varios, los
-  demás esperan con «Esperando turno».
-- Los PDF funcionan en cualquier servidor. **Word, Excel y PowerPoint necesitan LibreOffice**:
-  en Render hay que usar el servicio con **Docker** (el `Dockerfile` ya lo instala, con fuentes
-  compatibles con las de Office). Sin LibreOffice, la app avisa «Guardalo como PDF y subilo».
-- Si Render reinicia el servidor mientras procesa, **el trabajo no se pierde**: al volver a arrancar
-  sigue desde la página donde iba (las ya subidas no se repiten). Para eso, en Render hace falta la
-  base de datos (`DATABASE_URL`); sin ella el estado queda en el disco, que Render borra al reiniciar.
+<a id="estructura"></a>
 
 ## 📁 Estructura
 
@@ -286,6 +315,7 @@ servidor/                 Todo lo que corre en el servidor (Node)
   sockets.js              Tiempo real entre el control y la pantalla
   validadores-frase.js    Listas de letras/efectos y validación de textos
   multimedia.js           Música y videos: subir (firma de Cloudinary), YouTube, borrar, orden y espacio
+  almacen-grande.js       Videos de más de 100 MB en el dataset privado de Hugging Face
   validadores-medios.js   Validación de las órdenes de música/video y del estado de la pantalla
   guardian.js             Los 4 guardianes: filas con empleados, turnos, espacio y mensajes de más
 publico/                  Lo único que ve el navegador
@@ -303,13 +333,34 @@ datos/                    Lo que genera la app (no va a git): orden-imagenes.jso
                           frases-finales.json, avance-automatico.json
 aplicacion-pantalla/      App de Windows (Electron) que abre la pantalla de Render
 aplicacion-celular/       App de Android que abre el control de Render
+entrenamiento-filo/       Frases y entrenamiento del modelo chico de Filo
 pruebas/                  Pruebas automáticas (npm test) y prueba de carga (npm run carga)
-Dockerfile                Imagen para Render con LibreOffice (Word/Excel/PowerPoint)
-server.js                 Sólo compatibilidad: si Render arranca con «node server.js», llama a servidor/
+despliegue/               Lo de Render: Dockerfile (con LibreOffice para Word/Excel/PowerPoint),
+                          Dockerfile.dockerignore y ejemplo.env (las variables, sin valores)
+README.md, package.json, package-lock.json, .gitignore   Lo único suelto en la raíz
 ```
 
 Antes todo estaba suelto en la raíz y el servidor publicaba la carpeta entera,
 incluido `people.json` con los PIN de todos; ahora sólo se publica `publico/`.
+
+<a id="probar-en-la-pc"></a>
+
+## 🧪 Probar en la PC
+```bash
+npm install
+npm start
+```
+- http://localhost:3000/pantalla.html
+- http://localhost:3000/control.html
+- http://localhost:3000/gestionar.html
+- Para probar música y videos sin Cloudinary: `DOCUMENTOS_SIN_NUBE_LOCAL=1 npm start`
+  (se guardan en `publico/multimedia/`)
+- `npm test` corre las pruebas de `pruebas/`
+- `npm run carga -- http://localhost:3000 400 20` simula 400 personas y 20 documentos a la vez
+  (crea cuentas de prueba: no usarlo contra Render sin borrarlas después)
+- Para probar con Postgres sin instalar nada: `DATABASE_URL=pglite:./datos/pg` (sólo en la PC)
+
+<a id="despliegue-en-rendercom"></a>
 
 ## 🖥️ Despliegue en Render.com
 
@@ -326,16 +377,18 @@ incluido `people.json` con los PIN de todos; ahora sólo se publica `publico/`.
 2. **Render.com**:
    - Crea cuenta en [render.com](https://render.com)
    - New → Web Service → Connect GitHub repo
-   - **Runtime**: Node
-   - **Build**: `npm install`
-   - **Start**: `npm start` (auto from package.json)
-   - Agregá las variables de entorno de Cloudinary (ver abajo)
+   - **Runtime**: Docker
+   - **Dockerfile Path**: `./despliegue/Dockerfile` (el contexto queda en la raíz: `.`)
+   - Agregá las variables de entorno (las de Cloudinary, ver abajo; la lista completa está en
+     `despliegue/ejemplo.env`)
    - Deploy! URL: `https://tu-app.onrender.com`
 
 3. **Uso**:
    - Abre `/pantalla.html` en proyector/TV
    - Abre `/control.html` en celular (misma red)
    - ¡Controla las imágenes!
+
+<a id="imagenes-permanentes-con-cloudinary"></a>
 
 ## ☁️ Imágenes permanentes con Cloudinary
 
@@ -347,11 +400,13 @@ perderse — por eso ese servidor usa [Cloudinary](https://cloudinary.com)
 
 1. Creá una cuenta gratis en [cloudinary.com](https://cloudinary.com).
 2. En el Dashboard, copiá **Cloud name**, **API Key** y **API Secret**.
-3. Local: copiá `.env.example` a `.env` y completá esos tres valores.
+3. Local: copiá `despliegue/ejemplo.env` a `.env` (en la raíz) y completá esos tres valores.
 4. Render: agregá las mismas tres variables en **Environment** del servicio.
 
 Sin estas variables, la pantalla y el control funcionan igual, pero el botón
 de subir imágenes en `/gestionar.html` no va a andar (avisa con un error claro).
+
+<a id="base-de-datos-recomendada"></a>
 
 ## 🗄️ Base de datos (recomendada)
 
@@ -378,6 +433,8 @@ público y se podía bajar la lista de personas).
 
 Es para **un solo servidor** (como Render hoy): si algún día hubiera varios a la vez, cada uno
 tendría su propia copia en memoria.
+
+<a id="pin-por-persona"></a>
 
 ## 🔒 PIN por persona
 
@@ -431,6 +488,8 @@ usuarios a mano:
   automático y sus documentos en proceso. Su nombre queda libre. Nadie más ve esta sección,
   y el servidor rechaza a cualquiera que no sea admin. El nombre «admin» está reservado.
 
+<a id="invitacion-de-clase-y-porteros-muchas-escuelas-a-la-vez"></a>
+
 ## 🎟️ Invitación de clase y porteros (muchas escuelas a la vez)
 
 - **Registro rápido (invitación de clase):** al iniciar sesión en la pantalla, una banda dorada
@@ -458,20 +517,22 @@ usuarios a mano:
   Para `npm run carga` (400 registros desde una sola PC) hay que subir los de registro mientras
   dure la prueba.
 
-## 🧪 Local
-```bash
-npm install
-npm start
-```
-- http://localhost:3000/pantalla.html
-- http://localhost:3000/control.html
-- http://localhost:3000/gestionar.html
-- Para probar música y videos sin Cloudinary: `DOCUMENTOS_SIN_NUBE_LOCAL=1 npm start`
-  (se guardan en `publico/multimedia/`)
-- `npm test` corre las pruebas de `pruebas/`
-- `npm run carga -- http://localhost:3000 400 20` simula 400 personas y 20 documentos a la vez
-  (crea cuentas de prueba: no usarlo contra Render sin borrarlas después)
-- Para probar con Postgres sin instalar nada: `DATABASE_URL=pglite:./datos/pg` (sólo en la PC)
+<a id="los-4-guardianes-servidorguardianjs"></a>
+
+## 🛡️ Los 4 guardianes (`servidor/guardian.js`)
+Para que con muchos usuarios no se atore el servidor gratis:
+- **👤 Usuarios**: nadie acapara (máximo de subidas en curso por persona, turnos justos) y
+  cuenta quién está conectado.
+- **👷 Tareas**: «empleados» que suben imágenes (también las páginas de PDF y documentos),
+  música y videos en paralelo. Si crece la fila contrata más (hasta un máximo) y después
+  vuelven al mínimo. El próximo turno es para quien menos tareas tiene en curso.
+- **📦 Almacenamiento**: reparte el espacio, cuida el cupo por hora de Cloudinary
+  (`CUPO_NUBE_POR_HORA`, 400) y explica por qué cuando a alguien no le alcanza.
+- **📺 Pantallas**: la música y los videos de cada persona van sólo a su pantalla y frena a
+  quien manda más de 30 mensajes por segundo.
+Trabajan solos en el servidor; ya no se muestran en el celular.
+
+<a id="features"></a>
 
 ## 📱 Features
 - Socket.IO real-time

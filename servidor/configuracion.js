@@ -56,7 +56,7 @@ if (nubeLista) {
     api_secret: process.env.CLOUDINARY_API_SECRET
   });
 } else {
-  console.warn('⚠️  Cloudinary no configurado — las imágenes subidas desde /gestionar.html sólo quedarán en este disco (se pierden en Render al redeployar). Ver .env.example.');
+  console.warn('⚠️  Cloudinary no configurado — las imágenes subidas desde /gestionar.html sólo quedarán en este disco (se pierden en Render al redeployar). Ver despliegue/ejemplo.env.');
 }
 
 module.exports = {

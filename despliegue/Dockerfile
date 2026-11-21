@@ -1,4 +1,5 @@
-# Imagen para Render (tipo de servicio: Docker). Incluye LibreOffice para convertir
+# Imagen para Render (tipo de servicio: Docker; en Render, «Dockerfile Path» = ./despliegue/Dockerfile
+# y el contexto es la raíz del repo, por eso los COPY usan rutas desde la raíz). Incluye LibreOffice para convertir
 # Word, Excel y PowerPoint a PDF en «Subir documento» (Modo avanzado).
 FROM node:22-bookworm-slim
 

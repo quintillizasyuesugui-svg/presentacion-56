@@ -21,7 +21,7 @@ const crypto = require('crypto');
 // No tiene archivo ni foto en Cloudinary; la pantalla la muestra en un recuadro.
 const PAGINAS_POR_PERSONA = 30;
 
-const ERROR_SIN_NUBE = 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá .env.example.';
+const ERROR_SIN_NUBE = 'Cloudinary no está configurado en el servidor (faltan variables de entorno). Revisá despliegue/ejemplo.env.';
 
 async function imagenesDeLaCarpeta() {
   let archivos;

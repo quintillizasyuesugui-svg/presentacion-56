@@ -364,28 +364,29 @@
     }
   };
 
-  // ---- Red neuronal esférica 3D (pantalla de espera) ----
-  // Los nodos viven en coordenadas (x,y,z) reales sobre una esfera y se rotan
-  // con matemática 3D de verdad cada cuadro; se proyectan a 2D con perspectiva
-  // (más cerca de "cámara" = más grande y brillante) y se dibujan de atrás
-  // hacia adelante para que se tapen entre sí de forma correcta.
+  // ---- Red neuronal esférica 3D con anillo (pantalla de espera) ----
+  // Los nodos viven en coordenadas (x,y,z) reales sobre una esfera y se rotan con matemática 3D
+  // cada cuadro; se proyectan con perspectiva y se dibujan de atrás hacia adelante.
+  // - Los de adelante brillan con un halo; las señales viajan entre nodos con una estela corta y
+  //   el nodo que la recibe destella.
+  // - La esfera respira suave, un anillo de partículas gira inclinado (la mitad de atrás queda
+  //   tapada por la esfera) y hay estrellas quietas en el fondo.
+  // - Con el mouse, la esfera se inclina un poco hacia él.
+  // - Con «reducir movimiento» queda quieta. Se detiene al arrancar la presentación y vuelve a
+  //   girar si la pantalla de espera aparece de nuevo.
   function initBrainSphere() {
     const canvas = document.getElementById('brainSphere');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-
-    const SIZE = 200; // tamaño lógico en px — el CSS puede achicarlo, la nitidez la da el dpr
+    const SIZE = 260; // tamaño lógico en px — el CSS puede achicarlo, la nitidez la da el dpr
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = SIZE * dpr;
     canvas.height = SIZE * dpr;
     ctx.scale(dpr, dpr);
 
-    const COUNT = 68; // más "neuronas" — red más densa
-    const AXIAL_TILT = -0.4; // inclinación fija del eje, look "planeta"
+    const COUNT = 110;
     const nodes = [];
-
-    // Distribución pareja de puntos sobre una esfera unitaria (esfera de Fibonacci)
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // esfera de Fibonacci: puntos parejos
     for (let i = 0; i < COUNT; i++) {
       const y = 1 - (i / (COUNT - 1)) * 2;
       const r = Math.sqrt(Math.max(0, 1 - y * y));
@@ -393,144 +394,199 @@
       nodes.push({ x: Math.cos(theta) * r, y, z: Math.sin(theta) * r, activity: 0 });
     }
 
-    function dist3(a, b) {
-      return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-    }
-
-    // Cada nodo se conecta con sus 3 vecinos más cercanos en el espacio 3D — malla más rica
+    // Cada nodo se conecta con sus 3 vecinos más cercanos
     const edges = [];
-    nodes.forEach((n, i) => {
-      const nearest = nodes
-        .map((m, j) => ({ j, d: i === j ? Infinity : dist3(n, m) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 3);
-      nearest.forEach(({ j }) => {
-        const key = [i, j].sort((a, b) => a - b).join('-');
-        if (!edges.some(e => e.key === key)) edges.push({ key, a: i, b: j });
-      });
+    const vistos = new Set();
+    nodes.forEach((a, i) => {
+      nodes.map((b, j) => ({ j, d: i === j ? Infinity : Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) }))
+        .sort((p, q) => p.d - q.d).slice(0, 3)
+        .forEach(({ j }) => {
+          const key = i < j ? i + '-' + j : j + '-' + i;
+          if (!vistos.has(key)) { vistos.add(key); edges.push([i, j]); }
+        });
     });
 
-    // "Pensamiento": pulsos de señal que viajan entre nodos conectados y hacen
-    // destellar al nodo que los recibe — como sinapsis disparando al azar.
+    // Partículas del anillo: ángulo, distancia y tamaño al azar
+    const ring = Array.from({ length: 220 }, (_, i) => ({
+      a: (i / 220) * Math.PI * 2 + Math.random() * 0.03, r: Math.random(), s: Math.random()
+    }));
+
     const pulses = [];
     let nextPulseAt = 0;
-
-    function spawnPulse(now) {
-      const edge = edges[Math.floor(Math.random() * edges.length)];
-      const forward = Math.random() < 0.5;
-      pulses.push({
-        from: forward ? edge.a : edge.b,
-        to: forward ? edge.b : edge.a,
-        start: now,
-        duration: 450 + Math.random() * 350
-      });
-      nextPulseAt = now + 30 + Math.random() * 90; // más seguido = se ve "pensando" más rápido
-    }
+    const ESTELA = 0.35;
+    const raton = { x: 0, y: 0, ax: 0, ay: 0 };
+    window.addEventListener('pointermove', (e) => {
+      raton.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      raton.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    }, { passive: true });
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const R = SIZE * 0.36;
-    const CX = SIZE / 2;
-    const CY = SIZE / 2;
+    const C = SIZE / 2;
     const PERSPECTIVE = 2.5;
+    const entre = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
 
     function render(now, animated) {
-      const angle = animated ? (now / 1000) * 0.35 : 0.6;
-      const cosA = Math.cos(angle), sinA = Math.sin(angle);
-      const cosT = Math.cos(AXIAL_TILT), sinT = Math.sin(AXIAL_TILT);
-
-      // Rota en Y (giro del "planeta") y aplica una inclinación fija en X
-      const rotated = nodes.map(n => {
-        const x = n.x * cosA - n.z * sinA;
-        const zSpin = n.x * sinA + n.z * cosA;
-        const y = n.y * cosT - zSpin * sinT;
-        const z = n.y * sinT + zSpin * cosT;
-        return { x, y, z };
-      });
-
-      const screen = rotated.map(p => {
-        const scale = PERSPECTIVE / (PERSPECTIVE - p.z);
-        return { x: CX + p.x * R * scale, y: CY + p.y * R * scale, z: p.z, scale };
-      });
+      raton.ax += (raton.y * 0.25 - raton.ax) * 0.05;
+      raton.ay += (raton.x * 0.35 - raton.ay) * 0.05;
+      const giro = (animated ? (now / 1000) * 0.35 : 0.6) + raton.ay;
+      const tilt = -0.4 + raton.ax;
+      const cA = Math.cos(giro), sA = Math.sin(giro), cT = Math.cos(tilt), sT = Math.sin(tilt);
+      const rotar = (n) => {
+        const x = n.x * cA - n.z * sA, zs = n.x * sA + n.z * cA;
+        return { x, y: n.y * cT - zs * sT, z: n.y * sT + zs * cT };
+      };
+      const R = SIZE * 0.34 * (animated ? 1 + Math.sin(now / 1600) * 0.025 : 1);
+      const proy = (p) => {
+        const s = PERSPECTIVE / (PERSPECTIVE - p.z);
+        return { x: C + p.x * R * s, y: C + p.y * R * s, z: p.z, s };
+      };
+      const screen = nodes.map(n => proy(rotar(n)));
 
       if (animated) {
-        // Dispara pulsos de señal al azar entre nodos conectados
-        if (now >= nextPulseAt) spawnPulse(now);
-
-        for (let i = pulses.length - 1; i >= 0; i--) {
-          const pulse = pulses[i];
-          const t = (now - pulse.start) / pulse.duration;
-          if (t >= 1) {
-            nodes[pulse.to].activity = 1; // el nodo receptor "se enciende"
-            pulses.splice(i, 1);
+        if (now >= nextPulseAt) {
+          const [i, j] = edges[Math.floor(Math.random() * edges.length)];
+          const ida = Math.random() < 0.5;
+          pulses.push({ from: ida ? i : j, to: ida ? j : i, start: now, duration: 450 + Math.random() * 400 });
+          nextPulseAt = now + 60 + Math.random() * 100;
+        }
+        for (let k = pulses.length - 1; k >= 0; k--) {
+          if ((now - pulses[k].start) / pulses[k].duration >= 1) {
+            nodes[pulses[k].to].activity = 1; // el nodo que la recibe destella
+            pulses.splice(k, 1);
           }
         }
-        nodes.forEach(n => { n.activity *= 0.9; }); // decae hasta el próximo pulso
+        nodes.forEach(n => { n.activity *= 0.92; });
       }
 
       ctx.clearRect(0, 0, SIZE, SIZE);
 
-      // Silueta de la esfera, apenas visible
+      // Resplandor de fondo
+      const fondo = ctx.createRadialGradient(C, C, R * 0.2, C, C, R * 1.35);
+      fondo.addColorStop(0, 'rgba(23,182,234,0.16)');
+      fondo.addColorStop(1, 'rgba(23,182,234,0)');
+      ctx.fillStyle = fondo;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+
+      // Anillo: elipse inclinada; z < 0 es la mitad de atrás (se dibuja antes que la esfera)
+      const ringPts = ring.map(p => {
+        const a = p.a + (animated ? (now / 1000) * (0.22 + p.s * 0.08) : 0);
+        const rr = R * (1.18 + p.r * 0.2);
+        const ex = Math.cos(a) * rr, ey = Math.sin(a) * rr * 0.26, inc = -0.32;
+        return { x: C + ex * Math.cos(inc) - ey * Math.sin(inc), y: C + ex * Math.sin(inc) + ey * Math.cos(inc), z: Math.sin(a), s: p.s };
+      });
+      const pintarAnillo = (atras) => ringPts.forEach(p => {
+        if ((p.z < 0) !== atras) return;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(150,225,255,${(atras ? 0.25 : 0.8) * (0.5 + p.s * 0.5)})`;
+        ctx.arc(p.x, p.y, 0.8 + p.s * 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      pintarAnillo(true);
+
+      // Silueta de la esfera
       ctx.beginPath();
-      ctx.arc(CX, CY, R, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(23, 182, 234, 0.15)';
+      ctx.arc(C, C, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(23,182,234,0.22)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Conexiones — más tenues cuanto más lejos de "cámara"
-      edges.forEach(e => {
-        const a = screen[e.a], b = screen[e.b];
+      // Conexiones — más tenues y finas cuanto más lejos de la "cámara"
+      edges.forEach(([i, j]) => {
+        const a = screen[i], b = screen[j];
         const depth = ((a.z + b.z) / 2 + 1) / 2; // 0 = atrás, 1 = adelante
         ctx.beginPath();
-        ctx.strokeStyle = `rgba(52, 205, 250, ${0.06 + depth * 0.35})`;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = `rgba(52,205,250,${0.04 + depth * depth * 0.5})`;
+        ctx.lineWidth = 0.6 + depth * 0.7;
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
       });
 
-      // Nodos, dibujados de atrás hacia adelante para que se superpongan bien
-      const order = screen.map((_, i) => i).sort((i, j) => screen[i].z - screen[j].z);
-      order.forEach(i => {
+      // Nodos de atrás hacia adelante; los de adelante con halo
+      screen.map((_, i) => i).sort((i, j) => screen[i].z - screen[j].z).forEach(i => {
         const p = screen[i];
-        const activity = nodes[i].activity;
+        const act = nodes[i].activity;
         const depth = (p.z + 1) / 2;
-        const radius = Math.max(0.9, 2.6 * p.scale) * (1 + activity * 0.7);
-        const opacity = Math.min(1, 0.35 + depth * 0.65 + activity * 0.5);
+        const radius = Math.max(0.8, 2.1 * p.s) * (1 + act * 0.8);
+        const opacity = Math.min(1, 0.3 + depth * 0.7 + act * 0.5);
+        if (depth > 0.55) {
+          const rh = radius * (3.2 + act * 3);
+          const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rh);
+          halo.addColorStop(0, `rgba(23,182,234,${(0.18 + act * 0.45) * depth})`);
+          halo.addColorStop(1, 'rgba(23,182,234,0)');
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, rh, 0, Math.PI * 2);
+          ctx.fill();
+        }
         const grad = ctx.createRadialGradient(p.x - radius * 0.3, p.y - radius * 0.3, 0, p.x, p.y, radius);
-        grad.addColorStop(0, `rgba(201, 247, 255, ${opacity})`);
-        grad.addColorStop(1, `rgba(23, 182, 234, ${opacity * 0.85})`);
+        grad.addColorStop(0, `rgba(201,247,255,${opacity})`);
+        grad.addColorStop(1, `rgba(23,182,234,${opacity * 0.85})`);
         ctx.beginPath();
         ctx.fillStyle = grad;
         ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // Pulsos viajando por sus conexiones — el "pensamiento" en tránsito
+      // Señales en camino, con estela
       if (animated) {
         pulses.forEach(pulse => {
           const t = Math.min(1, (now - pulse.start) / pulse.duration);
-          const a = screen[pulse.from], b = screen[pulse.to];
-          const x = a.x + (b.x - a.x) * t;
-          const y = a.y + (b.y - a.y) * t;
-          ctx.beginPath();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.arc(x, y, 1.8, 0, Math.PI * 2);
-          ctx.fill();
+          const a = nodes[pulse.from], b = nodes[pulse.to];
+          for (let k = 8; k >= 0; k--) {
+            const q = proy(rotar(entre(a, b, Math.max(0, t - (k / 8) * ESTELA))));
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255,255,255,${(1 - k / 8) * 0.85})`;
+            ctx.arc(q.x, q.y, 2 * (1 - (k / 8) * 0.7), 0, Math.PI * 2);
+            ctx.fill();
+          }
         });
       }
+
+      pintarAnillo(false);
     }
 
+    // Estrellas quietas del fondo
+    const estrellas = document.getElementById('waitingStars');
+    function pintarEstrellas() {
+      if (!estrellas) return;
+      const w = waiting.clientWidth, h = waiting.clientHeight;
+      if (!w || !h) return;
+      estrellas.width = w * dpr;
+      estrellas.height = h * dpr;
+      const ec = estrellas.getContext('2d');
+      ec.scale(dpr, dpr);
+      const cantidad = Math.round(Math.min(220, (w * h) / 6500));
+      for (let i = 0; i < cantidad; i++) {
+        ec.beginPath();
+        ec.fillStyle = `rgba(200,235,255,${0.15 + Math.random() * 0.5})`;
+        ec.arc(Math.random() * w, Math.random() * h, Math.random() * 1.2 + 0.2, 0, Math.PI * 2);
+        ec.fill();
+      }
+    }
+    pintarEstrellas();
+    let reloj = 0;
+    window.addEventListener('resize', () => { clearTimeout(reloj); reloj = setTimeout(pintarEstrellas, 200); }, { passive: true });
+
     if (reduceMotion) {
-      render(0, false); // ángulo fijo, sin loop de animación
+      render(0, false); // ángulo fijo, sin animación
       return;
     }
 
+    let girando = false;
     function loop(ts) {
-      if (waiting.classList.contains('hide')) return; // se detiene solo al arrancar la presentación
+      if (waiting.classList.contains('hide')) { girando = false; return; } // se detiene al arrancar la presentación
       render(ts, true);
       requestAnimationFrame(loop);
     }
-    requestAnimationFrame(loop);
+    function arrancar() {
+      if (girando || waiting.classList.contains('hide')) return;
+      girando = true;
+      requestAnimationFrame(loop);
+    }
+    // Si la pantalla de espera vuelve (cerrar sesión), la esfera vuelve a girar
+    new MutationObserver(arrancar).observe(waiting, { attributes: true, attributeFilter: ['class'] });
+    arrancar();
   }
   initBrainSphere();
 

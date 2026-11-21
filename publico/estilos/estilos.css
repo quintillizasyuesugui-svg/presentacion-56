@@ -267,9 +267,21 @@ body.pantalla {
    El giro real (rotación + perspectiva) se calcula en JS cuadro a cuadro;
    acá solo va el tamaño y el brillo del canvas. */
 .brain-sphere {
-  width: min(52vw, 190px);
-  height: min(52vw, 190px);
+  position: relative;
+  flex: none;
+  width: min(62vw, 26vh, 260px);
+  height: min(62vw, 26vh, 260px);
   filter: drop-shadow(0 0 22px rgba(23, 182, 234, 0.55));
+}
+
+.waiting > :not(.waiting-estrellas) { position: relative; }
+/* Estrellas quietas detrás de todo (las pinta pantalla.js) */
+.waiting-estrellas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .waiting h1 {
